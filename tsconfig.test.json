@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM"],
+    "jsx": "react-jsx",
+    "types": ["node", "vitest/globals"],
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": [
+    "tests/**/*.ts",
+    "electron/**/*.ts",
+    "renderer/**/*.ts",
+    "renderer/**/*.tsx",
+    "drizzle.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ],
+  "exclude": ["node_modules", "dist", "dist-electron"]
+}

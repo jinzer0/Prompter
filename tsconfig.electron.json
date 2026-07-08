@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "rootDir": "electron",
+    "noEmit": true
+  },
+  "include": ["electron/**/*.ts"],
+  "exclude": ["node_modules", "dist", "dist-electron"]
+}

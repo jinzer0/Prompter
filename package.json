@@ -1,0 +1,50 @@
+{
+  "name": "prompter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c cyan,green \"vite --host 127.0.0.1\" \"wait-on tcp:5173 && npm run native:electron && npm run build:electron && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
+    "build": "npm run typecheck && npm run native:electron && npm run build:electron && vite build",
+    "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --outdir=dist-electron --out-extension:.js=.cjs --external:electron --external:better-sqlite3 --sourcemap",
+    "db:generate": "drizzle-kit generate",
+    "native:electron": "electron-rebuild -f -w better-sqlite3 -v 43.0.0",
+    "native:node": "npm rebuild better-sqlite3",
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.electron.json --noEmit && tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "npm run native:node && vitest run",
+    "test:smoke": "npm run native:electron && playwright test"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwind-merge": "^3.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.2",
+    "@electron/rebuild": "^4.1.0",
+    "@playwright/test": "^1.61.1",
+    "@tailwindcss/vite": "^4.3.2",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^10.0.3",
+    "cross-env": "^10.1.0",
+    "drizzle-kit": "^0.31.10",
+    "electron": "^43.0.0",
+    "esbuild": "^0.28.1",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.3",
+    "vitest": "^4.1.10",
+    "wait-on": "^9.0.10"
+  }
+}

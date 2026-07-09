@@ -2,6 +2,7 @@ import { readdir } from "node:fs/promises"
 import { join } from "node:path"
 
 import type {
+  ExportPromptResult,
   PromptCompilerAnalyzeResult,
   PromptCompilerCompileResult,
 } from "../electron/ipc-types"
@@ -73,6 +74,12 @@ export const promptCompilerCompileFixture: PromptCompilerCompileResult = {
     qualityScore: 80,
     warnings: [],
   },
+}
+const exportPromptResultFixture: ExportPromptResult = {
+  format: "markdown",
+  filename: "prompt-export.md",
+  content: "# Prompt Export",
+  mimeType: "text/markdown",
 }
 
 export function createFailingServices(onServiceCall: () => void) {
@@ -164,6 +171,18 @@ export function createFailingServices(onServiceCall: () => void) {
     },
     async compile() {
       return promptCompilerCompileFixture
+    },
+    formatPromptForExport: () => {
+      onServiceCall()
+      return exportPromptResultFixture
+    },
+    async savePromptToFile() {
+      onServiceCall()
+      return { cancelled: true as const }
+    },
+    async copyText() {
+      onServiceCall()
+      return { copied: true as const }
     },
   }
 }

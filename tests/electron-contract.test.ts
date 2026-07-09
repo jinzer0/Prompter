@@ -7,6 +7,8 @@ import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
 import { createWindowOptions } from "../electron/window-options"
 import { createFailingServices, listFiles, validPromptAssetId } from "./electron-contract-helpers"
 
+// allow: SIZE_OK - central Electron shell contract covers bridge, IPC validation, and renderer boundaries.
+
 const validPromptVersionId = "22222222-2222-4222-8222-222222222222"
 const comparePromptVersionId = "33333333-3333-4333-8333-333333333333"
 const promptAssetResponse = {
@@ -77,11 +79,14 @@ describe("Electron shell contract", () => {
       "ping",
       "projects",
       "prompts",
+      "search",
       "tags",
       "harnessTemplates",
       "settings",
       "secrets",
       "promptCompiler",
+      "exports",
+      "clipboard",
     ])
     expect(Object.keys(bridge.projects)).toEqual(["create", "list", "get", "update", "delete"])
     expect(Object.keys(bridge.prompts)).toEqual([
@@ -105,6 +110,9 @@ describe("Electron shell contract", () => {
       "delete",
       "attachToPrompt",
       "detachFromPrompt",
+      "listForPrompt",
+      "listWithCounts",
+      "createAndAttachToPrompt",
     ])
     expect(Object.keys(bridge.harnessTemplates)).toEqual([
       "create",
@@ -127,6 +135,8 @@ describe("Electron shell contract", () => {
       "deleteOpenAIKey",
     ])
     expect(Object.keys(bridge.promptCompiler)).toEqual(["analyze", "compile"])
+    expect(Object.keys(bridge.exports)).toEqual(["formatPrompt", "savePromptToFile"])
+    expect(Object.keys(bridge.clipboard)).toEqual(["copyText"])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()
   })

@@ -11,6 +11,8 @@ import {
   responseSchemas,
 } from "./ipc-contract.js"
 
+// allow: SIZE_OK - central renderer bridge registry mirrors the typed IPC contract.
+
 export type { ElectronBridge, PingResponse }
 export { PING_CHANNEL, PING_RESPONSE }
 
@@ -250,6 +252,20 @@ export function createElectronBridge(invoke: InvokeIpc): ElectronBridge {
           response.promptCompilerCompile,
           input,
         ),
+    },
+    exports: {
+      formatPrompt: (input) =>
+        request(
+          ch.formatPromptForExport,
+          payload.formatPromptForExport,
+          response.formatPromptForExport,
+          input,
+        ),
+      savePromptToFile: (input) =>
+        request(ch.savePromptToFile, payload.savePromptToFile, response.savePromptToFile, input),
+    },
+    clipboard: {
+      copyText: (input) => request(ch.copyText, payload.copyText, response.copyText, input),
     },
   }
 }

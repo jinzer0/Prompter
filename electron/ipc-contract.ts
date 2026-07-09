@@ -34,6 +34,15 @@ export const COMPILED_PROMPT_REQUIRED_SECTIONS = [
   "# Working Instructions",
   "# Final Response Format",
 ] as const
+export const EXPORT_FORMATS = [
+  "markdown",
+  "codex",
+  "claude_code",
+  "cursor",
+  "generic_agent",
+  "agents_md",
+  "skill_md",
+] as const
 
 export const PERSISTENCE_CHANNELS = {
   createProject: "prompter:projects:create",
@@ -80,6 +89,9 @@ export const PERSISTENCE_CHANNELS = {
   deleteOpenAIKey: "prompter:secrets:openai-key:delete",
   promptCompilerAnalyze: "prompter:prompt-compiler:analyze",
   promptCompilerCompile: "prompter:prompt-compiler:compile",
+  formatPromptForExport: "prompter:exports:format-prompt",
+  savePromptToFile: "prompter:exports:save-prompt-to-file",
+  copyText: "prompter:clipboard:copy-text",
 } as const
 
 export type PingResponse = typeof PING_RESPONSE
@@ -101,6 +113,31 @@ const riskLevelSchema = z.enum(RISK_LEVELS)
 const searchSortSchema = z.enum(SEARCH_SORTS)
 const sortDirectionSchema = z.enum(SORT_DIRECTIONS)
 const promptCompilerErrorCodeSchema = z.enum(PROMPT_COMPILER_ERROR_CODES)
+export const exportFormatSchema = z.enum(EXPORT_FORMATS)
+
+export const exportFormatLabels = {
+  markdown: "Markdown Prompt",
+  codex: "Codex Prompt",
+  claude_code: "Claude Code Prompt",
+  cursor: "Cursor Prompt",
+  generic_agent: "Generic Agent Prompt",
+  agents_md: "AGENTS.md Snippet",
+  skill_md: "SKILL.md Draft",
+} as const satisfies Record<(typeof EXPORT_FORMATS)[number], string>
+
+function jsonArrayOrStringSchema<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((value) => {
+    if (typeof value !== "string") {
+      return value
+    }
+
+    try {
+      return JSON.parse(value)
+    } catch {
+      return value
+    }
+  }, z.array(schema))
+}
 
 export function settingKeyIsPublic(key: string): boolean {
   const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, "")
@@ -217,6 +254,55 @@ export const clarificationAnswerSchema = z.object({
   question: z.string().trim().min(1),
   answer: z.string().trim().min(1),
 })
+export const exportPromptInputSchema = z.object({
+  promptAssetId: idSchema.optional(),
+  promptVersionId: idSchema,
+  title: z.string(),
+  scenario: scenarioSchema,
+  targetAgent: targetAgentSchema,
+  originalInput: requiredTextSchema,
+  compiledPrompt: requiredTextSchema,
+  assumptions: jsonArrayOrStringSchema(z.string().trim().min(1)).optional(),
+  questions: jsonArrayOrStringSchema(clarificationQuestionSchema).optional(),
+  answers: jsonArrayOrStringSchema(clarificationAnswerSchema).optional(),
+  acceptanceCriteria: jsonArrayOrStringSchema(z.string().trim().min(1)).optional(),
+  validationCommands: jsonArrayOrStringSchema(z.string().trim().min(1)).optional(),
+  tags: jsonArrayOrStringSchema(tagSchema).optional(),
+  projectName: z.string().nullable().optional(),
+  qualityScore: z.number().int().min(0).max(100).nullable().optional(),
+  createdAt: timestampSchema.nullable().optional(),
+  updatedAt: timestampSchema.nullable().optional(),
+  format: exportFormatSchema,
+})
+const safeExportFilenameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(160)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._ -]*$/, "filename must be a safe filename")
+  .refine((value) => !value.includes(".."), "filename must not include path traversal")
+export const formatPromptForExportInputSchema = exportPromptInputSchema
+const directSavePromptToFileInputSchema = z.object({
+  content: requiredTextSchema,
+  format: exportFormatSchema,
+  filename: safeExportFilenameSchema.optional(),
+})
+export const savePromptToFileInputSchema = z.union([
+  exportPromptInputSchema.extend({ filename: safeExportFilenameSchema.optional() }),
+  directSavePromptToFileInputSchema,
+])
+export const copyTextInputSchema = z.object({ text: requiredTextSchema })
+export const exportPromptResultSchema = z.object({
+  format: exportFormatSchema,
+  filename: z.string().trim().min(1),
+  content: z.string(),
+  mimeType: z.literal("text/markdown"),
+})
+export const savePromptToFileResultSchema = z.union([
+  z.object({ cancelled: z.literal(true) }),
+  z.object({ cancelled: z.literal(false), filePath: z.string().trim().min(1) }),
+])
+export const copyTextResultSchema = z.object({ copied: z.literal(true) })
 export const promptCompilerAnalyzeOutputSchema = z.object({
   detectedScenario: scenarioSchema,
   detectedTargetAgent: targetAgentSchema,
@@ -437,6 +523,9 @@ export const payloadSchemas = {
   deleteOpenAIKey: noPayloadSchema,
   promptCompilerAnalyze: promptCompilerAnalyzeInputSchema,
   promptCompilerCompile: promptCompilerCompileInputSchema,
+  formatPromptForExport: formatPromptForExportInputSchema,
+  savePromptToFile: savePromptToFileInputSchema,
+  copyText: copyTextInputSchema,
 } as const
 
 export const responseSchemas = {
@@ -484,4 +573,7 @@ export const responseSchemas = {
   deleteOpenAIKey: openAIKeyStatusSchema,
   promptCompilerAnalyze: promptCompilerAnalyzeResultSchema,
   promptCompilerCompile: promptCompilerCompileResultSchema,
+  formatPromptForExport: exportPromptResultSchema,
+  savePromptToFile: savePromptToFileResultSchema,
+  copyText: copyTextResultSchema,
 } as const

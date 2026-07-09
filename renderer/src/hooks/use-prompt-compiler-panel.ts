@@ -223,13 +223,13 @@ export function usePromptCompilerPanel({
   }
 
   async function copyPrompt(): Promise<void> {
-    if (editablePrompt.trim().length === 0 || navigator.clipboard === undefined) {
+    if (editablePrompt.trim().length === 0) {
       setMessage("Compiled prompt is not available to copy")
       return
     }
 
     try {
-      await navigator.clipboard.writeText(editablePrompt)
+      await window.prompter.clipboard.copyText({ text: editablePrompt })
       setMessage("Compiled prompt copied.")
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Compiled prompt could not be copied")

@@ -2,12 +2,16 @@ import type { z } from "zod"
 import type { PingResponse, payloadSchemas } from "./ipc-contract.js"
 import type {
   ComparePromptVersionsResult,
+  CopyTextInput,
+  CopyTextResult,
   CreateHarnessTemplateInput,
   CreateNextPromptVersionResult,
   CreatePromptAssetInput,
   CreatePromptVersionInput,
   CreateTagInput,
   DeleteResult,
+  ExportPromptResult,
+  FormatPromptForExportInput,
   HarnessTemplate,
   OpenAIKeyStatus,
   Project,
@@ -19,6 +23,8 @@ import type {
   PromptCompilerCompileResult,
   PromptVersion,
   SaveOpenAIKeyInput,
+  SavePromptToFileInput,
+  SavePromptToFileResult,
   SearchPromptsResponse,
   Setting,
   SettingsDefaults,
@@ -105,5 +111,12 @@ export type ElectronBridge = {
   readonly promptCompiler: {
     readonly analyze: (input: PromptCompilerAnalyzeInput) => Promise<PromptCompilerAnalyzeResult>
     readonly compile: (input: PromptCompilerCompileInput) => Promise<PromptCompilerCompileResult>
+  }
+  readonly exports: {
+    readonly formatPrompt: (input: FormatPromptForExportInput) => Promise<ExportPromptResult>
+    readonly savePromptToFile: (input: SavePromptToFileInput) => Promise<SavePromptToFileResult>
+  }
+  readonly clipboard: {
+    readonly copyText: (input: CopyTextInput) => Promise<CopyTextResult>
   }
 }

@@ -1,9 +1,14 @@
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { app, BrowserWindow, safeStorage } from "electron"
+import { app, BrowserWindow, clipboard, dialog, safeStorage } from "electron"
 
 import { openPrompterDatabase, type PrompterDatabase } from "./db/connection.js"
 import { registerIpcHandlers } from "./ipc-handlers.js"
 import { createTestPromptCompilerClientFactory } from "./prompt-compiler/test-client.js"
+import {
+  createPromptExportNativeService,
+  type PromptExportNativeDependencies,
+} from "./prompt-export-native.js"
 import { createOpenAIKeyStore } from "./secrets/open-ai-key-store.js"
 import { createWindowOptions } from "./window-options.js"
 
@@ -33,6 +38,19 @@ function openMainDatabase(): PrompterDatabase {
   })
 }
 
+const promptExportNativeDependencies = {
+  showSaveDialog: (options) =>
+    dialog.showSaveDialog({
+      defaultPath: options.defaultPath,
+      filters: options.filters.map((filter) => ({
+        name: filter.name,
+        extensions: [...filter.extensions],
+      })),
+    }),
+  writeFile,
+  copyText: (text) => clipboard.writeText(text),
+} satisfies PromptExportNativeDependencies
+
 async function createMainWindow(): Promise<void> {
   const window = new BrowserWindow(createWindowOptions(preloadPath))
 
@@ -47,7 +65,10 @@ async function createMainWindow(): Promise<void> {
 async function start(): Promise<void> {
   await app.whenReady()
   database = openMainDatabase()
-  registerIpcHandlers(database.services)
+  registerIpcHandlers({
+    ...database.services,
+    ...createPromptExportNativeService(promptExportNativeDependencies),
+  })
   await createMainWindow()
 
   app.on("activate", () => {

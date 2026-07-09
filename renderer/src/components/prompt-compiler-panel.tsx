@@ -10,9 +10,11 @@ import type {
 } from "../../../electron/ipc-types"
 import { usePromptCompilerPanel } from "../hooks/use-prompt-compiler-panel"
 import type { LoadStatus } from "../hooks/use-prompter-library"
+import { exportBaseFromCompiled } from "../lib/prompt-export"
 import { CompiledPromptPreview } from "./compiled-prompt-preview"
 import { PromptCompilerAnalysis } from "./prompt-compiler-analysis"
 import { PromptCompilerForm } from "./prompt-compiler-form"
+import { PromptExportActions } from "./prompt-export-actions"
 import { PromptVersionManagement } from "./prompt-version-management"
 import { Panel } from "./shell/panel"
 import { Button } from "./ui/button"
@@ -63,6 +65,10 @@ export function PromptCompilerPanel({
     selectedAsset,
     selectedProject,
   })
+  const compiledExportBase =
+    compiler.compiled === null
+      ? null
+      : exportBaseFromCompiled(compiler.compiled, compiler.editablePrompt, selectedProject)
 
   function compileStaticPrompt(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
@@ -152,6 +158,14 @@ export function PromptCompilerPanel({
           value={compiler.editablePrompt}
           onChange={compiler.setEditablePrompt}
         />
+        <PromptExportActions
+          copyButtonLabel="Copy compiled export"
+          exportBase={compiledExportBase}
+          formatLabel="Compiled preview export format"
+          rawContent={compiler.editablePrompt}
+          saveButtonLabel="Save compiled export"
+          title="Compiled preview export"
+        />
 
         {selectedProject === null && (
           <EmptyState
@@ -191,6 +205,7 @@ export function PromptCompilerPanel({
             currentVersion={currentVersion}
             selectedAsset={selectedAsset}
             selectedVersion={selectedVersion}
+            projectName={selectedProject?.name ?? null}
             selectVersion={selectVersion}
             setCurrentVersion={setCurrentVersion}
             versions={versions}

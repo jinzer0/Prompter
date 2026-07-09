@@ -8,8 +8,11 @@ import {
   payloadSchemas,
 } from "./ipc-contract.js"
 import type { PromptSearchResultItem, SearchPromptsResponse } from "./ipc-types.js"
+import type { PromptExportNativeService } from "./prompt-export-native.js"
 
 // allow: SIZE_OK - central IPC handler registry mirrors the typed channel contract.
+
+type IpcServices = PersistenceServices & PromptExportNativeService
 
 function textPreview(value: string): string {
   const firstLine =
@@ -51,7 +54,7 @@ function searchResult(
   return { items, total: hits.length }
 }
 
-export function createPersistenceIpcHandlers(services: PersistenceServices) {
+export function createPersistenceIpcHandlers(services: IpcServices) {
   return {
     createProject: (payload: unknown) =>
       services.createProject(payloadSchemas.createProject.parse(payload)),
@@ -182,10 +185,15 @@ export function createPersistenceIpcHandlers(services: PersistenceServices) {
       services.promptCompilerAnalyze(payloadSchemas.promptCompilerAnalyze.parse(payload)),
     promptCompilerCompile: (payload: unknown) =>
       services.promptCompilerCompile(payloadSchemas.promptCompilerCompile.parse(payload)),
+    formatPromptForExport: (payload: unknown) =>
+      services.formatPromptForExport(payloadSchemas.formatPromptForExport.parse(payload)),
+    savePromptToFile: (payload: unknown) =>
+      services.savePromptToFile(payloadSchemas.savePromptToFile.parse(payload)),
+    copyText: (payload: unknown) => services.copyText(payloadSchemas.copyText.parse(payload)),
   }
 }
 
-export function registerIpcHandlers(services: PersistenceServices): void {
+export function registerIpcHandlers(services: IpcServices): void {
   const handlers = createPersistenceIpcHandlers(services)
 
   ipcMain.handle(PING_CHANNEL, () => PING_RESPONSE)
@@ -307,4 +315,11 @@ export function registerIpcHandlers(services: PersistenceServices): void {
   ipcMain.handle(PERSISTENCE_CHANNELS.promptCompilerCompile, (_event, payload) =>
     handlers.promptCompilerCompile(payload),
   )
+  ipcMain.handle(PERSISTENCE_CHANNELS.formatPromptForExport, (_event, payload) =>
+    handlers.formatPromptForExport(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.savePromptToFile, (_event, payload) =>
+    handlers.savePromptToFile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.copyText, (_event, payload) => handlers.copyText(payload))
 }

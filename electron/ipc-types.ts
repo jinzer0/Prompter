@@ -3,6 +3,8 @@ import type { z } from "zod"
 import type {
   comparePromptVersionsInputSchema,
   comparePromptVersionsResultSchema,
+  copyTextInputSchema,
+  copyTextResultSchema,
   createHarnessTemplateInputSchema,
   createNextPromptVersionInputSchema,
   createNextPromptVersionResultSchema,
@@ -11,14 +13,15 @@ import type {
   createPromptVersionInputSchema,
   createTagInputSchema,
   deleteResultSchema,
+  exportFormatSchema,
+  exportPromptInputSchema,
+  exportPromptResultSchema,
+  formatPromptForExportInputSchema,
   harnessTemplateSchema,
   openAIKeyStatusSchema,
   projectSchema,
   promptAssetFilterSchema,
   promptAssetSchema,
-  promptSearchFilterSchema,
-  promptSearchResultItemSchema,
-  promptSearchResultSchema,
   promptCompilerAnalyzeInputSchema,
   promptCompilerAnalyzeOutputSchema,
   promptCompilerAnalyzeResultSchema,
@@ -26,8 +29,13 @@ import type {
   promptCompilerCompileOutputSchema,
   promptCompilerCompileResultSchema,
   promptCompilerErrorSchema,
+  promptSearchFilterSchema,
+  promptSearchResultItemSchema,
+  promptSearchResultSchema,
   promptVersionSchema,
   saveOpenAIKeyInputSchema,
+  savePromptToFileInputSchema,
+  savePromptToFileResultSchema,
   settingSchema,
   settingsDefaultsSchema,
   tagLinkSchema,
@@ -65,6 +73,14 @@ export type HarnessTemplate = z.infer<typeof harnessTemplateSchema>
 export type Setting = z.infer<typeof settingSchema>
 export type SettingsDefaults = z.infer<typeof settingsDefaultsSchema>
 export type OpenAIKeyStatus = z.infer<typeof openAIKeyStatusSchema>
+export type ExportFormat = z.infer<typeof exportFormatSchema>
+export type ExportPromptInput = z.output<typeof exportPromptInputSchema>
+export type ExportPromptResult = z.infer<typeof exportPromptResultSchema>
+export type FormatPromptForExportInput = z.output<typeof formatPromptForExportInputSchema>
+export type SavePromptToFileInput = z.output<typeof savePromptToFileInputSchema>
+export type SavePromptToFileResult = z.infer<typeof savePromptToFileResultSchema>
+export type CopyTextInput = z.output<typeof copyTextInputSchema>
+export type CopyTextResult = z.infer<typeof copyTextResultSchema>
 export type PromptCompilerAnalyzeInput = z.output<typeof promptCompilerAnalyzeInputSchema>
 export type PromptCompilerCompileInput = z.output<typeof promptCompilerCompileInputSchema>
 export type PromptCompilerAnalyzeOutput = z.infer<typeof promptCompilerAnalyzeOutputSchema>

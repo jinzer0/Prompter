@@ -157,6 +157,18 @@ function createPhase9Services(onServiceCall: () => void) {
     async compile() {
       return promptCompilerCompileFixture
     },
+    formatPromptForExport: () => ({
+      format: "markdown" as const,
+      filename: "prompt-export.md",
+      content: "# Prompt Export",
+      mimeType: "text/markdown" as const,
+    }),
+    async savePromptToFile() {
+      return { cancelled: true as const }
+    },
+    async copyText() {
+      return { copied: true as const }
+    },
   }
 }
 

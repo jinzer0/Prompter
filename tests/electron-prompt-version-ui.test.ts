@@ -78,6 +78,14 @@ test("saves compiler output as a new version on the selected prompt without crea
       ["# Objective", revisedCompiledPrompt, "", "# Validation", "npm run test:smoke"].join("\n"),
       { timeout: phase6ActionTimeoutMs },
     )
+    await expect(
+      run.page.getByRole("combobox", { name: "Compiled preview export format" }),
+    ).toBeVisible()
+    await run.page
+      .getByRole("combobox", { name: "Compiled preview export format" })
+      .selectOption("codex")
+    await run.page.getByRole("button", { name: "Copy compiled export" }).click()
+    await expect(run.page.getByText("Copied Codex Prompt.")).toBeVisible()
 
     await expect(run.page.getByRole("button", { name: "Save as new version" })).toBeVisible({
       timeout: phase6ActionTimeoutMs,
@@ -87,6 +95,13 @@ test("saves compiler output as a new version on the selected prompt without crea
     await expect(run.page.getByRole("heading", { name: "Version history" })).toBeVisible()
     await expect(run.page.getByText("Version 2")).toBeVisible()
     await expect(run.page.getByText(revisedCompiledPrompt)).toBeVisible()
+    await expect(run.page.getByRole("combobox", { name: "Version export format" })).toBeVisible()
+    await expect(run.page.getByRole("button", { name: "Save version export" })).toBeVisible()
+    await run.page
+      .getByRole("combobox", { name: "Version export format" })
+      .selectOption("claude_code")
+    await run.page.getByRole("button", { name: "Copy version export" }).click()
+    await expect(run.page.getByText("Copied Claude Code Prompt.")).toBeVisible()
     await run.page.getByRole("button", { name: /Version 1/ }).click()
     await expect(run.page.getByText(initialCompiledPrompt)).toBeVisible()
     await run.page.getByRole("button", { name: "현재 버전으로 지정" }).click()

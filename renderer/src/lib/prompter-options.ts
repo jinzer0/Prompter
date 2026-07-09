@@ -1,7 +1,8 @@
-import type { Project, PromptAsset } from "../../../electron/ipc-types"
+import type { Project, PromptAsset, SettingsDefaults } from "../../../electron/ipc-types"
 
 export type TargetAgent = NonNullable<Project["defaultAgent"]>
 export type PromptScenario = PromptAsset["scenario"]
+export type AppTheme = SettingsDefaults["appTheme"]
 
 export const targetAgentOptions = [
   { value: "codex", label: "Codex" },
@@ -18,6 +19,12 @@ export const scenarioOptions = [
   { value: "docs", label: "Docs" },
   { value: "research", label: "Research" },
 ] as const satisfies readonly { readonly value: PromptScenario; readonly label: string }[]
+
+export const appThemeOptions = [
+  { value: "system", label: "System" },
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+] as const satisfies readonly { readonly value: AppTheme; readonly label: string }[]
 
 const targetAgentLabels: Record<TargetAgent, string> = {
   codex: "Codex",
@@ -78,5 +85,18 @@ export function parseScenario(value: string): PromptScenario {
       return "research"
     default:
       return "feature"
+  }
+}
+
+export function parseAppTheme(value: string): AppTheme {
+  switch (value) {
+    case "system":
+      return "system"
+    case "light":
+      return "light"
+    case "dark":
+      return "dark"
+    default:
+      return "system"
   }
 }

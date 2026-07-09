@@ -1,40 +1,13 @@
 import { access, mkdir, mkdtemp, rm } from "node:fs/promises"
-import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { ElectronApplication, Page } from "@playwright/test"
-import { _electron as electron, expect, test } from "@playwright/test"
+import type { Page } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 
-const requireElectron = createRequire(import.meta.url)
-const electronExecutable: unknown = requireElectron("electron")
+import { createNamedProject, launchPrompter } from "./electron-playwright-helpers"
 
-if (typeof electronExecutable !== "string") {
-  throw new TypeError("Electron executable path must resolve to a string")
-}
-
-const electronExecutablePath = electronExecutable
 const phase3ScreenshotPath = "test-results/phase3-ui.png"
 const phase4ScreenshotPath = "test-results/phase4-compiler-ui.png"
-
-type RunningApp = {
-  readonly app: ElectronApplication
-  readonly page: Page
-}
-
-async function launchPrompter(userDataDirectory: string): Promise<RunningApp> {
-  const app = await electron.launch({
-    executablePath: electronExecutablePath,
-    args: ["."],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      PROMPTER_USER_DATA_DIR: userDataDirectory,
-    },
-  })
-  const page = await app.firstWindow()
-  await expect(page.locator('[data-testid="app-shell"]')).toBeVisible()
-  return { app, page }
-}
 
 async function createProject(page: Page): Promise<void> {
   await page.getByRole("button", { name: "New Project" }).click()
@@ -60,8 +33,8 @@ async function createPrompt(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Save Prompt" }).click()
   await expect(page.getByText("Original input is required")).toBeVisible()
 
-  await page.getByRole("combobox", { name: "Scenario" }).selectOption("feature")
-  await page.getByRole("combobox", { name: "Target agent" }).selectOption("codex")
+  await page.getByRole("combobox", { exact: true, name: "Scenario" }).selectOption("feature")
+  await page.getByRole("combobox", { exact: true, name: "Target agent" }).selectOption("codex")
   await page
     .getByRole("textbox", { name: "Original input" })
     .fill("Turn a vague feature request into implementation steps.")
@@ -79,13 +52,6 @@ async function createPrompt(page: Page): Promise<void> {
     page.getByText("Compiled phase 3 instructions for the selected project."),
   ).toBeVisible()
   await expect(page.getByText("Version 1")).toBeVisible()
-}
-
-async function createNamedProject(page: Page, name: string): Promise<void> {
-  await page.getByRole("button", { name: "New Project" }).click()
-  await page.getByRole("textbox", { name: "Project name" }).fill(name)
-  await page.getByRole("button", { name: "Save Project" }).click()
-  await expect(page.getByRole("button", { name: new RegExp(name) })).toBeVisible()
 }
 
 test("supports project and prompt library CRUD through the UI", async ({

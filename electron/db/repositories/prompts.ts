@@ -2,26 +2,21 @@ import { and, desc, eq, isNull, type SQL } from "drizzle-orm"
 
 import type {
   CreatePromptAssetInput,
-  CreatePromptVersionInput,
   DeleteResult,
   PromptAsset,
   PromptAssetFilter,
-  PromptVersion,
   UpdatePromptAssetInput,
 } from "../../ipc-types.js"
 import * as schema from "../schema.js"
 import { type AppDatabase, createId, createTimestamp, optionalText, requireRow } from "./common.js"
+import { createPromptVersionRepository, type PromptVersionRepository } from "./prompt-versions.js"
 
-export type PromptRepository = {
+export type PromptRepository = PromptVersionRepository & {
   readonly createPromptAsset: (input: CreatePromptAssetInput) => PromptAsset
   readonly listPromptAssets: (filter?: PromptAssetFilter) => readonly PromptAsset[]
   readonly getPromptAsset: (id: string) => PromptAsset | null
   readonly updatePromptAsset: (id: string, input: UpdatePromptAssetInput) => PromptAsset
   readonly deletePromptAsset: (id: string) => DeleteResult
-  readonly createPromptVersion: (input: CreatePromptVersionInput) => PromptVersion
-  readonly listPromptVersions: (promptAssetId: string) => readonly PromptVersion[]
-  readonly getPromptVersion: (id: string) => PromptVersion | null
-  readonly setCurrentPromptVersion: (promptAssetId: string, versionId: string) => PromptAsset
 }
 
 function assetFilters(filter: PromptAssetFilter | undefined): SQL | undefined {
@@ -45,7 +40,10 @@ function assetFilters(filter: PromptAssetFilter | undefined): SQL | undefined {
 }
 
 export function createPromptRepository(db: AppDatabase): PromptRepository {
+  const promptVersions = createPromptVersionRepository(db)
+
   return {
+    ...promptVersions,
     createPromptAsset(input) {
       const now = createTimestamp()
 
@@ -136,80 +134,6 @@ export function createPromptRepository(db: AppDatabase): PromptRepository {
     deletePromptAsset(id) {
       db.delete(schema.promptAssets).where(eq(schema.promptAssets.id, id)).run()
       return { id }
-    },
-    createPromptVersion(input) {
-      const latest = db
-        .select({ versionNumber: schema.promptVersions.versionNumber })
-        .from(schema.promptVersions)
-        .where(eq(schema.promptVersions.promptAssetId, input.promptAssetId))
-        .orderBy(desc(schema.promptVersions.versionNumber))
-        .limit(1)
-        .get()
-      const versionNumber = (latest?.versionNumber ?? 0) + 1
-
-      return requireRow(
-        db
-          .insert(schema.promptVersions)
-          .values({
-            id: createId(),
-            promptAssetId: input.promptAssetId,
-            versionNumber,
-            originalInput: input.originalInput,
-            compiledPrompt: input.compiledPrompt,
-            assumptions: optionalText(input.assumptions),
-            questions: optionalText(input.questions),
-            answers: optionalText(input.answers),
-            acceptanceCriteria: optionalText(input.acceptanceCriteria),
-            validationCommands: optionalText(input.validationCommands),
-            qualityScore: input.qualityScore ?? null,
-            createdAt: createTimestamp(),
-          })
-          .returning()
-          .get(),
-        "prompt version",
-        input.promptAssetId,
-      )
-    },
-    listPromptVersions(promptAssetId) {
-      return db
-        .select()
-        .from(schema.promptVersions)
-        .where(eq(schema.promptVersions.promptAssetId, promptAssetId))
-        .orderBy(desc(schema.promptVersions.versionNumber))
-        .all()
-    },
-    getPromptVersion(id) {
-      return (
-        db.select().from(schema.promptVersions).where(eq(schema.promptVersions.id, id)).get() ??
-        null
-      )
-    },
-    setCurrentPromptVersion(promptAssetId, versionId) {
-      requireRow(
-        db
-          .select()
-          .from(schema.promptVersions)
-          .where(
-            and(
-              eq(schema.promptVersions.id, versionId),
-              eq(schema.promptVersions.promptAssetId, promptAssetId),
-            ),
-          )
-          .get(),
-        "prompt version",
-        versionId,
-      )
-
-      return requireRow(
-        db
-          .update(schema.promptAssets)
-          .set({ currentVersionId: versionId, updatedAt: createTimestamp() })
-          .where(eq(schema.promptAssets.id, promptAssetId))
-          .returning()
-          .get(),
-        "prompt asset",
-        promptAssetId,
-      )
     },
   }
 }

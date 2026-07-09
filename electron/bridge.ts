@@ -79,12 +79,26 @@ export function createElectronBridge(invoke: InvokeIpc): ElectronBridge {
           response.createPromptVersion,
           input,
         ),
+      createNextVersion: (input) =>
+        request(
+          ch.createNextPromptVersion,
+          payload.createNextPromptVersion,
+          response.createNextPromptVersion,
+          input,
+        ),
       listVersions: (promptAssetId) =>
         request(ch.listPromptVersions, payload.listPromptVersions, response.listPromptVersions, {
           id: promptAssetId,
         }),
       getVersion: (id) =>
         request(ch.getPromptVersion, payload.getPromptVersion, response.getPromptVersion, { id }),
+      getCurrentVersion: (promptAssetId) =>
+        request(
+          ch.getCurrentPromptVersion,
+          payload.getCurrentPromptVersion,
+          response.getCurrentPromptVersion,
+          { id: promptAssetId },
+        ),
       setCurrentVersion: (promptAssetId, versionId) =>
         request(
           ch.setCurrentPromptVersion,
@@ -94,6 +108,24 @@ export function createElectronBridge(invoke: InvokeIpc): ElectronBridge {
             promptAssetId,
             versionId,
           },
+        ),
+      compareVersions: (baseVersionId, compareVersionId) =>
+        request(
+          ch.comparePromptVersions,
+          payload.comparePromptVersions,
+          response.comparePromptVersions,
+          { baseVersionId, compareVersionId },
+        ),
+    },
+    search: {
+      searchPrompts: (input) =>
+        request(ch.searchPrompts, payload.searchPrompts, response.searchPrompts, input),
+      rebuildIndex: () =>
+        request(
+          ch.rebuildSearchIndex,
+          payload.rebuildSearchIndex,
+          response.rebuildSearchIndex,
+          undefined,
         ),
     },
     tags: {
@@ -112,6 +144,24 @@ export function createElectronBridge(invoke: InvokeIpc): ElectronBridge {
           promptAssetId,
           tagId,
         }),
+      listForPrompt: (promptAssetId) =>
+        request(ch.listTagsForPrompt, payload.listTagsForPrompt, response.listTagsForPrompt, {
+          id: promptAssetId,
+        }),
+      listWithCounts: () =>
+        request(
+          ch.listTagsWithCounts,
+          payload.listTagsWithCounts,
+          response.listTagsWithCounts,
+          undefined,
+        ),
+      createAndAttachToPrompt: (input) =>
+        request(
+          ch.createAndAttachTagToPrompt,
+          payload.createAndAttachTagToPrompt,
+          response.createAndAttachTagToPrompt,
+          input,
+        ),
     },
     harnessTemplates: {
       create: (input) =>
@@ -155,6 +205,51 @@ export function createElectronBridge(invoke: InvokeIpc): ElectronBridge {
       set: (key, value) =>
         request(ch.setSetting, payload.setSetting, response.setSetting, { key, value }),
       list: () => request(ch.listSettings, payload.listSettings, response.listSettings, undefined),
+      getDefaults: () =>
+        request(
+          ch.getSettingsDefaults,
+          payload.getSettingsDefaults,
+          response.getSettingsDefaults,
+          undefined,
+        ),
+      updateDefaults: (input) =>
+        request(
+          ch.updateSettingsDefaults,
+          payload.updateSettingsDefaults,
+          response.updateSettingsDefaults,
+          input,
+        ),
+    },
+    secrets: {
+      saveOpenAIKey: (input) =>
+        request(ch.saveOpenAIKey, payload.saveOpenAIKey, response.saveOpenAIKey, input),
+      hasOpenAIKey: () =>
+        request(ch.hasOpenAIKey, payload.hasOpenAIKey, response.hasOpenAIKey, undefined),
+      getOpenAIKeyStatus: () =>
+        request(
+          ch.getOpenAIKeyStatus,
+          payload.getOpenAIKeyStatus,
+          response.getOpenAIKeyStatus,
+          undefined,
+        ),
+      deleteOpenAIKey: () =>
+        request(ch.deleteOpenAIKey, payload.deleteOpenAIKey, response.deleteOpenAIKey, undefined),
+    },
+    promptCompiler: {
+      analyze: (input) =>
+        request(
+          ch.promptCompilerAnalyze,
+          payload.promptCompilerAnalyze,
+          response.promptCompilerAnalyze,
+          input,
+        ),
+      compile: (input) =>
+        request(
+          ch.promptCompilerCompile,
+          payload.promptCompilerCompile,
+          response.promptCompilerCompile,
+          input,
+        ),
     },
   }
 }

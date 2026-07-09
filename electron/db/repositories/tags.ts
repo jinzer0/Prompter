@@ -1,6 +1,13 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, count, desc, eq } from "drizzle-orm"
 
-import type { CreateTagInput, DeleteResult, Tag, TagLink, UpdateTagInput } from "../../ipc-types.js"
+import type {
+  CreateTagInput,
+  DeleteResult,
+  Tag,
+  TagCount,
+  TagLink,
+  UpdateTagInput,
+} from "../../ipc-types.js"
 import * as schema from "../schema.js"
 import { type AppDatabase, createId, createTimestamp, requireRow } from "./common.js"
 
@@ -11,6 +18,16 @@ export type TagRepository = {
   readonly deleteTag: (id: string) => DeleteResult
   readonly attachTagToPrompt: (promptAssetId: string, tagId: string) => TagLink
   readonly detachTagFromPrompt: (promptAssetId: string, tagId: string) => TagLink
+  readonly listTagsForPrompt: (promptAssetId: string) => readonly Tag[]
+  readonly listTagsWithCounts: () => readonly TagCount[]
+  readonly createAndAttachTagToPrompt: (
+    promptAssetId: string,
+    input: CreateTagInput,
+  ) => TagLink
+}
+
+function findTagByName(db: AppDatabase, name: string): Tag | undefined {
+  return db.select().from(schema.tags).where(eq(schema.tags.name, name)).get()
 }
 
 export function createTagRepository(db: AppDatabase): TagRepository {
@@ -60,6 +77,47 @@ export function createTagRepository(db: AppDatabase): TagRepository {
           ),
         )
         .run()
+      return link
+    },
+    listTagsForPrompt(promptAssetId) {
+      return db
+        .select({ id: schema.tags.id, name: schema.tags.name, createdAt: schema.tags.createdAt })
+        .from(schema.tags)
+        .innerJoin(schema.promptTags, eq(schema.promptTags.tagId, schema.tags.id))
+        .where(eq(schema.promptTags.promptAssetId, promptAssetId))
+        .orderBy(desc(schema.tags.createdAt))
+        .all()
+    },
+    listTagsWithCounts() {
+      return db
+        .select({
+          id: schema.tags.id,
+          name: schema.tags.name,
+          createdAt: schema.tags.createdAt,
+          promptCount: count(schema.promptTags.promptAssetId),
+        })
+        .from(schema.tags)
+        .leftJoin(schema.promptTags, eq(schema.promptTags.tagId, schema.tags.id))
+        .groupBy(schema.tags.id, schema.tags.name, schema.tags.createdAt)
+        .orderBy(desc(schema.tags.createdAt))
+        .all()
+    },
+    createAndAttachTagToPrompt(promptAssetId, input) {
+      const existing = findTagByName(db, input.name)
+      const tag =
+        existing ??
+        requireRow(
+          db
+            .insert(schema.tags)
+            .values({ id: createId(), name: input.name, createdAt: createTimestamp() })
+            .returning()
+            .get(),
+          "tag",
+          input.name,
+        )
+      const link = { promptAssetId, tagId: tag.id }
+
+      db.insert(schema.promptTags).values(link).onConflictDoNothing().run()
       return link
     },
   }

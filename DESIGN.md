@@ -73,8 +73,8 @@ All spacing derives from a base of `4px`.
 
 ### Grid
 
-- Shell columns: `210px` sidebar, fluid prompt library with `340px` minimum, `260px` compiler.
-- App minimum content width: `860px`; narrower windows intentionally scroll horizontally so all required panels remain accessible.
+- Shell columns: `210px` sidebar, fluid prompt library with `320px` minimum, `460px` compiler.
+- App minimum content width: `1040px`; narrower windows intentionally scroll horizontally so all required panels remain accessible.
 - Breakpoints follow Tailwind defaults; desktop smoke targets `900x720` and `1280x800`.
 
 ### Rules

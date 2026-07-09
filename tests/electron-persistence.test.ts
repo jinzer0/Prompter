@@ -163,6 +163,57 @@ describe("Electron persistence", () => {
     }
   })
 
+  it("creates the next prompt version and marks it current atomically", async () => {
+    const database = await createTestDatabase()
+
+    try {
+      const project = database.services.createProject({ name: "Versioned Prompts" })
+      const asset = database.services.createPromptAsset({
+        projectId: project.id,
+        title: "Versioned Compiler Prompt",
+        scenario: "feature",
+        targetAgent: "codex",
+      })
+
+      const first = database.services.createNextPromptVersion({
+        promptAssetId: asset.id,
+        originalInput: "Write the first implementation prompt.",
+        compiledPrompt: "# Objective\nShip the first implementation prompt.",
+        makeCurrent: true,
+        qualityScore: 72,
+      })
+      const second = database.services.createNextPromptVersion({
+        promptAssetId: asset.id,
+        originalInput: "Write the revised implementation prompt.",
+        compiledPrompt: "# Objective\nShip the revised implementation prompt.",
+        makeCurrent: true,
+        assumptions: '["Existing prompt metadata stays on the version."]',
+        questions: "[]",
+        answers: "[]",
+        acceptanceCriteria: "Version 2 is current.",
+        validationCommands: "npm run typecheck",
+        qualityScore: 91,
+      })
+
+      expect(first.version.versionNumber).toBe(1)
+      expect(first.asset.currentVersionId).toBe(first.version.id)
+      expect(second.version.versionNumber).toBe(2)
+      expect(second.asset.currentVersionId).toBe(second.version.id)
+      expect(database.services.getPromptAsset(asset.id)?.currentVersionId).toBe(second.version.id)
+      expect(database.services.listPromptVersions(asset.id).map((version) => version.id)).toEqual([
+        second.version.id,
+        first.version.id,
+      ])
+
+      const restored = database.services.setCurrentPromptVersion(asset.id, first.version.id)
+
+      expect(restored.currentVersionId).toBe(first.version.id)
+      expect(database.services.listPromptVersions(asset.id)).toHaveLength(2)
+    } finally {
+      database.close()
+    }
+  })
+
   it("creates tags and attaches them to prompt assets", async () => {
     const database = await createTestDatabase()
 

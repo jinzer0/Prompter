@@ -8,13 +8,19 @@ export type ScopedPromptVersions = {
 export function currentVersionForAsset(
   asset: PromptAsset | null,
   scopedVersions: ScopedPromptVersions | null,
+  fallbackVersion: PromptVersion | null = null,
 ): PromptVersion | null {
-  if (asset === null || scopedVersions === null || scopedVersions.assetId !== asset.id) {
-    return null
+  if (asset === null) {
+    return fallbackVersion
+  }
+
+  if (scopedVersions === null || scopedVersions.assetId !== asset.id) {
+    return fallbackVersion
   }
 
   return (
     scopedVersions.versions.find((version) => version.id === asset.currentVersionId) ??
+    fallbackVersion ??
     scopedVersions.versions[0] ??
     null
   )

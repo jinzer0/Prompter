@@ -2,13 +2,28 @@ import Database from "better-sqlite3"
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import { drizzle } from "drizzle-orm/better-sqlite3"
 import { migrate } from "drizzle-orm/better-sqlite3/migrator"
-
+import type { PromptCompilerClientFactory } from "../prompt-compiler/prompt-compiler-service.js"
+import type { OpenAIKeyStore } from "../secrets/open-ai-key-store.js"
 import * as schema from "./schema.js"
 import { createPersistenceServices, type PersistenceServices } from "./services.js"
+
+function bootstrapSearchIndex(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE VIRTUAL TABLE IF NOT EXISTS prompt_search_fts USING fts5(
+      prompt_asset_id UNINDEXED,
+      title,
+      original_input,
+      compiled_prompt,
+      tokenize = 'unicode61'
+    )
+  `)
+}
 
 export type PrompterDatabaseConfig = {
   readonly databasePath: string
   readonly migrationsFolder: string
+  readonly openAIKeyStore?: OpenAIKeyStore
+  readonly promptCompilerClientFactory?: PromptCompilerClientFactory
 }
 
 export type PrompterDatabase = {
@@ -26,11 +41,17 @@ export function openPrompterDatabase(config: PrompterDatabaseConfig): PrompterDa
 
   const db = drizzle(sqlite, { schema })
   migrate(db, { migrationsFolder: config.migrationsFolder })
+  bootstrapSearchIndex(sqlite)
 
   return {
     sqlite,
     db,
-    services: createPersistenceServices(db),
+    services: createPersistenceServices(
+      db,
+      sqlite,
+      config.openAIKeyStore,
+      config.promptCompilerClientFactory,
+    ),
     close: () => sqlite.close(),
   }
 }

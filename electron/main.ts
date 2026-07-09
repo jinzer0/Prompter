@@ -1,8 +1,10 @@
 import { join } from "node:path"
-import { app, BrowserWindow } from "electron"
+import { app, BrowserWindow, safeStorage } from "electron"
 
 import { openPrompterDatabase, type PrompterDatabase } from "./db/connection.js"
 import { registerIpcHandlers } from "./ipc-handlers.js"
+import { createTestPromptCompilerClientFactory } from "./prompt-compiler/test-client.js"
+import { createOpenAIKeyStore } from "./secrets/open-ai-key-store.js"
 import { createWindowOptions } from "./window-options.js"
 
 const electronDirectory = join(app.getAppPath(), "dist-electron")
@@ -18,9 +20,16 @@ if (prompterUserDataDirectory !== undefined && prompterUserDataDirectory.length 
 }
 
 function openMainDatabase(): PrompterDatabase {
+  const promptCompilerClientFactory = createTestPromptCompilerClientFactory(process.env)
+
   return openPrompterDatabase({
     databasePath: join(app.getPath("userData"), "prompter.sqlite"),
     migrationsFolder: join(app.getAppPath(), "drizzle"),
+    openAIKeyStore: createOpenAIKeyStore({
+      safeStorage,
+      secretFilePath: join(app.getPath("userData"), "secrets", "open-ai-key.json"),
+    }),
+    ...(promptCompilerClientFactory === undefined ? {} : { promptCompilerClientFactory }),
   })
 }
 

@@ -1,3 +1,4 @@
+import type { PromptCompilerCompileOutput } from "../../../../electron/ipc-types"
 import type { PromptScenario, TargetAgent } from "../prompter-options"
 
 export type PromptCompilerInput = {
@@ -19,8 +20,13 @@ export type CompiledPromptResult = {
   readonly compiledPrompt: string
   readonly scenario: PromptScenario
   readonly targetAgent: TargetAgent
+  readonly summary?: string
   readonly assumptions: readonly string[]
+  readonly questions?: PromptCompilerCompileOutput["questions"]
+  readonly answers?: PromptCompilerCompileOutput["answers"]
   readonly acceptanceCriteria: readonly string[]
   readonly validationCommands: readonly string[]
+  readonly suggestedTags?: readonly string[]
   readonly qualityScore: number
+  readonly warnings?: readonly string[]
 }

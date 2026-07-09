@@ -33,9 +33,9 @@
   --space-6: 24px;
   --space-8: 32px;
   --layout-sidebar-width: 210px;
-  --layout-library-min: 340px;
-  --layout-compiler-width: 260px;
-  --layout-shell-min: 860px;
+  --layout-library-min: 320px;
+  --layout-compiler-width: 460px;
+  --layout-shell-min: 1040px;
   background: var(--color-shell);
   font-family: var(--font-sans);
   font-feature-settings: "cv01", "ss03";

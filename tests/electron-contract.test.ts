@@ -1,84 +1,45 @@
-import { readdir, readFile } from "node:fs/promises"
-import { join } from "node:path"
+import { readFile } from "node:fs/promises"
 import { describe, expect, it } from "vitest"
 
 import { createElectronBridge, PING_RESPONSE } from "../electron/bridge"
+import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
 import { createWindowOptions } from "../electron/window-options"
+import { createFailingServices, listFiles, validPromptAssetId } from "./electron-contract-helpers"
 
-async function listFiles(directory: string): Promise<readonly string[]> {
-  const entries = await readdir(directory, { withFileTypes: true })
-  const paths = await Promise.all(
-    entries.map((entry) => {
-      const filePath = join(directory, entry.name)
-
-      if (entry.isDirectory()) {
-        return listFiles(filePath)
-      }
-
-      return Promise.resolve([filePath])
-    }),
-  )
-
-  return paths.flat()
-}
-
-const validPromptAssetId = "11111111-1111-4111-8111-111111111111"
-
-function createFailingServices(onServiceCall: () => void) {
-  return {
-    createProject: () => {
-      onServiceCall()
-      throw new Error("repository should not be called")
-    },
-    listProjects: () => [],
-    getProject: () => null,
-    updateProject: () => {
-      throw new Error("unused service")
-    },
-    deleteProject: (id: string) => ({ id }),
-    createPromptAsset: () => {
-      throw new Error("unused service")
-    },
-    listPromptAssets: () => [],
-    getPromptAsset: () => null,
-    updatePromptAsset: () => {
-      throw new Error("unused service")
-    },
-    deletePromptAsset: (id: string) => ({ id }),
-    createPromptVersion: () => {
-      onServiceCall()
-      throw new Error("repository should not be called")
-    },
-    listPromptVersions: () => [],
-    getPromptVersion: () => null,
-    setCurrentPromptVersion: () => {
-      throw new Error("unused service")
-    },
-    createTag: () => {
-      throw new Error("unused service")
-    },
-    listTags: () => [],
-    updateTag: () => {
-      throw new Error("unused service")
-    },
-    deleteTag: (id: string) => ({ id }),
-    attachTagToPrompt: (promptAssetId: string, tagId: string) => ({ promptAssetId, tagId }),
-    detachTagFromPrompt: (promptAssetId: string, tagId: string) => ({ promptAssetId, tagId }),
-    createHarnessTemplate: () => {
-      throw new Error("unused service")
-    },
-    listHarnessTemplates: () => [],
-    getHarnessTemplate: () => null,
-    updateHarnessTemplate: () => {
-      throw new Error("unused service")
-    },
-    deleteHarnessTemplate: (id: string) => ({ id }),
-    getSetting: () => null,
-    setSetting: (key: string, value: string) => ({ key, value, updatedAt: 1 }),
-    listSettings: () => [],
-  }
-}
+const validPromptVersionId = "22222222-2222-4222-8222-222222222222"
+const comparePromptVersionId = "33333333-3333-4333-8333-333333333333"
+const promptAssetResponse = {
+  id: validPromptAssetId,
+  projectId: null,
+  title: "Versioned Prompt",
+  scenario: "feature",
+  targetAgent: "codex",
+  currentVersionId: validPromptVersionId,
+  parentPromptId: null,
+  createdAt: 1,
+  updatedAt: 2,
+} as const
+const promptVersionResponse = {
+  id: validPromptVersionId,
+  promptAssetId: validPromptAssetId,
+  versionNumber: 1,
+  originalInput: "Original request",
+  compiledPrompt: "Compiled prompt",
+  assumptions: null,
+  questions: null,
+  answers: null,
+  acceptanceCriteria: null,
+  validationCommands: null,
+  qualityScore: null,
+  createdAt: 1,
+} as const
+const compareVersionResponse = {
+  ...promptVersionResponse,
+  id: comparePromptVersionId,
+  versionNumber: 2,
+  compiledPrompt: "Compiled prompt\nwith changes",
+} as const
 
 describe("Electron shell contract", () => {
   it("uses secure BrowserWindow defaults for the main window", () => {
@@ -119,6 +80,8 @@ describe("Electron shell contract", () => {
       "tags",
       "harnessTemplates",
       "settings",
+      "secrets",
+      "promptCompiler",
     ])
     expect(Object.keys(bridge.projects)).toEqual(["create", "list", "get", "update", "delete"])
     expect(Object.keys(bridge.prompts)).toEqual([
@@ -128,9 +91,12 @@ describe("Electron shell contract", () => {
       "updateAsset",
       "deleteAsset",
       "createVersion",
+      "createNextVersion",
       "listVersions",
       "getVersion",
+      "getCurrentVersion",
       "setCurrentVersion",
+      "compareVersions",
     ])
     expect(Object.keys(bridge.tags)).toEqual([
       "create",
@@ -147,9 +113,77 @@ describe("Electron shell contract", () => {
       "update",
       "delete",
     ])
-    expect(Object.keys(bridge.settings)).toEqual(["get", "set", "list"])
+    expect(Object.keys(bridge.settings)).toEqual([
+      "get",
+      "set",
+      "list",
+      "getDefaults",
+      "updateDefaults",
+    ])
+    expect(Object.keys(bridge.secrets)).toEqual([
+      "saveOpenAIKey",
+      "hasOpenAIKey",
+      "getOpenAIKeyStatus",
+      "deleteOpenAIKey",
+    ])
+    expect(Object.keys(bridge.promptCompiler)).toEqual(["analyze", "compile"])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()
+  })
+
+  it("routes Phase 6 prompt version methods through typed bridge channels", async () => {
+    const calls: { readonly channel: string; readonly payload: unknown }[] = []
+    const bridge = createElectronBridge(async (channel, payload) => {
+      calls.push({ channel, payload })
+
+      if (channel === PERSISTENCE_CHANNELS.createNextPromptVersion) {
+        return { asset: promptAssetResponse, version: promptVersionResponse }
+      }
+      if (channel === PERSISTENCE_CHANNELS.getCurrentPromptVersion) {
+        return promptVersionResponse
+      }
+      if (channel === PERSISTENCE_CHANNELS.comparePromptVersions) {
+        return { baseVersion: promptVersionResponse, compareVersion: compareVersionResponse }
+      }
+
+      throw new Error(`Unexpected channel ${channel}`)
+    })
+
+    await expect(
+      bridge.prompts.createNextVersion({
+        promptAssetId: validPromptAssetId,
+        originalInput: "Original request",
+        compiledPrompt: "Compiled prompt",
+      }),
+    ).resolves.toEqual({ asset: promptAssetResponse, version: promptVersionResponse })
+    await expect(bridge.prompts.getCurrentVersion(validPromptAssetId)).resolves.toEqual(
+      promptVersionResponse,
+    )
+    await expect(
+      bridge.prompts.compareVersions(validPromptVersionId, comparePromptVersionId),
+    ).resolves.toEqual({
+      baseVersion: promptVersionResponse,
+      compareVersion: compareVersionResponse,
+    })
+    expect(calls).toEqual([
+      {
+        channel: PERSISTENCE_CHANNELS.createNextPromptVersion,
+        payload: {
+          promptAssetId: validPromptAssetId,
+          originalInput: "Original request",
+          compiledPrompt: "Compiled prompt",
+          makeCurrent: true,
+        },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.getCurrentPromptVersion,
+        payload: { id: validPromptAssetId },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.comparePromptVersions,
+        payload: { baseVersionId: validPromptVersionId, compareVersionId: comparePromptVersionId },
+      },
+    ])
   })
 
   it("rejects malformed IPC payloads before repository calls", () => {
@@ -182,6 +216,19 @@ describe("Electron shell contract", () => {
         compiledPrompt: "   ",
       }),
     ).toThrow(/compiledPrompt/)
+    expect(() =>
+      handlers.createNextPromptVersion({
+        promptAssetId: validPromptAssetId,
+        originalInput: "",
+        compiledPrompt: "Compiled prompt",
+      }),
+    ).toThrow(/originalInput/)
+    expect(() =>
+      handlers.comparePromptVersions({
+        baseVersionId: validPromptVersionId,
+        compareVersionId: "",
+      }),
+    ).toThrow(/compareVersionId/)
     expect(called).toBe(false)
   })
 
@@ -198,20 +245,6 @@ describe("Electron shell contract", () => {
     expect(rendererSource).not.toContain("node:fs")
     expect(rendererSource).not.toContain("node:path")
     expect(rendererSource).not.toContain("process.env")
-  })
-
-  it("keeps Phase 2 scope free of execution and LLM storage", async () => {
-    const files = await listFiles("electron")
-    const sourceFiles = files.filter((filePath) => /\.(ts|tsx)$/.test(filePath))
-    const contents = await Promise.all(sourceFiles.map((filePath) => readFile(filePath, "utf8")))
-    const mainSource = contents.join("\n")
-
-    expect(mainSource).not.toContain("prompt_runs")
-    expect(mainSource).not.toContain("agent_runs")
-    expect(mainSource).not.toContain("execution_results")
-    expect(mainSource).not.toContain("validation_results")
-    expect(mainSource).not.toContain("run_logs")
-    expect(mainSource).not.toContain("openai")
   })
 
   it("keeps shell copy aligned with Phase 1 UI-only scope", async () => {

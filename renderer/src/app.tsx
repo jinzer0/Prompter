@@ -4,6 +4,7 @@ import type { PingResponse } from "../../electron/bridge"
 import { ProjectSidebarSection } from "./components/project-sidebar-section"
 import { PromptCompilerPanel } from "./components/prompt-compiler-panel"
 import { PromptLibraryPanel } from "./components/prompt-library-panel"
+import { SettingsPanel } from "./components/settings-panel"
 import { SidebarSection, sidebarSections } from "./components/shell/sidebar-section"
 import { useProjectPrompts, useProjects } from "./hooks/use-prompter-library"
 
@@ -11,8 +12,13 @@ type PingState = PingResponse | "pending"
 
 export function App() {
   const [pingResult, setPingResult] = useState<PingState>("pending")
+  const [tagRefreshSignal, setTagRefreshSignal] = useState(0)
   const projectLibrary = useProjects()
   const promptLibrary = useProjectPrompts(projectLibrary.selectedProject?.id ?? null)
+
+  function refreshPromptTags(): void {
+    setTagRefreshSignal((current) => current + 1)
+  }
 
   useEffect(() => {
     let isActive = true
@@ -69,6 +75,7 @@ export function App() {
                 items={section.items}
               />
             ))}
+            <SettingsPanel />
           </div>
 
           <div className="mt-5 rounded-card border border-border bg-panel-muted p-3 text-[12px] text-muted">
@@ -81,20 +88,30 @@ export function App() {
 
         <PromptLibraryPanel
           assets={promptLibrary.assets}
+          currentVersionSummaries={promptLibrary.currentVersionSummaries}
           createPrompt={promptLibrary.createPrompt}
           error={promptLibrary.assetError}
           selectAsset={promptLibrary.selectAsset}
           selectedAsset={promptLibrary.selectedAsset}
           selectedProject={projectLibrary.selectedProject}
           status={promptLibrary.assetStatus}
+          tagRefreshSignal={tagRefreshSignal}
+          onTagsChanged={refreshPromptTags}
         />
         <PromptCompilerPanel
+          compareVersions={promptLibrary.compareVersions}
+          createNextVersion={promptLibrary.createNextVersion}
           createPrompt={promptLibrary.createPrompt}
           currentVersion={promptLibrary.currentVersion}
           error={promptLibrary.versionError}
           selectedAsset={promptLibrary.selectedAsset}
+          selectedVersion={promptLibrary.selectedVersion}
           selectedProject={projectLibrary.selectedProject}
+          selectVersion={promptLibrary.selectVersion}
+          setCurrentVersion={promptLibrary.setCurrentVersion}
           status={promptLibrary.versionStatus}
+          versions={promptLibrary.versions}
+          onTagsChanged={refreshPromptTags}
         />
       </div>
     </main>

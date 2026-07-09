@@ -1,25 +1,30 @@
-import { type FormEvent, useState } from "react"
+import type { FormEvent } from "react"
 import type {
+  ComparePromptVersionsResult,
+  CreateNextPromptVersionInput,
   CreatePromptAssetInput,
   CreatePromptVersionInput,
   Project,
   PromptAsset,
   PromptVersion,
 } from "../../../electron/ipc-types"
+import { usePromptCompilerPanel } from "../hooks/use-prompt-compiler-panel"
 import type { LoadStatus } from "../hooks/use-prompter-library"
-import { formatTimestamp } from "../lib/format-timestamp"
-import { compileStaticPrompt } from "../lib/prompt-compiler/static-prompt-compiler"
-import type { CompiledPromptResult, PromptCompilerInput } from "../lib/prompt-compiler/types"
-import { scenarioLabel, targetAgentLabel } from "../lib/prompter-options"
 import { CompiledPromptPreview } from "./compiled-prompt-preview"
+import { PromptCompilerAnalysis } from "./prompt-compiler-analysis"
 import { PromptCompilerForm } from "./prompt-compiler-form"
+import { PromptVersionManagement } from "./prompt-version-management"
 import { Panel } from "./shell/panel"
-import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
+import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { EmptyState } from "./ui/empty-state"
 
 type PromptCompilerPanelProps = {
+  readonly compareVersions: (
+    baseVersionId: string,
+    compareVersionId: string,
+  ) => Promise<ComparePromptVersionsResult>
+  readonly createNextVersion: (input: CreateNextPromptVersionInput) => Promise<PromptVersion>
   readonly createPrompt: (
     assetInput: CreatePromptAssetInput,
     versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
@@ -27,117 +32,41 @@ type PromptCompilerPanelProps = {
   readonly currentVersion: PromptVersion | null
   readonly error: string | null
   readonly selectedAsset: PromptAsset | null
+  readonly selectedVersion: PromptVersion | null
   readonly selectedProject: Project | null
+  readonly selectVersion: (id: string) => void
+  readonly setCurrentVersion: (promptAssetId: string, versionId: string) => Promise<void>
   readonly status: LoadStatus
-}
-
-const emptyCompilerInput: PromptCompilerInput = {
-  title: "",
-  originalInput: "",
-  scenario: "feature",
-  targetAgent: "codex",
-  projectContext: "",
-  techStack: "",
-  constraints: "",
-  acceptanceCriteria: "",
-  validationCommands: "",
-  additionalNotes: "",
-}
-
-function DetailRow({ label, value }: { readonly label: string; readonly value: string }) {
-  return (
-    <div className="space-y-1">
-      <dt className="font-mono text-[11px] text-muted">{label}</dt>
-      <dd className="text-[12px] text-muted-strong">{value}</dd>
-    </div>
-  )
+  readonly versions: readonly PromptVersion[]
+  readonly onTagsChanged: () => void
 }
 
 export function PromptCompilerPanel({
+  compareVersions,
+  createNextVersion,
   createPrompt,
   currentVersion,
   error,
   selectedAsset,
+  selectedVersion,
   selectedProject,
+  selectVersion,
+  setCurrentVersion,
   status,
+  versions,
+  onTagsChanged,
 }: PromptCompilerPanelProps) {
-  const [draft, setDraft] = useState<PromptCompilerInput>(emptyCompilerInput)
-  const [compiled, setCompiled] = useState<CompiledPromptResult | null>(null)
-  const [editablePrompt, setEditablePrompt] = useState("")
-  const [message, setMessage] = useState<string | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
+  const compiler = usePromptCompilerPanel({
+    createNextVersion,
+    createPrompt,
+    onTagsChanged,
+    selectedAsset,
+    selectedProject,
+  })
 
-  function compilePrompt(event: FormEvent<HTMLFormElement>): void {
+  function compileStaticPrompt(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
-
-    if (draft.originalInput.trim().length === 0) {
-      setMessage("Original request is required")
-      return
-    }
-
-    const result = compileStaticPrompt(draft)
-    setCompiled(result)
-    setEditablePrompt(result.compiledPrompt)
-    setMessage("Compiled prompt is ready to review.")
-  }
-
-  async function savePrompt(): Promise<void> {
-    if (selectedProject === null) {
-      setMessage("Select a project before saving compiled prompt")
-      return
-    }
-
-    if (compiled === null || editablePrompt.trim().length === 0) {
-      setMessage("Compile a prompt before saving")
-      return
-    }
-
-    setIsSaving(true)
-    setMessage(null)
-
-    try {
-      await createPrompt(
-        {
-          projectId: selectedProject.id,
-          title: compiled.title,
-          scenario: compiled.scenario,
-          targetAgent: compiled.targetAgent,
-        },
-        {
-          originalInput: compiled.originalInput,
-          compiledPrompt: editablePrompt.trim(),
-          assumptions: JSON.stringify(compiled.assumptions),
-          questions: JSON.stringify([]),
-          answers: JSON.stringify([]),
-          acceptanceCriteria: compiled.acceptanceCriteria.join("\n"),
-          validationCommands: compiled.validationCommands.join("\n"),
-          qualityScore: compiled.qualityScore,
-        },
-      )
-      setMessage("Compiled prompt saved.")
-    } catch (saveError) {
-      setMessage(
-        saveError instanceof Error ? saveError.message : "Compiled prompt could not be saved",
-      )
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  async function copyPrompt(): Promise<void> {
-    if (editablePrompt.trim().length === 0 || navigator.clipboard === undefined) {
-      setMessage("Compiled prompt is not available to copy")
-      return
-    }
-
-    try {
-      await navigator.clipboard.writeText(editablePrompt)
-      setMessage("Compiled prompt copied.")
-    } catch (copyError) {
-      setMessage(
-        copyError instanceof Error ? copyError.message : "Compiled prompt could not be copied",
-      )
-    }
+    compiler.compileStatic()
   }
 
   return (
@@ -150,30 +79,60 @@ export function PromptCompilerPanel({
         >
           Prompt Compiler
         </h2>
-        <p className="mt-1 text-[14px] text-muted">Static templates generate local prompts.</p>
+        <p className="mt-1 text-[14px] text-muted">
+          Analyze requests with LLMs or generate local template prompts.
+        </p>
       </header>
 
       <form
         className="mt-4 space-y-4 rounded-card border border-border bg-panel-elevated p-4"
-        onSubmit={compilePrompt}
+        onSubmit={compileStaticPrompt}
       >
-        <PromptCompilerForm draft={draft} onChange={setDraft} />
-        {message !== null && <p className="text-[12px] text-muted-strong">{message}</p>}
+        <PromptCompilerForm draft={compiler.draft} onChange={compiler.setDraft} />
+        {compiler.message !== null && (
+          <p className="text-[12px] text-muted-strong">{compiler.message}</p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button type="submit">프롬프트 컴파일</Button>
           <Button
             type="button"
             variant="secondary"
-            disabled={selectedProject === null || compiled === null || isSaving}
-            onClick={savePrompt}
+            disabled={compiler.isAnalyzing || compiler.isCompilingLLM}
+            onClick={compiler.analyzeWithLLM}
           >
-            {isSaving ? "Saving..." : "Save compiled prompt"}
+            {compiler.isAnalyzing ? "분석 중..." : "분석하기"}
           </Button>
           <Button
             type="button"
+            variant="secondary"
+            disabled={compiler.isAnalyzing || compiler.isCompilingLLM}
+            onClick={compiler.compileWithLLM}
+          >
+            {compiler.isCompilingLLM ? "생성 중..." : "최종 프롬프트 생성"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={selectedProject === null || compiler.compiled === null || compiler.isSaving}
+            onClick={compiler.savePrompt}
+          >
+            {compiler.isSaving ? "Saving..." : "Save compiled prompt"}
+          </Button>
+          {selectedAsset !== null && compiler.compiled !== null && (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={compiler.isSavingNextVersion || compiler.editablePrompt.trim().length === 0}
+              onClick={compiler.saveNextVersion}
+            >
+              {compiler.isSavingNextVersion ? "Saving..." : "Save as new version"}
+            </Button>
+          )}
+          <Button
+            type="button"
             variant="ghost"
-            disabled={editablePrompt.trim().length === 0}
-            onClick={copyPrompt}
+            disabled={compiler.editablePrompt.trim().length === 0}
+            onClick={compiler.copyPrompt}
           >
             Copy
           </Button>
@@ -181,7 +140,18 @@ export function PromptCompilerPanel({
       </form>
 
       <div className="mt-4 flex flex-1 flex-col gap-4">
-        <CompiledPromptPreview value={editablePrompt} onChange={setEditablePrompt} />
+        <PromptCompilerAnalysis
+          analysis={compiler.analysis}
+          answers={compiler.answers}
+          compiled={compiler.compiled}
+          onAnswerChange={compiler.setAnswer}
+          onSuggestedTagChange={compiler.setSuggestedTagSelection}
+          selectedSuggestedTags={compiler.selectedSuggestedTags}
+        />
+        <CompiledPromptPreview
+          value={compiler.editablePrompt}
+          onChange={compiler.setEditablePrompt}
+        />
 
         {selectedProject === null && (
           <EmptyState
@@ -216,49 +186,15 @@ export function PromptCompilerPanel({
         )}
 
         {selectedAsset !== null && status === "ready" && currentVersion !== null && (
-          <Card className="flex flex-1 flex-col">
-            <CardHeader>
-              <div className="flex items-center justify-between gap-3">
-                <CardTitle>{selectedAsset.title}</CardTitle>
-                <Badge variant="accent">Version {currentVersion.versionNumber}</Badge>
-              </div>
-              <CardDescription>{scenarioLabel(selectedAsset.scenario)}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-4">
-              <dl className="grid gap-3">
-                <DetailRow label="title" value={selectedAsset.title} />
-                <DetailRow label="scenario" value={selectedAsset.scenario} />
-                <DetailRow
-                  label="target_agent"
-                  value={targetAgentLabel(selectedAsset.targetAgent)}
-                />
-                <DetailRow label="version_number" value={String(currentVersion.versionNumber)} />
-                <DetailRow label="created_at" value={formatTimestamp(currentVersion.createdAt)} />
-                <DetailRow label="updated_at" value={formatTimestamp(selectedAsset.updatedAt)} />
-              </dl>
-
-              <section className="space-y-2" aria-labelledby="original-input-heading">
-                <h3 id="original-input-heading" className="font-mono text-[11px] text-muted">
-                  original_input
-                </h3>
-                <p className="min-h-24 whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 text-[12px] leading-5 text-muted-strong">
-                  {currentVersion.originalInput}
-                </p>
-              </section>
-
-              <section
-                className="flex flex-col space-y-2"
-                aria-labelledby="compiled-prompt-heading"
-              >
-                <h3 id="compiled-prompt-heading" className="font-mono text-[11px] text-muted">
-                  compiled_prompt
-                </h3>
-                <p className="flex-1 whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 font-mono text-[12px] leading-5 text-muted-strong">
-                  {currentVersion.compiledPrompt}
-                </p>
-              </section>
-            </CardContent>
-          </Card>
+          <PromptVersionManagement
+            compareVersions={compareVersions}
+            currentVersion={currentVersion}
+            selectedAsset={selectedAsset}
+            selectedVersion={selectedVersion}
+            selectVersion={selectVersion}
+            setCurrentVersion={setCurrentVersion}
+            versions={versions}
+          />
         )}
       </div>
     </Panel>

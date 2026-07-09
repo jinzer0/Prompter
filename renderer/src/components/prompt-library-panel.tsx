@@ -1,125 +1,57 @@
-import { type FormEvent, useState } from "react"
-
 import type {
   CreatePromptAssetInput,
   CreatePromptVersionInput,
   Project,
   PromptAsset,
 } from "../../../electron/ipc-types"
-import type { LoadStatus } from "../hooks/use-prompter-library"
-import {
-  type PromptScenario,
-  parseScenario,
-  parseTargetAgent,
-  scenarioOptions,
-  type TargetAgent,
-  targetAgentOptions,
-} from "../lib/prompter-options"
+import { usePromptLibraryPanel } from "../hooks/use-prompt-library-panel"
+import type { LoadStatus, PromptVersionSummary } from "../hooks/use-prompter-library"
 import { PromptAssetCard } from "./prompt-asset-card"
+import { PromptLibraryFilters } from "./prompt-library-filters"
+import { PromptLibraryNewPromptForm } from "./prompt-library-new-prompt-form"
+import { PromptSearchResultCard } from "./prompt-search-result-card"
+import { PromptTagAttachmentForm } from "./prompt-tag-attachment-form"
 import { Panel } from "./shell/panel"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { EmptyState } from "./ui/empty-state"
-import { Input } from "./ui/input"
-import { Select } from "./ui/select"
-import { Textarea } from "./ui/textarea"
-
-type PromptDraft = {
-  readonly title: string
-  readonly scenario: PromptScenario
-  readonly targetAgent: TargetAgent
-  readonly originalInput: string
-  readonly compiledPrompt: string
-}
 
 type PromptLibraryPanelProps = {
   readonly assets: readonly PromptAsset[]
+  readonly currentVersionSummaries: readonly PromptVersionSummary[]
   readonly createPrompt: (
     assetInput: CreatePromptAssetInput,
     versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
   ) => Promise<PromptAsset>
   readonly error: string | null
+  readonly onTagsChanged: () => void
   readonly selectAsset: (id: string) => void
   readonly selectedAsset: PromptAsset | null
   readonly selectedProject: Project | null
   readonly status: LoadStatus
-}
-
-const emptyPromptDraft: PromptDraft = {
-  title: "",
-  scenario: "feature",
-  targetAgent: "codex",
-  originalInput: "",
-  compiledPrompt: "",
+  readonly tagRefreshSignal: number
 }
 
 export function PromptLibraryPanel({
   assets,
+  currentVersionSummaries,
   createPrompt,
   error,
+  onTagsChanged,
   selectAsset,
   selectedAsset,
   selectedProject,
   status,
+  tagRefreshSignal,
 }: PromptLibraryPanelProps) {
-  const [draft, setDraft] = useState<PromptDraft>(emptyPromptDraft)
-  const [isFormOpen, setIsFormOpen] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-
-  async function submitPrompt(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault()
-
-    if (selectedProject === null) {
-      setMessage("Select a project before saving prompt")
-      return
-    }
-
-    const title = draft.title.trim()
-
-    if (title.length === 0) {
-      setMessage("Prompt title is required")
-      return
-    }
-
-    const originalInput = draft.originalInput.trim()
-
-    if (originalInput.length === 0) {
-      setMessage("Original input is required")
-      return
-    }
-
-    const compiledPrompt = draft.compiledPrompt.trim()
-
-    if (compiledPrompt.length === 0) {
-      setMessage("Compiled prompt is required")
-      return
-    }
-
-    setIsSaving(true)
-    setMessage(null)
-
-    try {
-      await createPrompt(
-        {
-          projectId: selectedProject.id,
-          title,
-          scenario: draft.scenario,
-          targetAgent: draft.targetAgent,
-        },
-        {
-          originalInput,
-          compiledPrompt,
-        },
-      )
-      setDraft(emptyPromptDraft)
-      setIsFormOpen(false)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Prompt could not be saved")
-    } finally {
-      setIsSaving(false)
-    }
-  }
+  const library = usePromptLibraryPanel({
+    assets,
+    createPrompt,
+    currentVersionSummaries,
+    selectedProject,
+    status,
+    tagRefreshSignal,
+  })
 
   return (
     <Panel data-testid="prompt-library" headingId="prompt-library-heading">
@@ -140,69 +72,38 @@ export function PromptLibraryPanel({
         </div>
         <Button
           disabled={selectedProject === null}
-          onClick={() => setIsFormOpen((isOpen) => !isOpen)}
+          onClick={() => library.setIsFormOpen(true)}
         >
           New Prompt
         </Button>
       </header>
 
-      {isFormOpen && selectedProject !== null && (
-        <form
-          className="mt-4 space-y-3 rounded-card border border-border bg-panel-elevated p-4"
-          onSubmit={submitPrompt}
-        >
-          <Input
-            aria-label="Prompt title"
-            placeholder="Prompt title"
-            value={draft.title}
-            onChange={(event) => setDraft({ ...draft, title: event.currentTarget.value })}
+      {library.isFormOpen && selectedProject !== null && (
+        <PromptLibraryNewPromptForm
+          draft={library.draft}
+          isSaving={library.isSaving}
+          message={library.message}
+          onChange={library.setDraft}
+          onSubmit={library.submitPrompt}
+        />
+      )}
+
+      {selectedProject !== null && (
+        <>
+          <PromptLibraryFilters
+            query={library.searchQuery}
+            scenario={library.scenarioFilter}
+            selectedTagIds={library.selectedTagIds}
+            tagCounts={library.tagCounts}
+            targetAgent={library.targetAgentFilter}
+            onClear={library.clearFilters}
+            onQueryChange={library.setSearchQuery}
+            onScenarioChange={library.setScenarioFilter}
+            onTagToggle={library.toggleTagFilter}
+            onTargetAgentChange={library.setTargetAgentFilter}
           />
-          <div className="grid gap-3 md:grid-cols-2">
-            <Select
-              aria-label="Scenario"
-              value={draft.scenario}
-              onChange={(event) =>
-                setDraft({ ...draft, scenario: parseScenario(event.currentTarget.value) })
-              }
-            >
-              {scenarioOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-            <Select
-              aria-label="Target agent"
-              value={draft.targetAgent}
-              onChange={(event) =>
-                setDraft({ ...draft, targetAgent: parseTargetAgent(event.currentTarget.value) })
-              }
-            >
-              {targetAgentOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Textarea
-            aria-label="Original input"
-            placeholder="Original input"
-            value={draft.originalInput}
-            onChange={(event) => setDraft({ ...draft, originalInput: event.currentTarget.value })}
-          />
-          <Textarea
-            aria-label="Compiled prompt"
-            placeholder="Compiled prompt"
-            value={draft.compiledPrompt}
-            onChange={(event) => setDraft({ ...draft, compiledPrompt: event.currentTarget.value })}
-          />
-          {message !== null && <p className="text-[12px] text-muted-strong">{message}</p>}
-          {isSaving && <p className="text-[12px] text-muted">Saving prompt...</p>}
-          <Button type="submit" disabled={isSaving}>
-            Save Prompt
-          </Button>
-        </form>
+          <PromptTagAttachmentForm selectedAsset={selectedAsset} onTagsChanged={onTagsChanged} />
+        </>
       )}
 
       <div className="mt-4 flex flex-1 flex-col gap-3">
@@ -228,20 +129,48 @@ export function PromptLibraryPanel({
         {selectedProject !== null && status === "error" && (
           <p className="text-[12px] text-muted-strong">{error}</p>
         )}
-        {selectedProject !== null && status === "ready" && assets.length === 0 && (
+        {selectedProject !== null && library.searchStatus === "loading" && (
+          <p className="text-[12px] text-muted">Searching prompts...</p>
+        )}
+        {selectedProject !== null && library.searchStatus === "error" && (
+          <p className="text-[12px] text-muted-strong">{library.searchError}</p>
+        )}
+        {selectedProject !== null && status === "ready" && assets.length === 0 && !library.hasActiveFilters && (
           <EmptyState
             label="Library state"
             title="No prompts yet"
             description="Create a prompt to store its first asset version in SQLite."
           />
         )}
+        {selectedProject !== null &&
+          status === "ready" &&
+          library.hasActiveFilters &&
+          library.searchStatus === "ready" &&
+          library.searchResults !== null &&
+          library.searchResults.length === 0 && (
+            <EmptyState
+              label="Library state"
+              title="No prompts match your filters"
+              description="Clear search filters or adjust the query."
+            />
+          )}
 
-        {assets.map((asset) => (
-          <PromptAssetCard
-            key={asset.id}
-            asset={asset}
-            isSelected={asset.id === selectedAsset?.id}
-            onSelect={() => selectAsset(asset.id)}
+        {library.searchResults === null &&
+          library.defaultItems.map(({ asset, currentVersion }) => (
+            <PromptAssetCard
+              key={asset.id}
+              asset={asset}
+              currentVersion={currentVersion}
+              isSelected={asset.id === selectedAsset?.id}
+              onSelect={() => selectAsset(asset.id)}
+            />
+          ))}
+        {library.searchResults?.map((item) => (
+          <PromptSearchResultCard
+            key={item.promptAssetId}
+            item={item}
+            isSelected={item.promptAssetId === selectedAsset?.id}
+            onSelect={() => selectAsset(item.promptAssetId)}
           />
         ))}
       </div>

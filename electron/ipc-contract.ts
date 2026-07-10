@@ -92,6 +92,7 @@ export const PERSISTENCE_CHANNELS = {
   formatPromptForExport: "prompter:exports:format-prompt",
   savePromptToFile: "prompter:exports:save-prompt-to-file",
   copyText: "prompter:clipboard:copy-text",
+  readText: "prompter:clipboard:read-text",
 } as const
 
 export type PingResponse = typeof PING_RESPONSE
@@ -292,6 +293,11 @@ export const savePromptToFileInputSchema = z.union([
   directSavePromptToFileInputSchema,
 ])
 export const copyTextInputSchema = z.object({ text: requiredTextSchema })
+export const clipboardReadTextResultSchema = z.object({
+  text: z.string(),
+  isEmpty: z.boolean(),
+  length: z.number().int().nonnegative(),
+})
 export const exportPromptResultSchema = z.object({
   format: exportFormatSchema,
   filename: z.string().trim().min(1),
@@ -526,6 +532,7 @@ export const payloadSchemas = {
   formatPromptForExport: formatPromptForExportInputSchema,
   savePromptToFile: savePromptToFileInputSchema,
   copyText: copyTextInputSchema,
+  readText: noPayloadSchema,
 } as const
 
 export const responseSchemas = {
@@ -576,4 +583,5 @@ export const responseSchemas = {
   formatPromptForExport: exportPromptResultSchema,
   savePromptToFile: savePromptToFileResultSchema,
   copyText: copyTextResultSchema,
+  readText: clipboardReadTextResultSchema,
 } as const

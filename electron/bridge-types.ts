@@ -2,6 +2,7 @@ import type { z } from "zod"
 import type { MenuAction } from "./app-menu.js"
 import type { PingResponse, payloadSchemas } from "./ipc-contract.js"
 import type {
+  ClipboardReadTextResult,
   ComparePromptVersionsResult,
   CopyTextInput,
   CopyTextResult,
@@ -122,5 +123,6 @@ export type ElectronBridge = {
   }
   readonly clipboard: {
     readonly copyText: (input: CopyTextInput) => Promise<CopyTextResult>
+    readonly readText: () => Promise<ClipboardReadTextResult>
   }
 }

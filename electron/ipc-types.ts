@@ -1,6 +1,7 @@
 import type { z } from "zod"
 
 import type {
+  clipboardReadTextResultSchema,
   comparePromptVersionsInputSchema,
   comparePromptVersionsResultSchema,
   copyTextInputSchema,
@@ -81,6 +82,7 @@ export type SavePromptToFileInput = z.output<typeof savePromptToFileInputSchema>
 export type SavePromptToFileResult = z.infer<typeof savePromptToFileResultSchema>
 export type CopyTextInput = z.output<typeof copyTextInputSchema>
 export type CopyTextResult = z.infer<typeof copyTextResultSchema>
+export type ClipboardReadTextResult = z.infer<typeof clipboardReadTextResultSchema>
 export type PromptCompilerAnalyzeInput = z.output<typeof promptCompilerAnalyzeInputSchema>
 export type PromptCompilerCompileInput = z.output<typeof promptCompilerCompileInputSchema>
 export type PromptCompilerAnalyzeOutput = z.infer<typeof promptCompilerAnalyzeOutputSchema>

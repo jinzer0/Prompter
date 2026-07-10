@@ -83,7 +83,12 @@ export function ProjectSidebarSection({
         <h2 id="projects-heading" className="text-[16px] font-semibold text-foreground">
           Projects
         </h2>
-        <Button variant="ghost" size="sm" onClick={() => setIsFormOpen((isOpen) => !isOpen)}>
+        <Button
+          data-menu-action-target="new-project"
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsFormOpen((isOpen) => !isOpen)}
+        >
           New Project
         </Button>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 
+import type { MenuAction } from "../../electron/app-menu"
 import type { PingResponse } from "../../electron/bridge"
 import { ProjectSidebarSection } from "./components/project-sidebar-section"
 import { PromptCompilerPanel } from "./components/prompt-compiler-panel"
@@ -9,6 +10,65 @@ import { SidebarSection, sidebarSections } from "./components/shell/sidebar-sect
 import { useProjectPrompts, useProjects } from "./hooks/use-prompter-library"
 
 type PingState = PingResponse | "pending"
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled menu action: ${value}`)
+}
+
+function clickMenuTarget(target: string): void {
+  const element = document.querySelector<HTMLElement>(`[data-menu-action-target="${target}"]`)
+
+  if (element instanceof HTMLButtonElement && element.disabled) {
+    return
+  }
+
+  element?.click()
+}
+
+function focusMenuTarget(target: string): void {
+  const element = document.querySelector<HTMLElement>(`[data-menu-action-target="${target}"]`)
+  element?.focus()
+  element?.scrollIntoView({ block: "nearest" })
+}
+
+function handleMenuAction(action: MenuAction): void {
+  switch (action) {
+    case "newPrompt":
+      clickMenuTarget("new-prompt")
+      return
+    case "newProject":
+      clickMenuTarget("new-project")
+      return
+    case "focusSearch":
+      focusMenuTarget("search-prompts")
+      return
+    case "savePrompt":
+      clickMenuTarget("save-compiled-prompt")
+      return
+    case "copyCompiledPrompt":
+      clickMenuTarget("copy-compiled-prompt")
+      return
+    case "exportPrompt":
+      clickMenuTarget("save-compiled-export")
+      return
+    case "openSettings":
+      focusMenuTarget("settings-panel")
+      return
+    case "closeActivePanel":
+      document.activeElement instanceof HTMLElement && document.activeElement.blur()
+      return
+    default:
+      assertNever(action)
+  }
+}
+
+function handleMenuKeyDown(event: KeyboardEvent): void {
+  if (event.key !== "Escape" || event.defaultPrevented) {
+    return
+  }
+
+  handleMenuAction("closeActivePanel")
+}
 
 export function App() {
   const [pingResult, setPingResult] = useState<PingState>("pending")
@@ -36,6 +96,13 @@ export function App() {
     return () => {
       isActive = false
     }
+  }, [])
+
+  useEffect(() => window.prompter.menu.onAction(handleMenuAction), [])
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleMenuKeyDown)
+    return () => window.removeEventListener("keydown", handleMenuKeyDown)
   }, [])
 
   return (

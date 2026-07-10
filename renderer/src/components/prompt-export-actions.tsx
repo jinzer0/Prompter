@@ -179,6 +179,7 @@ export function PromptExportActions({
             {copyButtonLabel}
           </Button>
           <Button
+            data-menu-action-target="save-compiled-export"
             type="button"
             variant="ghost"
             disabled={!hasContent || isWorking}

@@ -109,6 +109,7 @@ export function PromptCompilerPanel({
             {compiler.isAnalyzing ? "분석 중..." : "분석하기"}
           </Button>
           <Button
+            data-menu-action-target="save-compiled-prompt"
             type="button"
             variant="secondary"
             disabled={compiler.isAnalyzing || compiler.isCompilingLLM}
@@ -135,6 +136,7 @@ export function PromptCompilerPanel({
             </Button>
           )}
           <Button
+            data-menu-action-target="copy-compiled-prompt"
             type="button"
             variant="ghost"
             disabled={compiler.editablePrompt.trim().length === 0}

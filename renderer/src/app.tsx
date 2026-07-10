@@ -39,6 +39,9 @@ function handleMenuAction(action: MenuAction): void {
     case "newProject":
       clickMenuTarget("new-project")
       return
+    case "quickCaptureFromClipboard":
+      clickMenuTarget("quick-capture-from-clipboard")
+      return
     case "focusSearch":
       focusMenuTarget("search-prompts")
       return
@@ -63,7 +66,17 @@ function handleMenuAction(action: MenuAction): void {
 }
 
 function handleMenuKeyDown(event: KeyboardEvent): void {
-  if (event.key !== "Escape" || event.defaultPrevented) {
+  if (event.defaultPrevented) {
+    return
+  }
+
+  if (event.key.toLowerCase() === "v" && event.shiftKey && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault()
+    handleMenuAction("quickCaptureFromClipboard")
+    return
+  }
+
+  if (event.key !== "Escape") {
     return
   }
 

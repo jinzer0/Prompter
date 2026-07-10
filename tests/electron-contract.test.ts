@@ -122,11 +122,17 @@ describe("Electron shell contract", () => {
       "utf8",
     )
     const saveTargetIndex = compilerSource.indexOf('data-menu-action-target="save-compiled-prompt"')
+    const quickCaptureTargetIndex = compilerSource.indexOf(
+      'data-menu-action-target="quick-capture-from-clipboard"',
+    )
     const analyzeHandlerIndex = compilerSource.indexOf("onClick={compiler.analyzeWithLLM}")
     const saveHandlerIndex = compilerSource.indexOf("onClick={compiler.savePrompt}")
 
+    expect(quickCaptureTargetIndex).toBeGreaterThan(-1)
     expect(saveTargetIndex).toBeGreaterThan(analyzeHandlerIndex)
     expect(saveHandlerIndex).toBeGreaterThan(saveTargetIndex)
+    expect(appSource).toContain('case "quickCaptureFromClipboard"')
+    expect(appSource).toContain('clickMenuTarget("quick-capture-from-clipboard")')
     expect(appSource).toContain('event.key !== "Escape"')
     expect(appSource).toContain('handleMenuAction("closeActivePanel")')
     expect(appSource).toContain('window.addEventListener("keydown", handleMenuKeyDown)')
@@ -150,6 +156,7 @@ describe("Electron shell contract", () => {
     expect(MENU_ACTIONS).toEqual([
       "newPrompt",
       "newProject",
+      "quickCaptureFromClipboard",
       "focusSearch",
       "savePrompt",
       "copyCompiledPrompt",
@@ -158,6 +165,7 @@ describe("Electron shell contract", () => {
       "closeActivePanel",
     ])
     expect(menuActionSchema.parse("focusSearch")).toBe("focusSearch")
+    expect(menuActionSchema.parse("quickCaptureFromClipboard")).toBe("quickCaptureFromClipboard")
     expect(() => menuActionSchema.parse("runPrompt")).toThrow()
   })
 
@@ -179,6 +187,9 @@ describe("Electron shell contract", () => {
     ])
     expect(findMenuItem(template, "New Prompt").accelerator).toBe("CmdOrCtrl+N")
     expect(findMenuItem(template, "New Project").accelerator).toBe("CmdOrCtrl+Shift+N")
+    expect(findMenuItem(template, "Quick Capture from Clipboard").accelerator).toBe(
+      "CmdOrCtrl+Shift+V",
+    )
     expect(findMenuItem(template, "Search").accelerator).toBe("CmdOrCtrl+F")
     expect(findMenuItem(template, "Save Prompt").accelerator).toBe("CmdOrCtrl+S")
     expect(findMenuItem(template, "Copy Compiled Prompt").accelerator).toBe("CmdOrCtrl+Shift+C")
@@ -187,6 +198,7 @@ describe("Electron shell contract", () => {
 
     clickMenuItem(findMenuItem(template, "New Prompt"))
     clickMenuItem(findMenuItem(template, "New Project"))
+    clickMenuItem(findMenuItem(template, "Quick Capture from Clipboard"))
     clickMenuItem(findMenuItem(template, "Search"))
     clickMenuItem(findMenuItem(template, "Copy Compiled Prompt"))
     clickMenuItem(findMenuItem(template, "Close Active Panel"))
@@ -194,6 +206,7 @@ describe("Electron shell contract", () => {
     expect(actions).toEqual([
       "newPrompt",
       "newProject",
+      "quickCaptureFromClipboard",
       "focusSearch",
       "copyCompiledPrompt",
       "closeActivePanel",
@@ -299,7 +312,7 @@ describe("Electron shell contract", () => {
     ])
     expect(Object.keys(bridge.promptCompiler)).toEqual(["analyze", "compile"])
     expect(Object.keys(bridge.exports)).toEqual(["formatPrompt", "savePromptToFile"])
-    expect(Object.keys(bridge.clipboard)).toEqual(["copyText"])
+    expect(Object.keys(bridge.clipboard)).toEqual(["copyText", "readText"])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()
   })

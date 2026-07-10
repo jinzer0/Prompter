@@ -5,6 +5,7 @@ export const MENU_ACTION_CHANNEL = "prompter:menu-action" as const
 export const MENU_ACTIONS = [
   "newPrompt",
   "newProject",
+  "quickCaptureFromClipboard",
   "focusSearch",
   "savePrompt",
   "copyCompiledPrompt",
@@ -91,6 +92,11 @@ export function createApplicationMenuTemplate({
           label: "New Project",
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => sendAction("newProject"),
+        },
+        {
+          label: "Quick Capture from Clipboard",
+          accelerator: "CmdOrCtrl+Shift+V",
+          click: () => sendAction("quickCaptureFromClipboard"),
         },
         { type: "separator" },
         {

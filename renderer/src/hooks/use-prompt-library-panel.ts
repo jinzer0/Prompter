@@ -9,9 +9,9 @@ import type {
   PromptVersion,
   TagWithCount,
 } from "../../../electron/ipc-types"
+import type { ScenarioFilter, TargetAgentFilter } from "../components/prompt-library-filters"
 import type { PromptDraft } from "../components/prompt-library-new-prompt-form"
 import { emptyPromptDraft } from "../components/prompt-library-new-prompt-form"
-import type { ScenarioFilter, TargetAgentFilter } from "../components/prompt-library-filters"
 import type { LoadStatus, PromptVersionSummary } from "./prompt-library-data"
 
 type CreatePrompt = (
@@ -71,6 +71,8 @@ export function usePromptLibraryPanel({
   )
 
   useEffect(() => {
+    void tagRefreshSignal
+
     if (selectedProject === null || status !== "ready") {
       setTagCounts([])
       return
@@ -94,6 +96,8 @@ export function usePromptLibraryPanel({
   }, [selectedProject, status, tagRefreshSignal])
 
   useEffect(() => {
+    void tagRefreshSignal
+
     if (selectedProject === null || status !== "ready" || !hasActiveFilters) {
       setSearchResults(null)
       setSearchStatus("ready")

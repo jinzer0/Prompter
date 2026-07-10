@@ -21,6 +21,7 @@ import { compileStaticPrompt } from "../lib/prompt-compiler/static-prompt-compil
 import type { CompiledPromptResult, PromptCompilerInput } from "../lib/prompt-compiler/types"
 import { versionInputFromCompiled } from "../lib/prompt-compiler/version-input"
 import { useCompilerDefaults } from "./use-compiler-defaults"
+import { useCompilerQuickCapture } from "./use-compiler-quick-capture"
 import { useCompilerSuggestedTags } from "./use-compiler-suggested-tags"
 
 type CreatePrompt = (
@@ -58,6 +59,21 @@ export function usePromptCompilerPanel({
   const suggestedTags = useCompilerSuggestedTags({ onTagsChanged })
 
   useCompilerDefaults(setDraft, setMessage)
+
+  function resetImportedDraftState(): void {
+    setAnalysis(null)
+    setAnswers({})
+    setCompiled(null)
+    setEditablePrompt("")
+    suggestedTags.clearSuggestedTags()
+  }
+
+  const quickCapture = useCompilerQuickCapture({
+    draft,
+    resetImportedDraftState,
+    setDraft,
+    setMessage,
+  })
 
   function compileStatic(): void {
     if (draft.originalInput.trim().length === 0) {
@@ -244,17 +260,23 @@ export function usePromptCompilerPanel({
     analysis,
     answers,
     analyzeWithLLM,
+    cancelClipboardImport: quickCapture.cancelClipboardImport,
     compileStatic,
     compileWithLLM,
     compiled,
+    confirmClipboardImport: quickCapture.confirmClipboardImport,
     copyPrompt,
     draft,
     editablePrompt,
+    importFromClipboard: quickCapture.importFromClipboard,
     isAnalyzing,
     isCompilingLLM,
+    isReadingClipboard: quickCapture.isReadingClipboard,
     isSaving,
     isSavingNextVersion,
     message,
+    originalRequestFocusSignal: quickCapture.originalRequestFocusSignal,
+    pendingClipboardImport: quickCapture.pendingClipboardImport,
     saveNextVersion,
     savePrompt,
     setAnswer,

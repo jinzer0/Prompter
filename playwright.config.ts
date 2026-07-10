@@ -9,6 +9,7 @@ export default defineConfig({
     "electron-settings-ui.test.ts",
     "electron-llm-compiler-ui.test.ts",
     "electron-prompt-search-ui.test.ts",
+    "phase11-quick-capture-ui.test.ts",
   ],
   timeout: 30_000,
   workers: 1,

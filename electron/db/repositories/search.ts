@@ -1,8 +1,7 @@
 import type Database from "better-sqlite3"
 import { z } from "zod"
-
-import type { PromptSearchFilter, PromptSearchResult, PromptSearchTag } from "../../ipc-types.js"
 import { promptAssetSchema, promptVersionSchema, tagSchema } from "../../ipc-contract.js"
+import type { PromptSearchFilter, PromptSearchResult, PromptSearchTag } from "../../ipc-types.js"
 
 const searchRowSchema = z.object({ promptAssetId: z.string().uuid() })
 const searchRowsSchema = z.array(searchRowSchema)
@@ -59,7 +58,10 @@ function addInFilter(
   parameters.push(...values)
 }
 
-function findPromptTags(sqlite: Database.Database, promptAssetId: string): readonly PromptSearchTag[] {
+function findPromptTags(
+  sqlite: Database.Database,
+  promptAssetId: string,
+): readonly PromptSearchTag[] {
   return promptSearchTagsSchema.parse(
     sqlite
       .prepare(
@@ -183,7 +185,9 @@ export function createSearchRepository(sqlite: Database.Database): SearchReposit
       }
       if (filter.projectId !== undefined) {
         clauses.push(
-          filter.projectId === null ? "prompt_assets.project_id IS NULL" : "prompt_assets.project_id = ?",
+          filter.projectId === null
+            ? "prompt_assets.project_id IS NULL"
+            : "prompt_assets.project_id = ?",
         )
         if (filter.projectId !== null) {
           parameters.push(filter.projectId)

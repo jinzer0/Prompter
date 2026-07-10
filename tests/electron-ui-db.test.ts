@@ -183,7 +183,7 @@ test("compiles and saves a static prompt through the compiler panel", async ({
     await expect(preview).toContainText("# Final Response Format")
     await preview.fill("# Objective\nManual preview edit before save.")
     await expect(preview).toHaveValue("# Objective\nManual preview edit before save.")
-    await firstRun.page.getByRole("button", { name: "Copy" }).click()
+    await firstRun.page.getByRole("button", { name: "Copy", exact: true }).click()
     await expect(firstRun.page.getByText("Compiled prompt copied.")).toBeVisible()
 
     await firstRun.page.getByRole("button", { name: "Save compiled prompt" }).click()

@@ -1,3 +1,4 @@
+import type Database from "better-sqlite3"
 import {
   createPromptCompilerService,
   type PromptCompilerClientFactory,
@@ -7,7 +8,6 @@ import {
   createUnavailableOpenAIKeyStore,
   type OpenAIKeyStore,
 } from "../secrets/open-ai-key-store.js"
-import type Database from "better-sqlite3"
 import type { AppDatabase } from "./repositories/common.js"
 import { createHarnessTemplateRepository } from "./repositories/harness-templates.js"
 import { createProjectRepository } from "./repositories/projects.js"

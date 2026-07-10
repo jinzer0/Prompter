@@ -27,7 +27,9 @@ describe("Electron Phase 7 search persistence", () => {
 
       const ftsTables = stringArraySchema.parse(
         database.sqlite
-          .prepare("select name from sqlite_master where type = 'table' and name = 'prompt_search_fts'")
+          .prepare(
+            "select name from sqlite_master where type = 'table' and name = 'prompt_search_fts'",
+          )
           .pluck()
           .all(),
       )
@@ -148,7 +150,9 @@ describe("Electron Phase 7 search persistence", () => {
       })
 
       const firstLink = createAndAttachTagToPrompt(database, firstPrompt.id, { name: "phase-7" })
-      const duplicateLink = createAndAttachTagToPrompt(database, firstPrompt.id, { name: "phase-7" })
+      const duplicateLink = createAndAttachTagToPrompt(database, firstPrompt.id, {
+        name: "phase-7",
+      })
       createAndAttachTagToPrompt(database, secondPrompt.id, { name: "phase-7" })
 
       expect(duplicateLink).toEqual(firstLink)

@@ -83,7 +83,9 @@ test("searches prompts with filters and saves LLM suggested tags", async ({
     await page.getByRole("button", { name: "Save API key" }).click()
     await page.getByRole("textbox", { name: "Original request" }).fill("Build Phase 7 search UX.")
     await page.getByRole("button", { name: "분석하기" }).click()
-    await expect(page.getByText("The request needs one clarification before compiling.")).toBeVisible()
+    await expect(
+      page.getByText("The request needs one clarification before compiling."),
+    ).toBeVisible()
     await page.getByRole("textbox", { name: "Answer for focus" }).fill("Search, filters, and tags.")
     await page.getByRole("button", { name: "최종 프롬프트 생성" }).click()
     await expect(page.getByRole("checkbox", { name: "Save tag phase5" })).toBeVisible()

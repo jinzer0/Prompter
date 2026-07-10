@@ -20,10 +20,7 @@ export type TagRepository = {
   readonly detachTagFromPrompt: (promptAssetId: string, tagId: string) => TagLink
   readonly listTagsForPrompt: (promptAssetId: string) => readonly Tag[]
   readonly listTagsWithCounts: () => readonly TagCount[]
-  readonly createAndAttachTagToPrompt: (
-    promptAssetId: string,
-    input: CreateTagInput,
-  ) => TagLink
+  readonly createAndAttachTagToPrompt: (promptAssetId: string, input: CreateTagInput) => TagLink
 }
 
 function findTagByName(db: AppDatabase, name: string): Tag | undefined {

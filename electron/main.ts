@@ -1,7 +1,8 @@
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { app, BrowserWindow, clipboard, dialog, safeStorage } from "electron"
+import { app, BrowserWindow, clipboard, dialog, Menu, safeStorage } from "electron"
 
+import { createApplicationMenuTemplate, MENU_ACTION_CHANNEL } from "./app-menu.js"
 import { openPrompterDatabase, type PrompterDatabase } from "./db/connection.js"
 import { registerIpcHandlers } from "./ipc-handlers.js"
 import { createTestPromptCompilerClientFactory } from "./prompt-compiler/test-client.js"
@@ -38,6 +39,18 @@ function openMainDatabase(): PrompterDatabase {
   })
 }
 
+function installApplicationMenu(window: BrowserWindow): void {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate(
+      createApplicationMenuTemplate({
+        isDevelopment: rendererDevServerUrl !== undefined && rendererDevServerUrl.length > 0,
+        isMac: process.platform === "darwin",
+        sendAction: (action) => window.webContents.send(MENU_ACTION_CHANNEL, action),
+      }),
+    ),
+  )
+}
+
 const promptExportNativeDependencies = {
   showSaveDialog: (options) =>
     dialog.showSaveDialog({
@@ -53,6 +66,7 @@ const promptExportNativeDependencies = {
 
 async function createMainWindow(): Promise<void> {
   const window = new BrowserWindow(createWindowOptions(preloadPath))
+  installApplicationMenu(window)
 
   if (rendererDevServerUrl === undefined || rendererDevServerUrl.length === 0) {
     await window.loadFile(join(electronDirectory, "../dist/renderer/index.html"))

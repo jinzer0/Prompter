@@ -1,5 +1,6 @@
 import type { z } from "zod"
 
+import type { MenuAction } from "./app-menu.js"
 import type { ElectronBridge } from "./bridge-types.js"
 import {
   type IpcChannel,
@@ -17,6 +18,7 @@ export type { ElectronBridge, PingResponse }
 export { PING_CHANNEL, PING_RESPONSE }
 
 type InvokeIpc = (channel: IpcChannel, payload?: unknown) => Promise<unknown>
+type SubscribeMenuAction = (callback: (action: MenuAction) => void) => () => void
 type BridgeRequest = <TPayload extends z.ZodType, TResponse extends z.ZodType>(
   channel: IpcChannel,
   payloadSchema: TPayload,
@@ -32,7 +34,10 @@ function createBridgeRequest(invoke: InvokeIpc): BridgeRequest {
   }
 }
 
-export function createElectronBridge(invoke: InvokeIpc): ElectronBridge {
+export function createElectronBridge(
+  invoke: InvokeIpc,
+  subscribeMenuAction: SubscribeMenuAction = () => () => undefined,
+): ElectronBridge {
   const request = createBridgeRequest(invoke)
   const ch = PERSISTENCE_CHANNELS
   const payload = payloadSchemas
@@ -47,6 +52,9 @@ export function createElectronBridge(invoke: InvokeIpc): ElectronBridge {
       }
 
       throw new TypeError("Unexpected ping response from main process")
+    },
+    menu: {
+      onAction: subscribeMenuAction,
     },
     projects: {
       create: (input) =>

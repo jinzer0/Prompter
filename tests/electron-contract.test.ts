@@ -1,6 +1,12 @@
 import { readFile } from "node:fs/promises"
 import { describe, expect, it } from "vitest"
 
+import {
+  createApplicationMenuTemplate,
+  MENU_ACTION_CHANNEL,
+  MENU_ACTIONS,
+  menuActionSchema,
+} from "../electron/app-menu"
 import { createElectronBridge, PING_RESPONSE } from "../electron/bridge"
 import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
@@ -42,8 +48,90 @@ const compareVersionResponse = {
   versionNumber: 2,
   compiledPrompt: "Compiled prompt\nwith changes",
 } as const
+type MenuTemplateItem = ReturnType<typeof createApplicationMenuTemplate>[number]
+
+function findMenuItem(items: readonly MenuTemplateItem[], label: string): MenuTemplateItem {
+  for (const item of items) {
+    if (item.label === label) {
+      return item
+    }
+
+    if (Array.isArray(item.submenu)) {
+      const nested = item.submenu.find((submenuItem) => submenuItem.label === label)
+      if (nested !== undefined) {
+        return nested
+      }
+    }
+  }
+
+  throw new Error(`Menu item not found: ${label}`)
+}
+
+function findMenuRole(items: readonly MenuTemplateItem[], role: string): MenuTemplateItem {
+  for (const item of items) {
+    if (item.role === role) {
+      return item
+    }
+
+    if (Array.isArray(item.submenu)) {
+      const nested = item.submenu.find((submenuItem) => submenuItem.role === role)
+      if (nested !== undefined) {
+        return nested
+      }
+    }
+  }
+
+  throw new Error(`Menu role not found: ${role}`)
+}
+
+function clickMenuItem(item: MenuTemplateItem): void {
+  const click = item.click
+
+  if (click === undefined) {
+    throw new Error(`Menu item has no click handler: ${item.label ?? item.role ?? "unknown"}`)
+  }
+
+  Reflect.apply(click, undefined, [])
+}
 
 describe("Electron shell contract", () => {
+  it("defines macOS packaging scripts with native and migration safeguards", async () => {
+    const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
+      readonly scripts?: Record<string, string>
+    }
+    const packageScript = await readFile("scripts/package-macos.mjs", "utf8")
+    const zipTemplate = ["darwin-", "{process.arch}.zip"].join("$")
+
+    expect(packageJson.scripts?.["package"]).toBe("npm run build && node scripts/package-macos.mjs")
+    expect(packageJson.scripts?.["make"]).toBe("npm run package")
+    expect(packageScript).toContain("com.local.prompter")
+    expect(packageScript).toContain("Prompter.app")
+    expect(packageScript).toContain(zipTemplate)
+    expect(packageScript).toContain("CFBundleExecutable")
+    expect(packageScript).toContain('"Contents", "MacOS", "Electron"')
+    expect(packageScript).toContain("better-sqlite3")
+    expect(packageScript).toContain("drizzle")
+    expect(packageScript).toContain("unsigned")
+    expect(packageScript).not.toContain('replaceAll("Electron", appName)')
+  })
+
+  it("maps menu shortcuts to the intended renderer targets", async () => {
+    const appSource = await readFile("renderer/src/app.tsx", "utf8")
+    const compilerSource = await readFile(
+      "renderer/src/components/prompt-compiler-panel.tsx",
+      "utf8",
+    )
+    const saveTargetIndex = compilerSource.indexOf('data-menu-action-target="save-compiled-prompt"')
+    const analyzeHandlerIndex = compilerSource.indexOf("onClick={compiler.analyzeWithLLM}")
+    const saveHandlerIndex = compilerSource.indexOf("onClick={compiler.savePrompt}")
+
+    expect(saveTargetIndex).toBeGreaterThan(analyzeHandlerIndex)
+    expect(saveHandlerIndex).toBeGreaterThan(saveTargetIndex)
+    expect(appSource).toContain('event.key !== "Escape"')
+    expect(appSource).toContain('handleMenuAction("closeActivePanel")')
+    expect(appSource).toContain('window.addEventListener("keydown", handleMenuKeyDown)')
+  })
+
   it("uses secure BrowserWindow defaults for the main window", () => {
     const preloadPath = "/tmp/prompter-preload.js"
 
@@ -55,6 +143,79 @@ describe("Electron shell contract", () => {
       nodeIntegration: false,
       sandbox: true,
     })
+  })
+
+  it("defines the narrow main-to-renderer menu action channel", () => {
+    expect(MENU_ACTION_CHANNEL).toBe("prompter:menu-action")
+    expect(MENU_ACTIONS).toEqual([
+      "newPrompt",
+      "newProject",
+      "focusSearch",
+      "savePrompt",
+      "copyCompiledPrompt",
+      "exportPrompt",
+      "openSettings",
+      "closeActivePanel",
+    ])
+    expect(menuActionSchema.parse("focusSearch")).toBe("focusSearch")
+    expect(() => menuActionSchema.parse("runPrompt")).toThrow()
+  })
+
+  it("routes macOS menu accelerators through narrow renderer actions", () => {
+    const actions: string[] = []
+    const template = createApplicationMenuTemplate({
+      isDevelopment: false,
+      isMac: true,
+      sendAction: (action) => actions.push(action),
+    })
+
+    expect(template.map((item) => item.label)).toEqual([
+      "Prompter",
+      "File",
+      "Edit",
+      "View",
+      "Window",
+      "Help",
+    ])
+    expect(findMenuItem(template, "New Prompt").accelerator).toBe("CmdOrCtrl+N")
+    expect(findMenuItem(template, "New Project").accelerator).toBe("CmdOrCtrl+Shift+N")
+    expect(findMenuItem(template, "Search").accelerator).toBe("CmdOrCtrl+F")
+    expect(findMenuItem(template, "Save Prompt").accelerator).toBe("CmdOrCtrl+S")
+    expect(findMenuItem(template, "Copy Compiled Prompt").accelerator).toBe("CmdOrCtrl+Shift+C")
+    expect(findMenuItem(template, "Close Active Panel").accelerator).toBe("Esc")
+    expect(findMenuItem(template, "Settings...").accelerator).toBe("CmdOrCtrl+,")
+
+    clickMenuItem(findMenuItem(template, "New Prompt"))
+    clickMenuItem(findMenuItem(template, "New Project"))
+    clickMenuItem(findMenuItem(template, "Search"))
+    clickMenuItem(findMenuItem(template, "Copy Compiled Prompt"))
+    clickMenuItem(findMenuItem(template, "Close Active Panel"))
+
+    expect(actions).toEqual([
+      "newPrompt",
+      "newProject",
+      "focusSearch",
+      "copyCompiledPrompt",
+      "closeActivePanel",
+    ])
+    expect(() => findMenuItem(template, "Toggle Developer Tools")).toThrow()
+  })
+
+  it("keeps development-only menu items out of production templates", () => {
+    const productionTemplate = createApplicationMenuTemplate({
+      isDevelopment: false,
+      isMac: true,
+      sendAction: () => undefined,
+    })
+    const developmentTemplate = createApplicationMenuTemplate({
+      isDevelopment: true,
+      isMac: true,
+      sendAction: () => undefined,
+    })
+
+    expect(() => findMenuRole(productionTemplate, "reload")).toThrow()
+    expect(findMenuRole(developmentTemplate, "reload").role).toBe("reload")
+    expect(findMenuRole(developmentTemplate, "toggleDevTools").role).toBe("toggleDevTools")
   })
 
   it("exposes only grouped typed ping and persistence bridge methods", async () => {
@@ -77,6 +238,7 @@ describe("Electron shell contract", () => {
     await expect(bridge.ping()).resolves.toBe(PING_RESPONSE)
     expect(Object.keys(bridge)).toEqual([
       "ping",
+      "menu",
       "projects",
       "prompts",
       "search",
@@ -88,6 +250,7 @@ describe("Electron shell contract", () => {
       "exports",
       "clipboard",
     ])
+    expect(Object.keys(bridge.menu)).toEqual(["onAction"])
     expect(Object.keys(bridge.projects)).toEqual(["create", "list", "get", "update", "delete"])
     expect(Object.keys(bridge.prompts)).toEqual([
       "createAsset",
@@ -139,6 +302,28 @@ describe("Electron shell contract", () => {
     expect(Object.keys(bridge.clipboard)).toEqual(["copyText"])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()
+  })
+
+  it("exposes a typed menu action subscription without raw ipcRenderer", () => {
+    const subscriptions: ((action: "focusSearch") => void)[] = []
+    const bridge = createElectronBridge(
+      async () => PING_RESPONSE,
+      (callback) => {
+        subscriptions.push(callback)
+        return () => {
+          subscriptions.splice(subscriptions.indexOf(callback), 1)
+        }
+      },
+    )
+
+    const receivedActions: string[] = []
+    const unsubscribe = bridge.menu.onAction((action) => receivedActions.push(action))
+
+    subscriptions[0]?.("focusSearch")
+    unsubscribe()
+    subscriptions[0]?.("focusSearch")
+
+    expect(receivedActions).toEqual(["focusSearch"])
   })
 
   it("routes Phase 6 prompt version methods through typed bridge channels", async () => {

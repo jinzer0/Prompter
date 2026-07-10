@@ -1,4 +1,5 @@
 import type { z } from "zod"
+import type { MenuAction } from "./app-menu.js"
 import type { PingResponse, payloadSchemas } from "./ipc-contract.js"
 import type {
   ComparePromptVersionsResult,
@@ -42,6 +43,9 @@ type Input<TSchema extends z.ZodType> = z.input<TSchema>
 
 export type ElectronBridge = {
   readonly ping: () => Promise<PingResponse>
+  readonly menu: {
+    readonly onAction: (callback: (action: MenuAction) => void) => () => void
+  }
   readonly projects: {
     readonly create: (input: Input<typeof payloadSchemas.createProject>) => Promise<Project>
     readonly list: () => Promise<readonly Project[]>

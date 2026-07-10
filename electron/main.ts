@@ -62,6 +62,7 @@ const promptExportNativeDependencies = {
     }),
   writeFile,
   copyText: (text) => clipboard.writeText(text),
+  readText: () => clipboard.readText(),
 } satisfies PromptExportNativeDependencies
 
 async function createMainWindow(): Promise<void> {

@@ -1,4 +1,5 @@
 import type {
+  ClipboardReadTextResult,
   CopyTextInput,
   CopyTextResult,
   ExportFormat,
@@ -28,6 +29,7 @@ export type PromptExportNativeDependencies = {
   readonly showSaveDialog: (options: SaveDialogOptions) => Promise<SaveDialogResult>
   readonly writeFile: (filePath: string, content: string) => Promise<void>
   readonly copyText: (text: string) => void
+  readonly readText: () => string
 }
 
 export type PromptExportNativeService = ReturnType<typeof createPromptExportNativeService>
@@ -110,6 +112,10 @@ export function createPromptExportNativeService(dependencies: PromptExportNative
     async copyText(input: CopyTextInput): Promise<CopyTextResult> {
       dependencies.copyText(input.text)
       return { copied: true }
+    },
+    async readText(): Promise<ClipboardReadTextResult> {
+      const text = dependencies.readText()
+      return { text, isEmpty: text.length === 0, length: text.length }
     },
   }
 }

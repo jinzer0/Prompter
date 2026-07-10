@@ -43,6 +43,9 @@ describe("Phase 8 export native boundary contract", () => {
       if (channel === PERSISTENCE_CHANNELS.copyText) {
         return { copied: true }
       }
+      if (channel === PERSISTENCE_CHANNELS.readText) {
+        return { text: "Prompt body", isEmpty: false, length: 11 }
+      }
 
       throw new Error(`Unexpected channel ${channel}`)
     })
@@ -54,8 +57,13 @@ describe("Phase 8 export native boundary contract", () => {
     await expect(bridge.clipboard.copyText({ text: "Prompt body" })).resolves.toEqual({
       copied: true,
     })
+    await expect(bridge.clipboard.readText()).resolves.toEqual({
+      text: "Prompt body",
+      isEmpty: false,
+      length: 11,
+    })
     expect(Object.keys(bridge.exports)).toEqual(["formatPrompt", "savePromptToFile"])
-    expect(Object.keys(bridge.clipboard)).toEqual(["copyText"])
+    expect(Object.keys(bridge.clipboard)).toEqual(["copyText", "readText"])
     expect(calls).toEqual([
       { channel: PERSISTENCE_CHANNELS.formatPromptForExport, payload: validExportInput },
       {
@@ -63,6 +71,7 @@ describe("Phase 8 export native boundary contract", () => {
         payload: { content: "Prompt body", format: "markdown" },
       },
       { channel: PERSISTENCE_CHANNELS.copyText, payload: { text: "Prompt body" } },
+      { channel: PERSISTENCE_CHANNELS.readText, payload: undefined },
     ])
   })
 
@@ -84,6 +93,10 @@ describe("Phase 8 export native boundary contract", () => {
         called = true
         return { copied: true }
       },
+      readText: async () => {
+        called = true
+        return { text: "Prompt body", isEmpty: false, length: 11 }
+      },
     })
 
     expect(() =>
@@ -100,7 +113,15 @@ describe("Phase 8 export native boundary contract", () => {
       }),
     ).toThrow(/filename/)
     expect(() => handlers.copyText({ text: "   " })).toThrow(/text/)
+    expect(() => handlers.readText({ text: "unexpected" })).toThrow()
     expect(called).toBe(false)
+
+    await expect(handlers.readText(undefined)).resolves.toEqual({
+      text: "Prompt body",
+      isEmpty: false,
+      length: 11,
+    })
+    expect(called).toBe(true)
   })
 
   it("returns save cancellation without throwing", async () => {
@@ -109,6 +130,7 @@ describe("Phase 8 export native boundary contract", () => {
       formatPromptForExport: () => formattedExport,
       savePromptToFile: async () => ({ cancelled: true }),
       copyText: async () => ({ copied: true }),
+      readText: async () => ({ text: "", isEmpty: true, length: 0 }),
     })
 
     await expect(handlers.savePromptToFile(validExportInput)).resolves.toEqual({ cancelled: true })
@@ -123,6 +145,7 @@ describe("Phase 8 export native boundary contract", () => {
         showSaveDialog: async () => ({ canceled: false, filePath }),
         writeFile,
         copyText: () => undefined,
+        readText: () => "",
       })
 
       await expect(
@@ -139,6 +162,38 @@ describe("Phase 8 export native boundary contract", () => {
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
+  })
+
+  it("reads non-empty and empty clipboard text through the native clipboard service", async () => {
+    let clipboardText = "Keep every copied character."
+    const service = createPromptExportNativeService({
+      showSaveDialog: async () => ({ canceled: true }),
+      writeFile,
+      copyText: () => undefined,
+      readText: () => clipboardText,
+    })
+
+    await expect(service.readText()).resolves.toEqual({
+      text: "Keep every copied character.",
+      isEmpty: false,
+      length: 28,
+    })
+
+    clipboardText = ""
+
+    await expect(service.readText()).resolves.toEqual({ text: "", isEmpty: true, length: 0 })
+  })
+
+  it("rejects malformed clipboard read bridge responses", async () => {
+    const bridge = createElectronBridge(async (channel) => {
+      if (channel === PERSISTENCE_CHANNELS.readText) {
+        return { text: "Prompt body" }
+      }
+
+      throw new Error(`Unexpected channel ${channel}`)
+    })
+
+    await expect(bridge.clipboard.readText()).rejects.toThrow()
   })
 
   it("keeps renderer free of Electron, Node, filesystem, and shell access", async () => {

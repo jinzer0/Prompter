@@ -1,4 +1,4 @@
-import type { FormEvent } from "react"
+import { type FormEvent, useEffect, useRef } from "react"
 import type {
   ComparePromptVersionsResult,
   CreateNextPromptVersionInput,
@@ -18,7 +18,7 @@ import { PromptExportActions } from "./prompt-export-actions"
 import { PromptVersionManagement } from "./prompt-version-management"
 import { Panel } from "./shell/panel"
 import { Button } from "./ui/button"
-import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { EmptyState } from "./ui/empty-state"
 
 type PromptCompilerPanelProps = {
@@ -69,6 +69,13 @@ export function PromptCompilerPanel({
     compiler.compiled === null
       ? null
       : exportBaseFromCompiled(compiler.compiled, compiler.editablePrompt, selectedProject)
+  const originalRequestRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (compiler.originalRequestFocusSignal > 0) {
+      originalRequestRef.current?.focus()
+    }
+  }, [compiler.originalRequestFocusSignal])
 
   function compileStaticPrompt(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
@@ -94,11 +101,44 @@ export function PromptCompilerPanel({
         className="mt-4 space-y-4 rounded-card border border-border bg-panel-elevated p-4"
         onSubmit={compileStaticPrompt}
       >
-        <PromptCompilerForm draft={compiler.draft} onChange={compiler.setDraft} />
+        <PromptCompilerForm
+          draft={compiler.draft}
+          originalRequestRef={originalRequestRef}
+          onChange={compiler.setDraft}
+        />
         {compiler.message !== null && (
           <p className="text-[12px] text-muted-strong">{compiler.message}</p>
         )}
+        {compiler.pendingClipboardImport !== null && (
+          <Card className="bg-panel-muted">
+            <CardHeader>
+              <CardTitle>Replace the current original request with clipboard text?</CardTitle>
+              <CardDescription>
+                Current compiler draft details will stay unchanged until you confirm.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="secondary" onClick={compiler.confirmClipboardImport}>
+                  Replace original request
+                </Button>
+                <Button type="button" variant="ghost" onClick={compiler.cancelClipboardImport}>
+                  Cancel import
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         <div className="flex flex-wrap gap-2">
+          <Button
+            data-menu-action-target="quick-capture-from-clipboard"
+            type="button"
+            variant="secondary"
+            disabled={compiler.isReadingClipboard}
+            onClick={() => void compiler.importFromClipboard()}
+          >
+            {compiler.isReadingClipboard ? "Reading Clipboard..." : "Import from Clipboard"}
+          </Button>
           <Button type="submit">프롬프트 컴파일</Button>
           <Button
             type="button"

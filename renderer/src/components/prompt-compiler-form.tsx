@@ -1,3 +1,5 @@
+import type { Ref } from "react"
+
 import type { PromptCompilerInput } from "../lib/prompt-compiler/types"
 import {
   parseScenario,
@@ -11,10 +13,15 @@ import { Textarea } from "./ui/textarea"
 
 type PromptCompilerFormProps = {
   readonly draft: PromptCompilerInput
+  readonly originalRequestRef?: Ref<HTMLTextAreaElement>
   readonly onChange: (draft: PromptCompilerInput) => void
 }
 
-export function PromptCompilerForm({ draft, onChange }: PromptCompilerFormProps) {
+export function PromptCompilerForm({
+  draft,
+  originalRequestRef,
+  onChange,
+}: PromptCompilerFormProps) {
   return (
     <div className="space-y-3">
       <Input
@@ -26,6 +33,7 @@ export function PromptCompilerForm({ draft, onChange }: PromptCompilerFormProps)
       <Textarea
         aria-label="Original request"
         placeholder="Original request"
+        ref={originalRequestRef}
         value={draft.originalInput}
         onChange={(event) => onChange({ ...draft, originalInput: event.currentTarget.value })}
       />

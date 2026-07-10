@@ -63,7 +63,9 @@ export function PromptLibraryNewPromptForm({
         <Select
           aria-label="Scenario"
           value={draft.scenario}
-          onChange={(event) => onChange({ ...draft, scenario: parseScenario(event.currentTarget.value) })}
+          onChange={(event) =>
+            onChange({ ...draft, scenario: parseScenario(event.currentTarget.value) })
+          }
         >
           {scenarioOptions.map((option) => (
             <option key={option.value} value={option.value}>

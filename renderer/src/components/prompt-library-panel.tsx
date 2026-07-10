@@ -71,6 +71,7 @@ export function PromptLibraryPanel({
           </p>
         </div>
         <Button
+          data-menu-action-target="new-prompt"
           disabled={selectedProject === null}
           onClick={() => library.setIsFormOpen(true)}
         >
@@ -135,13 +136,16 @@ export function PromptLibraryPanel({
         {selectedProject !== null && library.searchStatus === "error" && (
           <p className="text-[12px] text-muted-strong">{library.searchError}</p>
         )}
-        {selectedProject !== null && status === "ready" && assets.length === 0 && !library.hasActiveFilters && (
-          <EmptyState
-            label="Library state"
-            title="No prompts yet"
-            description="Create a prompt to store its first asset version in SQLite."
-          />
-        )}
+        {selectedProject !== null &&
+          status === "ready" &&
+          assets.length === 0 &&
+          !library.hasActiveFilters && (
+            <EmptyState
+              label="Library state"
+              title="No prompts yet"
+              description="Create a prompt to store its first asset version in SQLite."
+            />
+          )}
         {selectedProject !== null &&
           status === "ready" &&
           library.hasActiveFilters &&

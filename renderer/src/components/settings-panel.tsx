@@ -7,7 +7,12 @@ export function SettingsPanel() {
   const settings = useSettingsPanel()
 
   return (
-    <section className="space-y-3" aria-labelledby="settings-heading">
+    <section
+      className="space-y-3"
+      aria-labelledby="settings-heading"
+      data-menu-action-target="settings-panel"
+      tabIndex={-1}
+    >
       <div className="flex items-center justify-between gap-3">
         <h2 id="settings-heading" className="text-[16px] font-semibold text-foreground">
           Settings

@@ -45,6 +45,7 @@ export function PromptLibraryFilters({
     <section className="mt-4 space-y-3 rounded-card border border-border bg-panel-elevated p-4">
       <div className="grid gap-3 md:grid-cols-3">
         <Input
+          data-menu-action-target="search-prompts"
           aria-label="Search prompts"
           placeholder="Search prompts"
           value={query}

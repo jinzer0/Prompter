@@ -75,8 +75,8 @@ not be exposed through the preload bridge, logs, exports, settings rows, or test
 - Static and LLM-assisted prompt compilation.
 - OpenAI key status, save, and delete settings flow.
 - Markdown, Codex, Claude Code, Cursor, Generic Agent, AGENTS.md snippet, and SKILL.md draft exports.
-- Clipboard copy and native file export.
-- macOS app menu and keyboard shortcuts for existing app actions.
+- Clipboard copy, clipboard import into Prompt Compiler, and native file export.
+- macOS app menu and keyboard shortcuts, including quick capture from clipboard.
 
 ## Explicitly Excluded
 

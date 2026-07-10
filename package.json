@@ -14,7 +14,9 @@
     "lint": "biome check .",
     "typecheck": "tsc -p tsconfig.electron.json --noEmit && tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "npm run native:node && vitest run",
-    "test:smoke": "npm run native:electron && playwright test"
+    "test:smoke": "npm run native:electron && playwright test",
+    "package": "npm run build && node scripts/package-macos.mjs",
+    "make": "npm run package"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

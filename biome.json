@@ -8,6 +8,7 @@
       "!.omo",
       "!dist",
       "!dist-electron",
+      "!release",
       "!drizzle/meta",
       "!coverage",
       "!playwright-report",

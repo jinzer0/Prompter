@@ -190,6 +190,10 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
     savePromptToFile: (payload: unknown) =>
       services.savePromptToFile(payloadSchemas.savePromptToFile.parse(payload)),
     copyText: (payload: unknown) => services.copyText(payloadSchemas.copyText.parse(payload)),
+    readText: (payload: unknown) => {
+      payloadSchemas.readText.parse(payload)
+      return services.readText()
+    },
   }
 }
 
@@ -322,4 +326,5 @@ export function registerIpcHandlers(services: IpcServices): void {
     handlers.savePromptToFile(payload),
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.copyText, (_event, payload) => handlers.copyText(payload))
+  ipcMain.handle(PERSISTENCE_CHANNELS.readText, (_event, payload) => handlers.readText(payload))
 }

@@ -169,6 +169,9 @@ function createPhase9Services(onServiceCall: () => void) {
     async copyText() {
       return { copied: true as const }
     },
+    async readText() {
+      return { text: "", isEmpty: true, length: 0 }
+    },
   }
 }
 

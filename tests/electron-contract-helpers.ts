@@ -184,5 +184,9 @@ export function createFailingServices(onServiceCall: () => void) {
       onServiceCall()
       return { copied: true as const }
     },
+    async readText() {
+      onServiceCall()
+      return { text: "", isEmpty: true, length: 0 }
+    },
   }
 }

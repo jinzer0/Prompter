@@ -274,6 +274,7 @@ export function createElectronBridge(
     },
     clipboard: {
       copyText: (input) => request(ch.copyText, payload.copyText, response.copyText, input),
+      readText: () => request(ch.readText, payload.readText, response.readText, undefined),
     },
   }
 }

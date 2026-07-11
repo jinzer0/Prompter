@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3"
+import type { CreateProjectInput } from "../ipc-contract.js"
 import {
   createPromptCompilerService,
   type PromptCompilerClientFactory,
@@ -10,6 +11,7 @@ import {
 } from "../secrets/open-ai-key-store.js"
 import type { AppDatabase } from "./repositories/common.js"
 import { createHarnessTemplateRepository } from "./repositories/harness-templates.js"
+import { createProjectContextProfileRepository } from "./repositories/project-context-profiles.js"
 import { createProjectRepository } from "./repositories/projects.js"
 import { createPromptRepository } from "./repositories/prompts.js"
 import { createSearchRepository } from "./repositories/search.js"
@@ -25,6 +27,7 @@ export function createPersistenceServices(
   promptCompilerClientFactory?: PromptCompilerClientFactory,
 ) {
   const projects = createProjectRepository(db)
+  const projectContextProfiles = createProjectContextProfileRepository(db)
   const prompts = createPromptRepository(db)
   const search = createSearchRepository(sqlite)
   const tags = createTagRepository(db)
@@ -35,16 +38,38 @@ export function createPersistenceServices(
       ? {
           getDefaults: () => settings.getDefaults(),
           getOpenAIKeyForMainProcessOnly: openAIKeyStore.getOpenAIKeyForMainProcessOnly,
+          getHarnessTemplate: (id) => harnessTemplates.getHarnessTemplate(id),
+          getProjectContextProfileForCompiler: (input) =>
+            projectContextProfiles.buildCompilerContext(input),
         }
       : {
           getDefaults: () => settings.getDefaults(),
           getOpenAIKeyForMainProcessOnly: openAIKeyStore.getOpenAIKeyForMainProcessOnly,
+          getHarnessTemplate: (id) => harnessTemplates.getHarnessTemplate(id),
+          getProjectContextProfileForCompiler: (input) =>
+            projectContextProfiles.buildCompilerContext(input),
           createClient: promptCompilerClientFactory,
         }
   const promptCompiler = createPromptCompilerService(promptCompilerConfig)
 
   return {
     ...projects,
+    createProject(input: CreateProjectInput) {
+      return db.transaction(() => {
+        const project = projects.createProject(input)
+
+        projectContextProfiles.createProjectContextProfile({
+          projectId: project.id,
+          name: "Default Context",
+          summary: project.description,
+          techStack: project.techStack,
+          isDefault: true,
+        })
+
+        return project
+      })
+    },
+    ...projectContextProfiles,
     ...prompts,
     ...search,
     ...tags,

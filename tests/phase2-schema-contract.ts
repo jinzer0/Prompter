@@ -2,6 +2,7 @@ import { z } from "zod"
 
 export const expectedTables = [
   "projects",
+  "project_context_profiles",
   "prompt_assets",
   "prompt_versions",
   "tags",
@@ -16,7 +17,13 @@ export const forbiddenTables = [
   "execution_results",
   "validation_results",
   "run_logs",
+  "clipboard_history",
+  "quick_capture_settings",
+  "quick_capture_preferences",
+  "quick_capture_drafts",
 ] as const
+
+export const forbiddenHarnessTemplateColumns = ["description", "is_builtin", "is_archived"] as const
 
 export const expectedColumns = {
   projects: [
@@ -25,6 +32,28 @@ export const expectedColumns = {
     "description",
     "tech_stack",
     "default_agent",
+    "created_at",
+    "updated_at",
+  ],
+  project_context_profiles: [
+    "id",
+    "project_id",
+    "name",
+    "summary",
+    "tech_stack",
+    "architecture_notes",
+    "coding_conventions",
+    "constraints",
+    "forbidden_actions",
+    "acceptance_defaults",
+    "validation_commands",
+    "security_notes",
+    "additional_context",
+    "testing_notes",
+    "package_manager",
+    "default_branch",
+    "repo_path",
+    "is_default",
     "created_at",
     "updated_at",
   ],

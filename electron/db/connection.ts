@@ -19,6 +19,15 @@ function bootstrapSearchIndex(sqlite: Database.Database): void {
   `)
 }
 
+function currentHarnessTemplateSchemaExists(sqlite: Database.Database): boolean {
+  const columns = sqlite
+    .prepare("select name from pragma_table_info('harness_templates')")
+    .pluck()
+    .all()
+
+  return columns.includes("scenario")
+}
+
 export type PrompterDatabaseConfig = {
   readonly databasePath: string
   readonly migrationsFolder: string
@@ -43,15 +52,20 @@ export function openPrompterDatabase(config: PrompterDatabaseConfig): PrompterDa
   migrate(db, { migrationsFolder: config.migrationsFolder })
   bootstrapSearchIndex(sqlite)
 
+  const services = createPersistenceServices(
+    db,
+    sqlite,
+    config.openAIKeyStore,
+    config.promptCompilerClientFactory,
+  )
+  if (currentHarnessTemplateSchemaExists(sqlite)) {
+    services.seedDefaultHarnessTemplates()
+  }
+
   return {
     sqlite,
     db,
-    services: createPersistenceServices(
-      db,
-      sqlite,
-      config.openAIKeyStore,
-      config.promptCompilerClientFactory,
-    ),
+    services,
     close: () => sqlite.close(),
   }
 }

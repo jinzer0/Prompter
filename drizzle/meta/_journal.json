@@ -15,6 +15,13 @@
       "when": 1783405557414,
       "tag": "0001_phase2_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783752366364,
+      "tag": "0002_project_context_profiles",
+      "breakpoints": true
     }
   ]
 }

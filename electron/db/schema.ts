@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm"
 import {
   type AnySQLiteColumn,
   index,
@@ -19,6 +20,40 @@ export const projects = sqliteTable("projects", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 })
+
+export const projectContextProfiles = sqliteTable(
+  "project_context_profiles",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    summary: text("summary"),
+    techStack: text("tech_stack"),
+    architectureNotes: text("architecture_notes"),
+    codingConventions: text("coding_conventions"),
+    constraints: text("constraints"),
+    forbiddenActions: text("forbidden_actions"),
+    acceptanceDefaults: text("acceptance_defaults"),
+    validationCommands: text("validation_commands"),
+    securityNotes: text("security_notes"),
+    additionalContext: text("additional_context"),
+    testingNotes: text("testing_notes"),
+    packageManager: text("package_manager"),
+    defaultBranch: text("default_branch"),
+    repoPath: text("repo_path"),
+    isDefault: integer("is_default", { mode: "boolean" }).notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("project_context_profiles_project_id_idx").on(table.projectId),
+    uniqueIndex("project_context_profiles_default_unique_idx")
+      .on(table.projectId)
+      .where(sql`is_default = 1`),
+  ],
+)
 
 export const promptAssets = sqliteTable(
   "prompt_assets",

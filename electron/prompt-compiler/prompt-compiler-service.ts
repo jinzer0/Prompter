@@ -4,6 +4,8 @@ import {
   promptCompilerErrorSchema,
 } from "../ipc-contract.js"
 import type {
+  HarnessTemplate,
+  ProjectContextCompilerBuildResult,
   PromptCompilerAnalyzeInput,
   PromptCompilerAnalyzeResult,
   PromptCompilerCompileInput,
@@ -12,6 +14,12 @@ import type {
   SettingsDefaults,
 } from "../ipc-types.js"
 import { createOpenAIResponseClient } from "./open-ai-client.js"
+import {
+  appendAnalyzeWarnings,
+  appendCompileWarnings,
+  resolveHarnessTemplate,
+  resolveProjectContextProfile,
+} from "./prompt-compiler-context.js"
 import {
   analyzeResponseJsonSchema,
   buildAnalyzePrompt,
@@ -50,6 +58,13 @@ export type PromptCompilerService = {
 export type PromptCompilerServiceConfig = {
   readonly getDefaults: () => SettingsDefaults
   readonly getOpenAIKeyForMainProcessOnly: () => Promise<string | null>
+  readonly getHarnessTemplate?: (
+    id: string,
+  ) => HarnessTemplate | null | Promise<HarnessTemplate | null>
+  readonly getProjectContextProfileForCompiler?: (input: {
+    readonly projectId: string
+    readonly profileId: string
+  }) => ProjectContextCompilerBuildResult | Promise<ProjectContextCompilerBuildResult>
   readonly createClient?: PromptCompilerClientFactory
 }
 
@@ -159,17 +174,29 @@ export function createPromptCompilerService(
   config: PromptCompilerServiceConfig,
 ): PromptCompilerService {
   async function analyze(input: PromptCompilerAnalyzeInput): Promise<PromptCompilerAnalyzeResult> {
+    const harness = await resolveHarnessTemplate(config, input.harnessTemplateId)
+    const projectContextProfile = await resolveProjectContextProfile(config, input)
     const output = await runCompilerRequest({
       serviceConfig: config,
       schema: promptCompilerAnalyzeOutputSchema,
       schemaName: "prompt_compiler_analyze",
       jsonSchema: analyzeResponseJsonSchema,
-      userPrompt: buildAnalyzePrompt(input),
+      userPrompt: buildAnalyzePrompt(
+        input,
+        harness.harnessTemplate?.templateBody,
+        projectContextProfile.context ?? undefined,
+      ),
     })
     const parsed = promptCompilerAnalyzeOutputSchema.safeParse(output)
 
     if (parsed.success) {
-      return { ok: true, value: parsed.data }
+      return {
+        ok: true,
+        value: appendAnalyzeWarnings(parsed.data, [
+          ...harness.warnings,
+          ...projectContextProfile.warnings,
+        ]),
+      }
     }
 
     return isCompilerError(output)
@@ -181,17 +208,29 @@ export function createPromptCompilerService(
   }
 
   async function compile(input: PromptCompilerCompileInput): Promise<PromptCompilerCompileResult> {
+    const harness = await resolveHarnessTemplate(config, input.harnessTemplateId)
+    const projectContextProfile = await resolveProjectContextProfile(config, input)
     const output = await runCompilerRequest({
       serviceConfig: config,
       schema: promptCompilerCompileOutputSchema,
       schemaName: "prompt_compiler_compile",
       jsonSchema: compileResponseJsonSchema,
-      userPrompt: buildCompilePrompt(input),
+      userPrompt: buildCompilePrompt(
+        input,
+        harness.harnessTemplate?.templateBody,
+        projectContextProfile.context ?? undefined,
+      ),
     })
     const parsed = promptCompilerCompileOutputSchema.safeParse(output)
 
     if (parsed.success) {
-      return { ok: true, value: parsed.data }
+      return {
+        ok: true,
+        value: appendCompileWarnings(parsed.data, [
+          ...harness.warnings,
+          ...projectContextProfile.warnings,
+        ]),
+      }
     }
 
     return isCompilerError(output)

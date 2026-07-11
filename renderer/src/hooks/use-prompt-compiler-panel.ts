@@ -1,10 +1,11 @@
-import { useState } from "react"
+import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react"
 
 import type {
   CreateNextPromptVersionInput,
   CreatePromptAssetInput,
   CreatePromptVersionInput,
   Project,
+  ProjectContextCompilerBuildResult,
   PromptAsset,
   PromptCompilerAnalyzeOutput,
   PromptVersion,
@@ -18,9 +19,13 @@ import {
   missingRequiredQuestion,
 } from "../lib/prompt-compiler/llm-compiler-flow"
 import { compileStaticPrompt } from "../lib/prompt-compiler/static-prompt-compiler"
-import type { CompiledPromptResult, PromptCompilerInput } from "../lib/prompt-compiler/types"
-import { versionInputFromCompiled } from "../lib/prompt-compiler/version-input"
+import type {
+  CompiledPromptResult,
+  LoadedHarnessTemplate,
+  PromptCompilerInput,
+} from "../lib/prompt-compiler/types"
 import { useCompilerDefaults } from "./use-compiler-defaults"
+import { useCompilerPersistenceActions } from "./use-compiler-persistence-actions"
 import { useCompilerQuickCapture } from "./use-compiler-quick-capture"
 import { useCompilerSuggestedTags } from "./use-compiler-suggested-tags"
 
@@ -30,6 +35,29 @@ type CreatePrompt = (
 ) => Promise<PromptAsset>
 
 type CreateNextVersion = (input: CreateNextPromptVersionInput) => Promise<PromptVersion>
+
+const staleStateDraftFields = [
+  "title",
+  "originalInput",
+  "scenario",
+  "targetAgent",
+  "harnessTemplateId",
+  "projectContextProfileId",
+  "includeProjectContextProfile",
+  "projectContext",
+  "techStack",
+  "constraints",
+  "acceptanceCriteria",
+  "validationCommands",
+  "additionalNotes",
+] as const satisfies readonly (keyof PromptCompilerInput)[]
+
+export function promptCompilerDraftChangeResetsStaleState(
+  current: PromptCompilerInput,
+  next: PromptCompilerInput,
+): boolean {
+  return staleStateDraftFields.some((field) => current[field] !== next[field])
+}
 
 type UsePromptCompilerPanelConfig = {
   readonly createPrompt: CreatePrompt
@@ -47,6 +75,7 @@ export function usePromptCompilerPanel({
   selectedProject,
 }: UsePromptCompilerPanelConfig) {
   const [draft, setDraft] = useState<PromptCompilerInput>(emptyCompilerInput)
+  const draftRef = useRef<PromptCompilerInput>(emptyCompilerInput)
   const [analysis, setAnalysis] = useState<PromptCompilerAnalyzeOutput | null>(null)
   const [answers, setAnswers] = useState<ClarificationAnswersById>({})
   const [compiled, setCompiled] = useState<CompiledPromptResult | null>(null)
@@ -54,34 +83,74 @@ export function usePromptCompilerPanel({
   const [message, setMessage] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isCompilingLLM, setIsCompilingLLM] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isSavingNextVersion, setIsSavingNextVersion] = useState(false)
   const suggestedTags = useCompilerSuggestedTags({ onTagsChanged })
 
-  useCompilerDefaults(setDraft, setMessage)
-
-  function resetImportedDraftState(): void {
+  const resetStaleDraftState = useCallback((): void => {
     setAnalysis(null)
     setAnswers({})
     setCompiled(null)
     setEditablePrompt("")
     suggestedTags.clearSuggestedTags()
+    setMessage(null)
+  }, [suggestedTags.clearSuggestedTags])
+
+  const setCompilerDraft = useCallback<Dispatch<SetStateAction<PromptCompilerInput>>>(
+    (update) => {
+      const current = draftRef.current
+      const next = typeof update === "function" ? update(current) : update
+
+      if (promptCompilerDraftChangeResetsStaleState(current, next)) {
+        resetStaleDraftState()
+      }
+
+      draftRef.current = next
+      setDraft(next)
+    },
+    [resetStaleDraftState],
+  )
+
+  useCompilerDefaults(setCompilerDraft, setMessage)
+
+  function resetImportedDraftState(): void {
+    resetStaleDraftState()
   }
 
   const quickCapture = useCompilerQuickCapture({
     draft,
     resetImportedDraftState,
-    setDraft,
+    setDraft: setCompilerDraft,
     setMessage,
   })
 
-  function compileStatic(): void {
+  const persistenceActions = useCompilerPersistenceActions({
+    compiled,
+    createNextVersion,
+    createPrompt,
+    editablePrompt,
+    onSavedNextVersion: () => {
+      setCompiled(null)
+      setEditablePrompt("")
+      suggestedTags.clearSuggestedTags()
+    },
+    selectedAsset,
+    selectedProject,
+    setMessage,
+    suggestedTags,
+  })
+
+  function compileStatic(
+    selectedHarnessTemplate: LoadedHarnessTemplate | null,
+    projectContextProfileBuildResult: ProjectContextCompilerBuildResult | null,
+  ): void {
     if (draft.originalInput.trim().length === 0) {
       setMessage("Original request is required")
       return
     }
 
-    const result = compileStaticPrompt(draft)
+    const result = compileStaticPrompt(
+      { ...draft, projectContextProfileBuildResult },
+      selectedHarnessTemplate,
+    )
     setCompiled(result)
     setEditablePrompt(result.compiledPrompt)
     suggestedTags.clearSuggestedTags()
@@ -155,7 +224,7 @@ export function usePromptCompilerPanel({
         return
       }
 
-      const nextCompiled = compiledFromLLM(result.value, draft.originalInput.trim())
+      const nextCompiled = compiledFromLLM(result.value, draft.originalInput)
       setCompiled(nextCompiled)
       setEditablePrompt(result.value.compiledPrompt)
       suggestedTags.clearSuggestedTags()
@@ -171,89 +240,12 @@ export function usePromptCompilerPanel({
     }
   }
 
-  async function savePrompt(): Promise<void> {
-    if (selectedProject === null) {
-      setMessage("Select a project before saving compiled prompt")
-      return
-    }
-
-    if (compiled === null || editablePrompt.trim().length === 0) {
-      setMessage("Compile a prompt before saving")
-      return
-    }
-
-    setIsSaving(true)
-    setMessage(null)
-
-    try {
-      const asset = await createPrompt(
-        {
-          projectId: selectedProject.id,
-          title: compiled.title,
-          scenario: compiled.scenario,
-          targetAgent: compiled.targetAgent,
-        },
-        versionInputFromCompiled(compiled, editablePrompt.trim()),
-      )
-      await window.prompter.search.rebuildIndex()
-      await suggestedTags.attachSelectedSuggestedTags(asset.id)
-      setMessage("Compiled prompt saved.")
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Compiled prompt could not be saved")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  async function saveNextVersion(): Promise<void> {
-    if (selectedAsset === null) {
-      setMessage("Select a prompt before saving a new version")
-      return
-    }
-
-    if (compiled === null || editablePrompt.trim().length === 0) {
-      setMessage("Compile a prompt before saving a new version")
-      return
-    }
-
-    setIsSavingNextVersion(true)
-    setMessage(null)
-
-    try {
-      await createNextVersion({
-        promptAssetId: selectedAsset.id,
-        ...versionInputFromCompiled(compiled, editablePrompt.trim()),
-        makeCurrent: true,
-      })
-      await window.prompter.search.rebuildIndex()
-      await suggestedTags.attachSelectedSuggestedTags(selectedAsset.id)
-      setCompiled(null)
-      setEditablePrompt("")
-      suggestedTags.clearSuggestedTags()
-      setMessage("Saved as a new version.")
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Prompt version could not be saved")
-    } finally {
-      setIsSavingNextVersion(false)
-    }
-  }
-
-  async function copyPrompt(): Promise<void> {
-    if (editablePrompt.trim().length === 0) {
-      setMessage("Compiled prompt is not available to copy")
-      return
-    }
-
-    try {
-      await window.prompter.clipboard.copyText({ text: editablePrompt })
-      setMessage("Compiled prompt copied.")
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Compiled prompt could not be copied")
-    }
-  }
-
   function setAnswer(questionId: string, answer: string): void {
     setAnswers((current) => ({ ...current, [questionId]: answer }))
+  }
+
+  function setHarnessTemplateId(id: string | null): void {
+    setCompilerDraft((current) => ({ ...current, harnessTemplateId: id }))
   }
 
   return {
@@ -261,27 +253,29 @@ export function usePromptCompilerPanel({
     answers,
     analyzeWithLLM,
     cancelClipboardImport: quickCapture.cancelClipboardImport,
+    clearStaleOutput: resetStaleDraftState,
     compileStatic,
     compileWithLLM,
     compiled,
     confirmClipboardImport: quickCapture.confirmClipboardImport,
-    copyPrompt,
+    copyPrompt: persistenceActions.copyPrompt,
     draft,
     editablePrompt,
     importFromClipboard: quickCapture.importFromClipboard,
     isAnalyzing,
     isCompilingLLM,
     isReadingClipboard: quickCapture.isReadingClipboard,
-    isSaving,
-    isSavingNextVersion,
+    isSaving: persistenceActions.isSaving,
+    isSavingNextVersion: persistenceActions.isSavingNextVersion,
     message,
     originalRequestFocusSignal: quickCapture.originalRequestFocusSignal,
     pendingClipboardImport: quickCapture.pendingClipboardImport,
-    saveNextVersion,
-    savePrompt,
+    saveNextVersion: persistenceActions.saveNextVersion,
+    savePrompt: persistenceActions.savePrompt,
     setAnswer,
-    setDraft,
+    setDraft: setCompilerDraft,
     setEditablePrompt,
+    setHarnessTemplateId,
     selectedSuggestedTags: suggestedTags.selectedSuggestedTags,
     setSuggestedTagSelection: suggestedTags.setSuggestedTagSelection,
   }

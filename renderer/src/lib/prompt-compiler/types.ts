@@ -1,4 +1,8 @@
-import type { PromptCompilerCompileOutput } from "../../../../electron/ipc-types"
+import type {
+  HarnessTemplate,
+  ProjectContextCompilerBuildResult,
+  PromptCompilerCompileOutput,
+} from "../../../../electron/ipc-types"
 import type { PromptScenario, TargetAgent } from "../prompter-options"
 
 export type PromptCompilerInput = {
@@ -6,6 +10,10 @@ export type PromptCompilerInput = {
   readonly originalInput: string
   readonly scenario: PromptScenario
   readonly targetAgent: TargetAgent
+  readonly harnessTemplateId?: string | null
+  readonly projectContextProfileId?: string | null
+  readonly includeProjectContextProfile?: boolean
+  readonly projectContextProfileBuildResult?: ProjectContextCompilerBuildResult | null
   readonly projectContext?: string
   readonly techStack?: string
   readonly constraints?: string
@@ -30,3 +38,5 @@ export type CompiledPromptResult = {
   readonly qualityScore: number
   readonly warnings?: readonly string[]
 }
+
+export type LoadedHarnessTemplate = Pick<HarnessTemplate, "id" | "templateBody" | "requiredFields">

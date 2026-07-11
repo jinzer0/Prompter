@@ -8,17 +8,24 @@ import type {
   PromptAsset,
   PromptVersion,
 } from "../../../electron/ipc-types"
+import { useAvailableHarnessTemplates } from "../hooks/use-available-harness-templates"
+import { useCompilerProjectContext } from "../hooks/use-compiler-project-context"
+import { useHarnessTemplates } from "../hooks/use-harness-templates"
 import { usePromptCompilerPanel } from "../hooks/use-prompt-compiler-panel"
 import type { LoadStatus } from "../hooks/use-prompter-library"
 import { exportBaseFromCompiled } from "../lib/prompt-export"
 import { CompiledPromptPreview } from "./compiled-prompt-preview"
+import { HarnessTemplateSelector } from "./harness-template-selector"
+import { ProjectContextProfileSelector } from "./project-context-profile-selector"
+import { PromptCompilerActions } from "./prompt-compiler-actions"
 import { PromptCompilerAnalysis } from "./prompt-compiler-analysis"
+import { PromptCompilerClipboardImportCard } from "./prompt-compiler-clipboard-import-card"
 import { PromptCompilerForm } from "./prompt-compiler-form"
+import { PromptCompilerHeader } from "./prompt-compiler-header"
 import { PromptExportActions } from "./prompt-export-actions"
 import { PromptVersionManagement } from "./prompt-version-management"
 import { Panel } from "./shell/panel"
-import { Button } from "./ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
+import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { EmptyState } from "./ui/empty-state"
 
 type PromptCompilerPanelProps = {
@@ -31,8 +38,13 @@ type PromptCompilerPanelProps = {
     assetInput: CreatePromptAssetInput,
     versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
   ) => Promise<PromptAsset>
+  readonly changedProjectContextProfileId: string | null
   readonly currentVersion: PromptVersion | null
+  readonly deletedHarnessTemplateIds: readonly string[]
+  readonly deletedProjectContextProfileIds: readonly string[]
   readonly error: string | null
+  readonly harnessTemplateRefreshSignal: number
+  readonly projectContextProfileRefreshSignal: number
   readonly selectedAsset: PromptAsset | null
   readonly selectedVersion: PromptVersion | null
   readonly selectedProject: Project | null
@@ -47,8 +59,13 @@ export function PromptCompilerPanel({
   compareVersions,
   createNextVersion,
   createPrompt,
+  changedProjectContextProfileId,
   currentVersion,
+  deletedHarnessTemplateIds,
+  deletedProjectContextProfileIds,
   error,
+  harnessTemplateRefreshSignal,
+  projectContextProfileRefreshSignal,
   selectedAsset,
   selectedVersion,
   selectedProject,
@@ -58,6 +75,7 @@ export function PromptCompilerPanel({
   versions,
   onTagsChanged,
 }: PromptCompilerPanelProps) {
+  const harnessTemplates = useHarnessTemplates()
   const compiler = usePromptCompilerPanel({
     createNextVersion,
     createPrompt,
@@ -70,6 +88,28 @@ export function PromptCompilerPanel({
       ? null
       : exportBaseFromCompiled(compiler.compiled, compiler.editablePrompt, selectedProject)
   const originalRequestRef = useRef<HTMLTextAreaElement>(null)
+  const projectContext = useCompilerProjectContext({
+    changedProjectContextProfileId,
+    deletedProjectContextProfileIds,
+    draft: compiler.draft,
+    onIncludedProfileChanged: compiler.clearStaleOutput,
+    projectContextProfileRefreshSignal,
+    selectedProject,
+    setDraft: compiler.setDraft,
+  })
+  const { availableTemplates, selectedTemplate } = useAvailableHarnessTemplates({
+    deletedHarnessTemplateIds,
+    harnessTemplateRefreshSignal,
+    harnessTemplates,
+    selectedTemplateId: compiler.draft.harnessTemplateId ?? null,
+    selectTemplate: compiler.setHarnessTemplateId,
+  })
+
+  useEffect(() => {
+    if (harnessTemplates.status === "idle") {
+      void harnessTemplates.loadTemplates({})
+    }
+  }, [harnessTemplates.loadTemplates, harnessTemplates.status])
 
   useEffect(() => {
     if (compiler.originalRequestFocusSignal > 0) {
@@ -79,23 +119,14 @@ export function PromptCompilerPanel({
 
   function compileStaticPrompt(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault()
-    compiler.compileStatic()
+    const profileBuildResult =
+      projectContext.previewStatus === "ready" ? projectContext.preview : null
+    compiler.compileStatic(selectedTemplate, profileBuildResult)
   }
 
   return (
     <Panel data-testid="prompt-compiler" headingId="prompt-compiler-heading">
-      <header className="border-b border-border-subtle pb-4">
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">Detail</p>
-        <h2
-          id="prompt-compiler-heading"
-          className="mt-2 text-[24px] font-medium tracking-[-0.012em]"
-        >
-          Prompt Compiler
-        </h2>
-        <p className="mt-1 text-[14px] text-muted">
-          Analyze requests with LLMs or generate local template prompts.
-        </p>
-      </header>
+      <PromptCompilerHeader />
 
       <form
         className="mt-4 space-y-4 rounded-card border border-border bg-panel-elevated p-4"
@@ -106,85 +137,58 @@ export function PromptCompilerPanel({
           originalRequestRef={originalRequestRef}
           onChange={compiler.setDraft}
         />
+        <HarnessTemplateSelector
+          error={harnessTemplates.error}
+          scenario={compiler.draft.scenario}
+          selectedTemplateId={compiler.draft.harnessTemplateId ?? null}
+          status={harnessTemplates.status}
+          targetAgent={compiler.draft.targetAgent}
+          templates={availableTemplates}
+          onChange={compiler.setHarnessTemplateId}
+        />
+        <ProjectContextProfileSelector
+          error={projectContext.error}
+          includeProjectContextProfile={projectContext.includeProjectContextProfile}
+          preview={projectContext.preview}
+          previewError={projectContext.previewError}
+          previewStatus={projectContext.previewStatus}
+          profiles={projectContext.profiles}
+          projectName={selectedProject?.name ?? null}
+          selectedProfileId={projectContext.selectedProfileId}
+          status={projectContext.status}
+          onIncludeChange={projectContext.setIncludeProjectContextProfile}
+          onManageProfiles={() => document.getElementById("context-profiles-heading")?.focus()}
+          onSelectProfile={projectContext.selectProfile}
+        />
         {compiler.message !== null && (
           <p className="text-[12px] text-muted-strong">{compiler.message}</p>
         )}
         {compiler.pendingClipboardImport !== null && (
-          <Card className="bg-panel-muted">
-            <CardHeader>
-              <CardTitle>Replace the current original request with clipboard text?</CardTitle>
-              <CardDescription>
-                Current compiler draft details will stay unchanged until you confirm.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="secondary" onClick={compiler.confirmClipboardImport}>
-                  Replace original request
-                </Button>
-                <Button type="button" variant="ghost" onClick={compiler.cancelClipboardImport}>
-                  Cancel import
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <PromptCompilerClipboardImportCard
+            onCancel={compiler.cancelClipboardImport}
+            onConfirm={compiler.confirmClipboardImport}
+          />
         )}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            data-menu-action-target="quick-capture-from-clipboard"
-            type="button"
-            variant="secondary"
-            disabled={compiler.isReadingClipboard}
-            onClick={() => void compiler.importFromClipboard()}
-          >
-            {compiler.isReadingClipboard ? "Reading Clipboard..." : "Import from Clipboard"}
-          </Button>
-          <Button type="submit">프롬프트 컴파일</Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={compiler.isAnalyzing || compiler.isCompilingLLM}
-            onClick={compiler.analyzeWithLLM}
-          >
-            {compiler.isAnalyzing ? "분석 중..." : "분석하기"}
-          </Button>
-          <Button
-            data-menu-action-target="save-compiled-prompt"
-            type="button"
-            variant="secondary"
-            disabled={compiler.isAnalyzing || compiler.isCompilingLLM}
-            onClick={compiler.compileWithLLM}
-          >
-            {compiler.isCompilingLLM ? "생성 중..." : "최종 프롬프트 생성"}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={selectedProject === null || compiler.compiled === null || compiler.isSaving}
-            onClick={compiler.savePrompt}
-          >
-            {compiler.isSaving ? "Saving..." : "Save compiled prompt"}
-          </Button>
-          {selectedAsset !== null && compiler.compiled !== null && (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={compiler.isSavingNextVersion || compiler.editablePrompt.trim().length === 0}
-              onClick={compiler.saveNextVersion}
-            >
-              {compiler.isSavingNextVersion ? "Saving..." : "Save as new version"}
-            </Button>
-          )}
-          <Button
-            data-menu-action-target="copy-compiled-prompt"
-            type="button"
-            variant="ghost"
-            disabled={compiler.editablePrompt.trim().length === 0}
-            onClick={compiler.copyPrompt}
-          >
-            Copy
-          </Button>
-        </div>
+        <PromptCompilerActions
+          canCopy={compiler.editablePrompt.trim().length > 0}
+          canSaveNextVersion={
+            selectedAsset !== null &&
+            compiler.compiled !== null &&
+            compiler.editablePrompt.trim().length > 0
+          }
+          canSavePrompt={selectedProject !== null && compiler.compiled !== null}
+          isAnalyzing={compiler.isAnalyzing}
+          isCompilingLLM={compiler.isCompilingLLM}
+          isReadingClipboard={compiler.isReadingClipboard}
+          isSaving={compiler.isSaving}
+          isSavingNextVersion={compiler.isSavingNextVersion}
+          onAnalyzeWithLLM={compiler.analyzeWithLLM}
+          onCompileWithLLM={compiler.compileWithLLM}
+          onCopyPrompt={compiler.copyPrompt}
+          onImportFromClipboard={compiler.importFromClipboard}
+          onSaveNextVersion={compiler.saveNextVersion}
+          onSavePrompt={compiler.savePrompt}
+        />
       </form>
 
       <div className="mt-4 flex flex-1 flex-col gap-4">

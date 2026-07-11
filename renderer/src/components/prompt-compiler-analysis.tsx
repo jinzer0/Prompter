@@ -75,6 +75,7 @@ export function PromptCompilerAnalysis({
             </div>
             <InlineList label="assumptions" items={analysis.assumptions} />
             <InlineList label="suggested_tags" items={analysis.suggestedTags} />
+            <InlineList label="warnings" items={analysis.warnings ?? []} />
             {analysis.questions.map((question) => (
               <section
                 key={question.id}

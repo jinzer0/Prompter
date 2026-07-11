@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useState } from "react"
 
 type UseCompilerSuggestedTagsConfig = {
   readonly onTagsChanged: () => void
@@ -7,11 +7,11 @@ type UseCompilerSuggestedTagsConfig = {
 export function useCompilerSuggestedTags({ onTagsChanged }: UseCompilerSuggestedTagsConfig) {
   const [selectedSuggestedTags, setSelectedSuggestedTags] = useState<readonly string[]>([])
 
-  function clearSuggestedTags(): void {
+  const clearSuggestedTags = useCallback((): void => {
     setSelectedSuggestedTags([])
-  }
+  }, [])
 
-  function setSuggestedTagSelection(tagName: string, isSelected: boolean): void {
+  const setSuggestedTagSelection = useCallback((tagName: string, isSelected: boolean): void => {
     setSelectedSuggestedTags((current) => {
       if (isSelected) {
         return current.includes(tagName) ? current : [...current, tagName]
@@ -19,20 +19,23 @@ export function useCompilerSuggestedTags({ onTagsChanged }: UseCompilerSuggested
 
       return current.filter((selectedTagName) => selectedTagName !== tagName)
     })
-  }
+  }, [])
 
-  async function attachSelectedSuggestedTags(promptAssetId: string): Promise<void> {
-    if (selectedSuggestedTags.length === 0) {
-      return
-    }
+  const attachSelectedSuggestedTags = useCallback(
+    async (promptAssetId: string): Promise<void> => {
+      if (selectedSuggestedTags.length === 0) {
+        return
+      }
 
-    await Promise.all(
-      selectedSuggestedTags.map((tagName) =>
-        window.prompter.tags.createAndAttachToPrompt({ promptAssetId, tagName }),
-      ),
-    )
-    onTagsChanged()
-  }
+      await Promise.all(
+        selectedSuggestedTags.map((tagName) =>
+          window.prompter.tags.createAndAttachToPrompt({ promptAssetId, tagName }),
+        ),
+      )
+      onTagsChanged()
+    },
+    [onTagsChanged, selectedSuggestedTags],
+  )
 
   return {
     attachSelectedSuggestedTags,

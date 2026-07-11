@@ -1,6 +1,10 @@
 import { scenarioLabel, targetAgentLabel } from "../prompter-options"
 import { bulletList, nonEmptyLines, paragraph, titleFromInput } from "./formatters"
 import {
+  HARNESS_WARNING_MISSING_TEMPLATE,
+  renderHarnessTemplate,
+} from "./harness-template-renderer"
+import {
   agentInstructions,
   baseWorkingInstructions,
   defaultConstraints,
@@ -9,7 +13,10 @@ import {
   scenarioAcceptanceCriteria,
   scenarioTaskLines,
 } from "./templates"
-import type { CompiledPromptResult, PromptCompilerInput } from "./types"
+import type { CompiledPromptResult, LoadedHarnessTemplate, PromptCompilerInput } from "./types"
+
+const PROJECT_CONTEXT_PROFILE_UNAVAILABLE_WARNING =
+  "Selected project context profile is unavailable; profile context was excluded."
 
 function qualityScore(input: PromptCompilerInput): number {
   const optionalFields = [
@@ -24,8 +31,56 @@ function qualityScore(input: PromptCompilerInput): number {
   return Math.min(5, Math.max(1, 2 + filledCount))
 }
 
-export function compileStaticPrompt(input: PromptCompilerInput): CompiledPromptResult {
-  const originalInput = input.originalInput.trim()
+function projectContextProfileWarnings(input: PromptCompilerInput): readonly string[] {
+  if (input.includeProjectContextProfile !== true) {
+    return []
+  }
+
+  const buildResult = input.projectContextProfileBuildResult
+
+  if (buildResult === undefined || buildResult === null) {
+    return [PROJECT_CONTEXT_PROFILE_UNAVAILABLE_WARNING]
+  }
+
+  if (buildResult.context === null) {
+    return buildResult.warnings.length === 0
+      ? [PROJECT_CONTEXT_PROFILE_UNAVAILABLE_WARNING]
+      : buildResult.warnings
+  }
+
+  return buildResult.warnings
+}
+
+function projectContextProfileContext(input: PromptCompilerInput): string | null {
+  if (input.includeProjectContextProfile !== true) {
+    return null
+  }
+
+  return input.projectContextProfileBuildResult?.context ?? null
+}
+
+function defaultContextSection(input: PromptCompilerInput): string {
+  const profileContext = projectContextProfileContext(input)
+  const manualContext = [input.projectContext, input.techStack, input.additionalNotes]
+    .filter(Boolean)
+    .join("\n")
+
+  if (profileContext === null) {
+    return paragraph(manualContext, "No additional context provided.")
+  }
+
+  if (manualContext.trim().length === 0) {
+    return profileContext
+  }
+
+  return [profileContext, "", paragraph(manualContext, "")].join("\n")
+}
+
+export function compileStaticPrompt(
+  input: PromptCompilerInput,
+  selectedHarness?: LoadedHarnessTemplate | null,
+): CompiledPromptResult {
+  const originalInput = input.originalInput
   const title = titleFromInput(input.title, originalInput)
   const constraints = nonEmptyLines(input.constraints)
   const acceptanceCriteria = nonEmptyLines(input.acceptanceCriteria)
@@ -42,15 +97,38 @@ export function compileStaticPrompt(input: PromptCompilerInput): CompiledPromptR
     "The receiving agent can inspect the target repository before editing.",
   ]
 
+  const profileWarnings = projectContextProfileWarnings(input)
+  const baseResult = {
+    title,
+    originalInput,
+    scenario: input.scenario,
+    targetAgent: input.targetAgent,
+    assumptions,
+    acceptanceCriteria: effectiveAcceptanceCriteria,
+    validationCommands: effectiveValidationCommands,
+    qualityScore: qualityScore(input),
+  }
+
+  if (selectedHarness !== undefined && selectedHarness !== null) {
+    const rendered = renderHarnessTemplate({
+      templateBody: selectedHarness.templateBody,
+      requiredFields: selectedHarness.requiredFields,
+      values: input,
+    })
+
+    return {
+      ...baseResult,
+      compiledPrompt: rendered.content,
+      warnings: rendered.warnings,
+    }
+  }
+
   const compiledPrompt = [
     "# Objective",
     originalInput,
     "",
     "# Context",
-    paragraph(
-      [input.projectContext, input.techStack, input.additionalNotes].filter(Boolean).join("\n"),
-      "No additional context provided.",
-    ),
+    defaultContextSection(input),
     "",
     "# Task",
     bulletList(scenarioTaskLines[input.scenario]),
@@ -85,15 +163,24 @@ export function compileStaticPrompt(input: PromptCompilerInput): CompiledPromptR
     "5. Follow-up work, if any",
   ].join("\n")
 
+  if (input.harnessTemplateId !== undefined && input.harnessTemplateId !== null) {
+    return {
+      compiledPrompt,
+      ...baseResult,
+      warnings: [HARNESS_WARNING_MISSING_TEMPLATE, ...profileWarnings],
+    }
+  }
+
+  if (profileWarnings.length > 0) {
+    return {
+      compiledPrompt,
+      ...baseResult,
+      warnings: profileWarnings,
+    }
+  }
+
   return {
-    title,
-    originalInput,
     compiledPrompt,
-    scenario: input.scenario,
-    targetAgent: input.targetAgent,
-    assumptions,
-    acceptanceCriteria: effectiveAcceptanceCriteria,
-    validationCommands: effectiveValidationCommands,
-    qualityScore: qualityScore(input),
+    ...baseResult,
   }
 }

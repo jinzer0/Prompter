@@ -14,6 +14,9 @@ export const emptyCompilerInput: PromptCompilerInput = {
   originalInput: "",
   scenario: "feature",
   targetAgent: "codex",
+  harnessTemplateId: null,
+  projectContextProfileId: null,
+  includeProjectContextProfile: false,
   projectContext: "",
   techStack: "",
   constraints: "",
@@ -31,9 +34,12 @@ export function analyzeInput(
   selectedProject: Project | null,
 ): PromptCompilerAnalyzeInput {
   return {
-    originalInput: draft.originalInput.trim(),
+    originalInput: draft.originalInput,
     scenario: draft.scenario,
     targetAgent: draft.targetAgent,
+    harnessTemplateId: draft.harnessTemplateId,
+    projectContextProfileId: draft.projectContextProfileId,
+    includeProjectContextProfile: draft.includeProjectContextProfile,
     projectContext: draft.projectContext,
     techStack: draft.techStack,
     constraints: draft.constraints,

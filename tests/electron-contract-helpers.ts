@@ -3,6 +3,8 @@ import { join } from "node:path"
 
 import type {
   ExportPromptResult,
+  ProjectContextCompilerBuildResult,
+  ProjectContextProfile,
   PromptCompilerAnalyzeResult,
   PromptCompilerCompileResult,
 } from "../electron/ipc-types"
@@ -74,6 +76,37 @@ export const promptCompilerCompileFixture: PromptCompilerCompileResult = {
     qualityScore: 80,
     warnings: [],
   },
+}
+export const validProjectId = "44444444-4444-4444-8444-444444444444"
+export const validProjectContextProfileId = "66666666-6666-4666-8666-666666666666"
+export const projectContextProfileFixture: ProjectContextProfile = {
+  id: validProjectContextProfileId,
+  projectId: validProjectId,
+  name: "Default Context",
+  summary: "A safe project summary.",
+  techStack: "TypeScript, Electron, SQLite",
+  architectureNotes: null,
+  codingConventions: null,
+  constraints: null,
+  forbiddenActions: null,
+  acceptanceDefaults: null,
+  validationCommands: "npm run typecheck",
+  securityNotes: null,
+  additionalContext: null,
+  testingNotes: null,
+  packageManager: "npm",
+  defaultBranch: "main",
+  repoPath: null,
+  isDefault: true,
+  createdAt: 1,
+  updatedAt: 2,
+}
+export const projectContextCompilerBuildFixture: ProjectContextCompilerBuildResult = {
+  profileId: validProjectContextProfileId,
+  profileName: "Default Context",
+  context: "## Project Context Profile\n\n### Summary\n\nA safe project summary.",
+  sectionNames: ["Summary"],
+  warnings: [],
 }
 const exportPromptResultFixture: ExportPromptResult = {
   format: "markdown",
@@ -152,6 +185,23 @@ export function createFailingServices(onServiceCall: () => void) {
       throw new Error("unused service")
     },
     deleteHarnessTemplate: (id: string) => ({ id }),
+    createProjectContextProfile: () => {
+      onServiceCall()
+      throw new Error("repository should not be called")
+    },
+    listProjectContextProfiles: () => [],
+    getProjectContextProfile: () => null,
+    getDefaultProjectContextProfile: () => null,
+    updateProjectContextProfile: () => {
+      onServiceCall()
+      throw new Error("repository should not be called")
+    },
+    deleteProjectContextProfile: (input: { readonly profileId: string }) => ({
+      id: input.profileId,
+    }),
+    duplicateProjectContextProfile: () => projectContextProfileFixture,
+    setDefaultProjectContextProfile: () => projectContextProfileFixture,
+    buildCompilerContext: () => projectContextCompilerBuildFixture,
     getSetting: () => null,
     setSetting: (key: string, value: string) => ({ key, value, updatedAt: 1 }),
     listSettings: () => [],

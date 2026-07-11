@@ -43,6 +43,50 @@ export const EXPORT_FORMATS = [
   "agents_md",
   "skill_md",
 ] as const
+export const PROJECT_CONTEXT_PROFILE_DB_FIELD_NAMES = [
+  "id",
+  "project_id",
+  "name",
+  "summary",
+  "tech_stack",
+  "architecture_notes",
+  "coding_conventions",
+  "constraints",
+  "forbidden_actions",
+  "acceptance_defaults",
+  "validation_commands",
+  "security_notes",
+  "additional_context",
+  "testing_notes",
+  "package_manager",
+  "default_branch",
+  "repo_path",
+  "is_default",
+  "created_at",
+  "updated_at",
+] as const
+export const PROJECT_CONTEXT_PROFILE_IPC_FIELD_NAMES = [
+  "id",
+  "projectId",
+  "name",
+  "summary",
+  "techStack",
+  "architectureNotes",
+  "codingConventions",
+  "constraints",
+  "forbiddenActions",
+  "acceptanceDefaults",
+  "validationCommands",
+  "securityNotes",
+  "additionalContext",
+  "testingNotes",
+  "packageManager",
+  "defaultBranch",
+  "repoPath",
+  "isDefault",
+  "createdAt",
+  "updatedAt",
+] as const
 
 export const PERSISTENCE_CHANNELS = {
   createProject: "prompter:projects:create",
@@ -78,6 +122,16 @@ export const PERSISTENCE_CHANNELS = {
   getHarnessTemplate: "prompter:harness-templates:get",
   updateHarnessTemplate: "prompter:harness-templates:update",
   deleteHarnessTemplate: "prompter:harness-templates:delete",
+  duplicateHarnessTemplate: "prompter:harness-templates:duplicate",
+  createProjectContextProfile: "prompter:project-context-profiles:create",
+  listProjectContextProfiles: "prompter:project-context-profiles:list",
+  getProjectContextProfile: "prompter:project-context-profiles:get",
+  getDefaultProjectContextProfile: "prompter:project-context-profiles:get-default",
+  updateProjectContextProfile: "prompter:project-context-profiles:update",
+  deleteProjectContextProfile: "prompter:project-context-profiles:delete",
+  duplicateProjectContextProfile: "prompter:project-context-profiles:duplicate",
+  setDefaultProjectContextProfile: "prompter:project-context-profiles:set-default",
+  buildProjectContextForCompiler: "prompter:project-context-profiles:build-compiler-context",
   getSetting: "prompter:settings:get",
   setSetting: "prompter:settings:set",
   listSettings: "prompter:settings:list",
@@ -105,7 +159,12 @@ const nameSchema = z.string().trim().min(1)
 const timestampSchema = z.number().int().nonnegative()
 const nullableTextSchema = z.string().nullable()
 const optionalTextSchema = z.string().nullable().optional()
+const nullableProfileTextInputSchema = z.string().nullable().optional().default(null)
+const nullableProfileTextUpdateSchema = z.string().nullable().optional()
 const requiredTextSchema = z.string().trim().min(1)
+const requiredPreservedTextSchema = z
+  .string()
+  .refine((value) => value.trim().length > 0, "Text must not be blank")
 const noPayloadSchema = z.undefined()
 const scenarioSchema = z.enum(SCENARIOS)
 const targetAgentSchema = z.enum(TARGET_AGENTS)
@@ -140,6 +199,47 @@ function jsonArrayOrStringSchema<T extends z.ZodTypeAny>(schema: T) {
   }, z.array(schema))
 }
 
+function parseJsonString(value: string, ctx: z.RefinementCtx): unknown {
+  try {
+    return JSON.parse(value)
+  } catch {
+    ctx.addIssue({ code: "custom", message: "Invalid JSON string" })
+    return z.NEVER
+  }
+}
+
+const requiredFieldsValueSchema = z.union([
+  z.array(z.string().trim().min(1)).transform((value) => JSON.stringify(value)),
+  z.string().transform((value, ctx) => {
+    const parsed = z.array(z.string().trim().min(1)).safeParse(parseJsonString(value, ctx))
+
+    if (!parsed.success) {
+      ctx.addIssue({ code: "custom", message: "requiredFields must be a JSON string array" })
+      return z.NEVER
+    }
+
+    return JSON.stringify(parsed.data)
+  }),
+  z.null(),
+])
+const clarificationPolicyObjectSchema = z
+  .record(z.string(), z.unknown())
+  .refine((value) => !Array.isArray(value), "clarificationPolicy must be a JSON object")
+const clarificationPolicyValueSchema = z.union([
+  clarificationPolicyObjectSchema.transform((value) => JSON.stringify(value)),
+  z.string().transform((value, ctx) => {
+    const parsed = clarificationPolicyObjectSchema.safeParse(parseJsonString(value, ctx))
+
+    if (!parsed.success) {
+      ctx.addIssue({ code: "custom", message: "clarificationPolicy must be a JSON object string" })
+      return z.NEVER
+    }
+
+    return JSON.stringify(parsed.data)
+  }),
+  z.null(),
+])
+
 export function settingKeyIsPublic(key: string): boolean {
   const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, "")
   return !normalizedKey.includes("openai") && !normalizedKey.includes("apikey")
@@ -154,6 +254,65 @@ export const projectSchema = z.object({
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 })
+
+const projectContextProfileTextFieldsSchema = z.object({
+  summary: nullableTextSchema,
+  techStack: nullableTextSchema,
+  architectureNotes: nullableTextSchema,
+  codingConventions: nullableTextSchema,
+  constraints: nullableTextSchema,
+  forbiddenActions: nullableTextSchema,
+  acceptanceDefaults: nullableTextSchema,
+  validationCommands: nullableTextSchema,
+  securityNotes: nullableTextSchema,
+  additionalContext: nullableTextSchema,
+  testingNotes: nullableTextSchema,
+  packageManager: nullableTextSchema,
+  defaultBranch: nullableTextSchema,
+  repoPath: nullableTextSchema,
+})
+const projectContextProfileTextInputFieldsSchema = z.object({
+  summary: nullableProfileTextInputSchema,
+  techStack: nullableProfileTextInputSchema,
+  architectureNotes: nullableProfileTextInputSchema,
+  codingConventions: nullableProfileTextInputSchema,
+  constraints: nullableProfileTextInputSchema,
+  forbiddenActions: nullableProfileTextInputSchema,
+  acceptanceDefaults: nullableProfileTextInputSchema,
+  validationCommands: nullableProfileTextInputSchema,
+  securityNotes: nullableProfileTextInputSchema,
+  additionalContext: nullableProfileTextInputSchema,
+  testingNotes: nullableProfileTextInputSchema,
+  packageManager: nullableProfileTextInputSchema,
+  defaultBranch: nullableProfileTextInputSchema,
+  repoPath: nullableProfileTextInputSchema,
+})
+const projectContextProfileTextUpdateFieldsSchema = z.object({
+  summary: nullableProfileTextUpdateSchema,
+  techStack: nullableProfileTextUpdateSchema,
+  architectureNotes: nullableProfileTextUpdateSchema,
+  codingConventions: nullableProfileTextUpdateSchema,
+  constraints: nullableProfileTextUpdateSchema,
+  forbiddenActions: nullableProfileTextUpdateSchema,
+  acceptanceDefaults: nullableProfileTextUpdateSchema,
+  validationCommands: nullableProfileTextUpdateSchema,
+  securityNotes: nullableProfileTextUpdateSchema,
+  additionalContext: nullableProfileTextUpdateSchema,
+  testingNotes: nullableProfileTextUpdateSchema,
+  packageManager: nullableProfileTextUpdateSchema,
+  defaultBranch: nullableProfileTextUpdateSchema,
+  repoPath: nullableProfileTextUpdateSchema,
+})
+export const projectContextProfileSchema = z
+  .object({
+    id: idSchema,
+    projectId: idSchema,
+    name: nameSchema,
+    isDefault: z.boolean(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .extend(projectContextProfileTextFieldsSchema.shape)
 
 export const promptAssetSchema = z.object({
   id: idSchema,
@@ -219,7 +378,7 @@ export const harnessTemplateSchema = z.object({
   name: nameSchema,
   scenario: scenarioSchema,
   targetAgent: targetAgentSchema,
-  templateBody: z.string().trim().min(1),
+  templateBody: requiredPreservedTextSchema,
   requiredFields: nullableTextSchema,
   clarificationPolicy: nullableTextSchema,
   createdAt: timestampSchema,
@@ -318,6 +477,7 @@ export const promptCompilerAnalyzeOutputSchema = z.object({
   assumptions: z.array(z.string().trim().min(1)),
   suggestedTags: z.array(z.string().trim().min(1)),
   riskLevel: riskLevelSchema,
+  warnings: z.array(z.string().trim().min(1)).default([]),
 })
 export const promptCompilerCompileOutputSchema = z.object({
   title: nameSchema,
@@ -352,6 +512,10 @@ export const promptCompilerCompileResultSchema = z.discriminatedUnion("ok", [
 ])
 export const deleteResultSchema = z.object({ id: idSchema })
 export const idPayloadSchema = z.object({ id: idSchema })
+export const projectContextProfileIdentitySchema = z.object({
+  projectId: idSchema,
+  profileId: idSchema,
+})
 
 export const createProjectInputSchema = z.object({
   name: nameSchema,
@@ -362,6 +526,39 @@ export const createProjectInputSchema = z.object({
 export const updateProjectInputSchema = createProjectInputSchema
   .partial()
   .refine((value) => Object.keys(value).length > 0, "At least one project field is required")
+export const createProjectContextProfileInputSchema = z
+  .object({
+    projectId: idSchema,
+    name: nameSchema,
+    isDefault: z.boolean().optional().default(false),
+  })
+  .extend(projectContextProfileTextInputFieldsSchema.shape)
+export const updateProjectContextProfileInputSchema = z
+  .object({
+    name: nameSchema.optional(),
+    isDefault: z.boolean().optional(),
+  })
+  .extend(projectContextProfileTextUpdateFieldsSchema.shape)
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    "At least one project context profile field is required",
+  )
+export const listProjectContextProfilesInputSchema = z.object({ projectId: idSchema })
+export const getProjectContextProfileInputSchema = projectContextProfileIdentitySchema
+export const deleteProjectContextProfileInputSchema = projectContextProfileIdentitySchema
+export const duplicateProjectContextProfileInputSchema = projectContextProfileIdentitySchema
+export const setDefaultProjectContextProfileInputSchema = projectContextProfileIdentitySchema
+export const buildProjectContextForCompilerInputSchema = projectContextProfileIdentitySchema
+export const updateProjectContextProfilePayloadSchema = projectContextProfileIdentitySchema.extend({
+  input: updateProjectContextProfileInputSchema,
+})
+export const projectContextCompilerBuildResultSchema = z.object({
+  profileId: idSchema.nullable(),
+  profileName: z.string().nullable(),
+  context: z.string().nullable(),
+  sectionNames: z.array(z.string().trim().min(1)),
+  warnings: z.array(z.string().trim().min(1)),
+})
 
 export const promptAssetFilterSchema = z
   .object({
@@ -421,12 +618,27 @@ export const createHarnessTemplateInputSchema = z.object({
   name: nameSchema,
   scenario: scenarioSchema,
   targetAgent: targetAgentSchema,
-  templateBody: z.string().trim().min(1),
-  requiredFields: optionalTextSchema,
-  clarificationPolicy: optionalTextSchema,
+  templateBody: requiredPreservedTextSchema,
+  requiredFields: requiredFieldsValueSchema.optional().default(null),
+  clarificationPolicy: clarificationPolicyValueSchema.optional().default(null),
 })
-export const updateHarnessTemplateInputSchema = createHarnessTemplateInputSchema
-  .partial()
+export const listHarnessTemplatesInputSchema = z
+  .object({
+    scenario: scenarioSchema.optional(),
+    targetAgent: targetAgentSchema.optional(),
+    query: z.string().trim().optional(),
+  })
+  .optional()
+export const duplicateHarnessTemplateInputSchema = idPayloadSchema
+export const updateHarnessTemplateInputSchema = z
+  .object({
+    name: nameSchema.optional(),
+    scenario: scenarioSchema.optional(),
+    targetAgent: targetAgentSchema.optional(),
+    templateBody: requiredPreservedTextSchema.optional(),
+    requiredFields: requiredFieldsValueSchema.optional(),
+    clarificationPolicy: clarificationPolicyValueSchema.optional(),
+  })
   .refine(
     (value) => Object.keys(value).length > 0,
     "At least one harness template field is required",
@@ -437,8 +649,39 @@ export const saveOpenAIKeyInputSchema = z.object({
 export const updateDefaultsInputSchema = settingsDefaultsSchema
   .partial()
   .refine((value) => Object.keys(value).length > 0, "At least one default setting is required")
+type PromptCompilerProjectContextFields = {
+  readonly projectId?: string | null | undefined
+  readonly projectContextProfileId?: string | null | undefined
+  readonly includeProjectContextProfile?: boolean | undefined
+}
+
+function validatePromptCompilerProjectContext(
+  value: PromptCompilerProjectContextFields,
+  ctx: z.RefinementCtx,
+): void {
+  if (value.includeProjectContextProfile !== true) {
+    return
+  }
+
+  if (value.projectId === undefined || value.projectId === null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["projectId"],
+      message: "projectId is required when includeProjectContextProfile is true",
+    })
+  }
+
+  if (value.projectContextProfileId === undefined || value.projectContextProfileId === null) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["projectContextProfileId"],
+      message: "projectContextProfileId is required when includeProjectContextProfile is true",
+    })
+  }
+}
+
 const promptCompilerBaseInputSchema = z.object({
-  originalInput: requiredTextSchema,
+  originalInput: requiredPreservedTextSchema,
   scenario: scenarioSchema.optional(),
   targetAgent: targetAgentSchema.optional(),
   projectContext: optionalTextSchema,
@@ -448,14 +691,21 @@ const promptCompilerBaseInputSchema = z.object({
   validationCommands: optionalTextSchema,
   additionalNotes: optionalTextSchema,
   projectId: idSchema.nullable().optional(),
+  harnessTemplateId: idSchema.nullable().optional(),
+  projectContextProfileId: idSchema.nullable().optional(),
+  includeProjectContextProfile: z.boolean().optional(),
 })
-export const promptCompilerAnalyzeInputSchema = promptCompilerBaseInputSchema
-export const promptCompilerCompileInputSchema = promptCompilerBaseInputSchema.extend({
-  scenario: scenarioSchema,
-  targetAgent: targetAgentSchema,
-  clarificationAnswers: z.array(clarificationAnswerSchema).optional(),
-  assumptions: z.array(z.string().trim().min(1)).optional(),
-})
+export const promptCompilerAnalyzeInputSchema = promptCompilerBaseInputSchema.superRefine(
+  validatePromptCompilerProjectContext,
+)
+export const promptCompilerCompileInputSchema = promptCompilerBaseInputSchema
+  .extend({
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    clarificationAnswers: z.array(clarificationAnswerSchema).optional(),
+    assumptions: z.array(z.string().trim().min(1)).optional(),
+  })
+  .superRefine(validatePromptCompilerProjectContext)
 export const setSettingInputSchema = z.object({
   key: keySchema.refine(settingKeyIsPublic, "Secrets cannot be stored in settings"),
   value: z.string(),
@@ -514,10 +764,20 @@ export const payloadSchemas = {
   searchPrompts: promptSearchFilterSchema,
   rebuildSearchIndex: noPayloadSchema,
   createHarnessTemplate: createHarnessTemplateInputSchema,
-  listHarnessTemplates: noPayloadSchema,
+  listHarnessTemplates: listHarnessTemplatesInputSchema,
   getHarnessTemplate: idPayloadSchema,
   updateHarnessTemplate: updateHarnessTemplatePayloadSchema,
   deleteHarnessTemplate: idPayloadSchema,
+  duplicateHarnessTemplate: duplicateHarnessTemplateInputSchema,
+  createProjectContextProfile: createProjectContextProfileInputSchema,
+  listProjectContextProfiles: listProjectContextProfilesInputSchema,
+  getProjectContextProfile: getProjectContextProfileInputSchema,
+  getDefaultProjectContextProfile: listProjectContextProfilesInputSchema,
+  updateProjectContextProfile: updateProjectContextProfilePayloadSchema,
+  deleteProjectContextProfile: deleteProjectContextProfileInputSchema,
+  duplicateProjectContextProfile: duplicateProjectContextProfileInputSchema,
+  setDefaultProjectContextProfile: setDefaultProjectContextProfileInputSchema,
+  buildProjectContextForCompiler: buildProjectContextForCompilerInputSchema,
   getSetting: keyPayloadSchema,
   setSetting: setSettingInputSchema,
   listSettings: noPayloadSchema,
@@ -569,6 +829,16 @@ export const responseSchemas = {
   getHarnessTemplate: harnessTemplateSchema.nullable(),
   updateHarnessTemplate: harnessTemplateSchema,
   deleteHarnessTemplate: deleteResultSchema,
+  duplicateHarnessTemplate: harnessTemplateSchema,
+  createProjectContextProfile: projectContextProfileSchema,
+  listProjectContextProfiles: z.array(projectContextProfileSchema),
+  getProjectContextProfile: projectContextProfileSchema.nullable(),
+  getDefaultProjectContextProfile: projectContextProfileSchema.nullable(),
+  updateProjectContextProfile: projectContextProfileSchema,
+  deleteProjectContextProfile: deleteResultSchema,
+  duplicateProjectContextProfile: projectContextProfileSchema,
+  setDefaultProjectContextProfile: projectContextProfileSchema,
+  buildProjectContextForCompiler: projectContextCompilerBuildResultSchema,
   getSetting: settingSchema.nullable(),
   setSetting: settingSchema,
   listSettings: z.array(settingSchema),
@@ -585,3 +855,30 @@ export const responseSchemas = {
   copyText: copyTextResultSchema,
   readText: clipboardReadTextResultSchema,
 } as const
+
+export type ProjectContextProfile = z.infer<typeof projectContextProfileSchema>
+export type CreateProjectInput = z.output<typeof createProjectInputSchema>
+export type CreateProjectContextProfileInput = z.output<
+  typeof createProjectContextProfileInputSchema
+>
+export type UpdateProjectContextProfileInput = z.output<
+  typeof updateProjectContextProfileInputSchema
+>
+export type ListProjectContextProfilesInput = z.output<typeof listProjectContextProfilesInputSchema>
+export type GetProjectContextProfileInput = z.output<typeof getProjectContextProfileInputSchema>
+export type DeleteProjectContextProfileInput = z.output<
+  typeof deleteProjectContextProfileInputSchema
+>
+export type DuplicateProjectContextProfileInput = z.output<
+  typeof duplicateProjectContextProfileInputSchema
+>
+export type SetDefaultProjectContextProfileInput = z.output<
+  typeof setDefaultProjectContextProfileInputSchema
+>
+export type BuildProjectContextForCompilerInput = z.output<
+  typeof buildProjectContextForCompilerInputSchema
+>
+export type ProjectContextCompilerBuildResult = z.infer<
+  typeof projectContextCompilerBuildResultSchema
+>
+export type DeleteResult = z.infer<typeof deleteResultSchema>

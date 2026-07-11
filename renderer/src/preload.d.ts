@@ -1,4 +1,4 @@
-import type { ElectronBridge } from "../../electron/bridge"
+import type { ElectronBridge } from "../../electron/ipc-types"
 
 declare global {
   interface Window {

@@ -1,7 +1,5 @@
 import type { z } from "zod"
 
-import type { MenuAction } from "./app-menu.js"
-import type { ElectronBridge } from "./bridge-types.js"
 import {
   type IpcChannel,
   PERSISTENCE_CHANNELS,
@@ -11,6 +9,7 @@ import {
   payloadSchemas,
   responseSchemas,
 } from "./ipc-contract.js"
+import type { ElectronBridge, MenuAction } from "./ipc-types.js"
 
 // allow: SIZE_OK - central renderer bridge registry mirrors the typed IPC contract.
 
@@ -65,6 +64,71 @@ export function createElectronBridge(
         request(ch.updateProject, payload.updateProject, response.updateProject, { id, input }),
       delete: (id) =>
         request(ch.deleteProject, payload.deleteProject, response.deleteProject, { id }),
+    },
+    projectContextProfiles: {
+      create: (input) =>
+        request(
+          ch.createProjectContextProfile,
+          payload.createProjectContextProfile,
+          response.createProjectContextProfile,
+          input,
+        ),
+      list: (projectId) =>
+        request(
+          ch.listProjectContextProfiles,
+          payload.listProjectContextProfiles,
+          response.listProjectContextProfiles,
+          { projectId },
+        ),
+      get: (projectId, profileId) =>
+        request(
+          ch.getProjectContextProfile,
+          payload.getProjectContextProfile,
+          response.getProjectContextProfile,
+          { projectId, profileId },
+        ),
+      getDefault: (projectId) =>
+        request(
+          ch.getDefaultProjectContextProfile,
+          payload.getDefaultProjectContextProfile,
+          response.getDefaultProjectContextProfile,
+          { projectId },
+        ),
+      update: (projectId, profileId, input) =>
+        request(
+          ch.updateProjectContextProfile,
+          payload.updateProjectContextProfile,
+          response.updateProjectContextProfile,
+          { projectId, profileId, input },
+        ),
+      delete: (projectId, profileId) =>
+        request(
+          ch.deleteProjectContextProfile,
+          payload.deleteProjectContextProfile,
+          response.deleteProjectContextProfile,
+          { projectId, profileId },
+        ),
+      duplicate: (projectId, profileId) =>
+        request(
+          ch.duplicateProjectContextProfile,
+          payload.duplicateProjectContextProfile,
+          response.duplicateProjectContextProfile,
+          { projectId, profileId },
+        ),
+      setDefault: (projectId, profileId) =>
+        request(
+          ch.setDefaultProjectContextProfile,
+          payload.setDefaultProjectContextProfile,
+          response.setDefaultProjectContextProfile,
+          { projectId, profileId },
+        ),
+      buildCompilerContext: (projectId, profileId) =>
+        request(
+          ch.buildProjectContextForCompiler,
+          payload.buildProjectContextForCompiler,
+          response.buildProjectContextForCompiler,
+          { projectId, profileId },
+        ),
     },
     prompts: {
       createAsset: (input) =>
@@ -181,12 +245,12 @@ export function createElectronBridge(
           response.createHarnessTemplate,
           input,
         ),
-      list: () =>
+      list: (filter) =>
         request(
           ch.listHarnessTemplates,
           payload.listHarnessTemplates,
           response.listHarnessTemplates,
-          undefined,
+          filter,
         ),
       get: (id) =>
         request(ch.getHarnessTemplate, payload.getHarnessTemplate, response.getHarnessTemplate, {
@@ -207,6 +271,13 @@ export function createElectronBridge(
           ch.deleteHarnessTemplate,
           payload.deleteHarnessTemplate,
           response.deleteHarnessTemplate,
+          { id },
+        ),
+      duplicate: (id) =>
+        request(
+          ch.duplicateHarnessTemplate,
+          payload.duplicateHarnessTemplate,
+          response.duplicateHarnessTemplate,
           { id },
         ),
     },

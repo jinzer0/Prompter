@@ -8,10 +8,23 @@ import {
   menuActionSchema,
 } from "../electron/app-menu"
 import { createElectronBridge, PING_RESPONSE } from "../electron/bridge"
-import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
+import {
+  createHarnessTemplateInputSchema,
+  harnessTemplateSchema,
+  PERSISTENCE_CHANNELS,
+} from "../electron/ipc-contract"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
 import { createWindowOptions } from "../electron/window-options"
-import { createFailingServices, listFiles, validPromptAssetId } from "./electron-contract-helpers"
+import {
+  createFailingServices,
+  listFiles,
+  projectContextCompilerBuildFixture,
+  projectContextProfileFixture,
+  validProjectContextProfileId,
+  validProjectId,
+  validPromptAssetId,
+} from "./electron-contract-helpers"
+import { readProductionSource } from "./source-guardrail-helpers"
 
 // allow: SIZE_OK - central Electron shell contract covers bridge, IPC validation, and renderer boundaries.
 
@@ -47,6 +60,18 @@ const compareVersionResponse = {
   id: comparePromptVersionId,
   versionNumber: 2,
   compiledPrompt: "Compiled prompt\nwith changes",
+} as const
+const validHarnessTemplateId = "44444444-4444-4444-8444-444444444444"
+const harnessTemplateResponse = {
+  id: validHarnessTemplateId,
+  name: "Feature Harness",
+  scenario: "feature",
+  targetAgent: "generic_agent",
+  templateBody: "  Keep exact body whitespace.  \n",
+  requiredFields: null,
+  clarificationPolicy: null,
+  createdAt: 1,
+  updatedAt: 2,
 } as const
 type MenuTemplateItem = ReturnType<typeof createApplicationMenuTemplate>[number]
 
@@ -94,6 +119,17 @@ function clickMenuItem(item: MenuTemplateItem): void {
   Reflect.apply(click, undefined, [])
 }
 
+function findButtonBlock(source: string, text: string, handler: string): string {
+  const buttonBlocks = source.match(/<Button[\s\S]*?<\/Button>/g) ?? []
+  const buttonBlock = buttonBlocks.find((block) => block.includes(text) && block.includes(handler))
+
+  if (buttonBlock === undefined) {
+    throw new Error(`Button block not found for ${text}`)
+  }
+
+  return buttonBlock
+}
+
 describe("Electron shell contract", () => {
   it("defines macOS packaging scripts with native and migration safeguards", async () => {
     const packageJson = JSON.parse(await readFile("package.json", "utf8")) as {
@@ -121,16 +157,33 @@ describe("Electron shell contract", () => {
       "renderer/src/components/prompt-compiler-panel.tsx",
       "utf8",
     )
-    const saveTargetIndex = compilerSource.indexOf('data-menu-action-target="save-compiled-prompt"')
-    const quickCaptureTargetIndex = compilerSource.indexOf(
+    const compilerActionsSource = await readFile(
+      "renderer/src/components/prompt-compiler-actions.tsx",
+      "utf8",
+    )
+    const saveTargetIndex = compilerActionsSource.indexOf(
+      'data-menu-action-target="save-compiled-prompt"',
+    )
+    const quickCaptureTargetIndex = compilerActionsSource.indexOf(
       'data-menu-action-target="quick-capture-from-clipboard"',
     )
-    const analyzeHandlerIndex = compilerSource.indexOf("onClick={compiler.analyzeWithLLM}")
-    const saveHandlerIndex = compilerSource.indexOf("onClick={compiler.savePrompt}")
+    const llmCompileButton = findButtonBlock(
+      compilerActionsSource,
+      "최종 프롬프트 생성",
+      "onClick={onCompileWithLLM}",
+    )
+    const saveCompiledPromptButton = findButtonBlock(
+      compilerActionsSource,
+      "Save compiled prompt",
+      "onClick={() => void onSavePrompt()}",
+    )
 
     expect(quickCaptureTargetIndex).toBeGreaterThan(-1)
-    expect(saveTargetIndex).toBeGreaterThan(analyzeHandlerIndex)
-    expect(saveHandlerIndex).toBeGreaterThan(saveTargetIndex)
+    expect(saveTargetIndex).toBeGreaterThan(-1)
+    expect(saveCompiledPromptButton).toContain('data-menu-action-target="save-compiled-prompt"')
+    expect(llmCompileButton).not.toContain('data-menu-action-target="save-compiled-prompt"')
+    expect(compilerSource).toContain("onAnalyzeWithLLM={compiler.analyzeWithLLM}")
+    expect(compilerSource).toContain("onSavePrompt={compiler.savePrompt}")
     expect(appSource).toContain('case "quickCaptureFromClipboard"')
     expect(appSource).toContain('clickMenuTarget("quick-capture-from-clipboard")')
     expect(appSource).toContain('event.key !== "Escape"')
@@ -253,6 +306,7 @@ describe("Electron shell contract", () => {
       "ping",
       "menu",
       "projects",
+      "projectContextProfiles",
       "prompts",
       "search",
       "tags",
@@ -263,8 +317,21 @@ describe("Electron shell contract", () => {
       "exports",
       "clipboard",
     ])
+    expect(Object.keys(bridge)).not.toContain("appEvents")
+    expect(Object.keys(bridge)).not.toContain("shortcuts")
     expect(Object.keys(bridge.menu)).toEqual(["onAction"])
     expect(Object.keys(bridge.projects)).toEqual(["create", "list", "get", "update", "delete"])
+    expect(Object.keys(bridge.projectContextProfiles)).toEqual([
+      "create",
+      "list",
+      "get",
+      "getDefault",
+      "update",
+      "delete",
+      "duplicate",
+      "setDefault",
+      "buildCompilerContext",
+    ])
     expect(Object.keys(bridge.prompts)).toEqual([
       "createAsset",
       "listAssets",
@@ -296,6 +363,7 @@ describe("Electron shell contract", () => {
       "get",
       "update",
       "delete",
+      "duplicate",
     ])
     expect(Object.keys(bridge.settings)).toEqual([
       "get",
@@ -315,6 +383,251 @@ describe("Electron shell contract", () => {
     expect(Object.keys(bridge.clipboard)).toEqual(["copyText", "readText"])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()
+  })
+
+  it("routes harness template list filters and duplicate through typed bridge channels", async () => {
+    const calls: { readonly channel: string; readonly payload: unknown }[] = []
+    const bridge = createElectronBridge(async (channel, payload) => {
+      calls.push({ channel, payload })
+
+      if (channel === PERSISTENCE_CHANNELS.listHarnessTemplates) {
+        return [harnessTemplateResponse]
+      }
+      if (channel === PERSISTENCE_CHANNELS.duplicateHarnessTemplate) {
+        return { ...harnessTemplateResponse, name: "Feature Harness Copy" }
+      }
+
+      throw new Error(`Unexpected channel ${channel}`)
+    })
+
+    await expect(bridge.harnessTemplates.list()).resolves.toEqual([harnessTemplateResponse])
+    await expect(bridge.harnessTemplates.list({ scenario: "feature" })).resolves.toEqual([
+      harnessTemplateResponse,
+    ])
+    await expect(bridge.harnessTemplates.list({ targetAgent: "generic_agent" })).resolves.toEqual([
+      harnessTemplateResponse,
+    ])
+    await expect(bridge.harnessTemplates.list({ query: "  Feature  " })).resolves.toEqual([
+      harnessTemplateResponse,
+    ])
+    await expect(bridge.harnessTemplates.list({ query: "   " })).resolves.toEqual([
+      harnessTemplateResponse,
+    ])
+    await expect(bridge.harnessTemplates.duplicate(validHarnessTemplateId)).resolves.toEqual({
+      ...harnessTemplateResponse,
+      name: "Feature Harness Copy",
+    })
+
+    expect(calls).toEqual([
+      { channel: PERSISTENCE_CHANNELS.listHarnessTemplates, payload: undefined },
+      { channel: PERSISTENCE_CHANNELS.listHarnessTemplates, payload: { scenario: "feature" } },
+      {
+        channel: PERSISTENCE_CHANNELS.listHarnessTemplates,
+        payload: { targetAgent: "generic_agent" },
+      },
+      { channel: PERSISTENCE_CHANNELS.listHarnessTemplates, payload: { query: "Feature" } },
+      { channel: PERSISTENCE_CHANNELS.listHarnessTemplates, payload: { query: "" } },
+      {
+        channel: PERSISTENCE_CHANNELS.duplicateHarnessTemplate,
+        payload: { id: validHarnessTemplateId },
+      },
+    ])
+  })
+
+  it("routes project context profile methods through typed bridge channels", async () => {
+    const calls: { readonly channel: string; readonly payload: unknown }[] = []
+    const bridge = createElectronBridge(async (channel, payload) => {
+      calls.push({ channel, payload })
+
+      if (channel === PERSISTENCE_CHANNELS.listProjectContextProfiles) {
+        return [projectContextProfileFixture]
+      }
+      if (channel === PERSISTENCE_CHANNELS.getProjectContextProfile) {
+        return projectContextProfileFixture
+      }
+      if (channel === PERSISTENCE_CHANNELS.getDefaultProjectContextProfile) {
+        return projectContextProfileFixture
+      }
+      if (channel === PERSISTENCE_CHANNELS.deleteProjectContextProfile) {
+        return { id: validProjectContextProfileId }
+      }
+      if (channel === PERSISTENCE_CHANNELS.buildProjectContextForCompiler) {
+        return projectContextCompilerBuildFixture
+      }
+      if (
+        channel === PERSISTENCE_CHANNELS.createProjectContextProfile ||
+        channel === PERSISTENCE_CHANNELS.updateProjectContextProfile ||
+        channel === PERSISTENCE_CHANNELS.duplicateProjectContextProfile ||
+        channel === PERSISTENCE_CHANNELS.setDefaultProjectContextProfile
+      ) {
+        return projectContextProfileFixture
+      }
+
+      throw new Error(`Unexpected channel ${channel}`)
+    })
+
+    await expect(
+      bridge.projectContextProfiles.create({
+        projectId: validProjectId,
+        name: "Default Context",
+        summary: "A safe project summary.",
+      }),
+    ).resolves.toEqual(projectContextProfileFixture)
+    await expect(bridge.projectContextProfiles.list(validProjectId)).resolves.toEqual([
+      projectContextProfileFixture,
+    ])
+    await expect(
+      bridge.projectContextProfiles.get(validProjectId, validProjectContextProfileId),
+    ).resolves.toEqual(projectContextProfileFixture)
+    await expect(bridge.projectContextProfiles.getDefault(validProjectId)).resolves.toEqual(
+      projectContextProfileFixture,
+    )
+    await expect(
+      bridge.projectContextProfiles.update(validProjectId, validProjectContextProfileId, {
+        name: "Updated Context",
+      }),
+    ).resolves.toEqual(projectContextProfileFixture)
+    await expect(
+      bridge.projectContextProfiles.delete(validProjectId, validProjectContextProfileId),
+    ).resolves.toEqual({ id: validProjectContextProfileId })
+    await expect(
+      bridge.projectContextProfiles.duplicate(validProjectId, validProjectContextProfileId),
+    ).resolves.toEqual(projectContextProfileFixture)
+    await expect(
+      bridge.projectContextProfiles.setDefault(validProjectId, validProjectContextProfileId),
+    ).resolves.toEqual(projectContextProfileFixture)
+    await expect(
+      bridge.projectContextProfiles.buildCompilerContext(
+        validProjectId,
+        validProjectContextProfileId,
+      ),
+    ).resolves.toEqual(projectContextCompilerBuildFixture)
+
+    expect(calls).toEqual([
+      {
+        channel: PERSISTENCE_CHANNELS.createProjectContextProfile,
+        payload: {
+          projectId: validProjectId,
+          name: "Default Context",
+          summary: "A safe project summary.",
+          techStack: null,
+          architectureNotes: null,
+          codingConventions: null,
+          constraints: null,
+          forbiddenActions: null,
+          acceptanceDefaults: null,
+          validationCommands: null,
+          securityNotes: null,
+          additionalContext: null,
+          testingNotes: null,
+          packageManager: null,
+          defaultBranch: null,
+          repoPath: null,
+          isDefault: false,
+        },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.listProjectContextProfiles,
+        payload: { projectId: validProjectId },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.getProjectContextProfile,
+        payload: { projectId: validProjectId, profileId: validProjectContextProfileId },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.getDefaultProjectContextProfile,
+        payload: { projectId: validProjectId },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.updateProjectContextProfile,
+        payload: {
+          projectId: validProjectId,
+          profileId: validProjectContextProfileId,
+          input: { name: "Updated Context" },
+        },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.deleteProjectContextProfile,
+        payload: { projectId: validProjectId, profileId: validProjectContextProfileId },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.duplicateProjectContextProfile,
+        payload: { projectId: validProjectId, profileId: validProjectContextProfileId },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.setDefaultProjectContextProfile,
+        payload: { projectId: validProjectId, profileId: validProjectContextProfileId },
+      },
+      {
+        channel: PERSISTENCE_CHANNELS.buildProjectContextForCompiler,
+        payload: { projectId: validProjectId, profileId: validProjectContextProfileId },
+      },
+    ])
+  })
+
+  it("validates harness template contract inputs without mutating template whitespace", () => {
+    const templateBody = "  \nKeep the exact template body.\n  "
+
+    expect(
+      createHarnessTemplateInputSchema.parse({
+        name: "Whitespace Harness",
+        scenario: "feature",
+        targetAgent: "generic_agent",
+        templateBody,
+        requiredFields: ["title", "originalInput"],
+        clarificationPolicy: { mode: "ask_when_missing" },
+      }),
+    ).toEqual({
+      name: "Whitespace Harness",
+      scenario: "feature",
+      targetAgent: "generic_agent",
+      templateBody,
+      requiredFields: JSON.stringify(["title", "originalInput"]),
+      clarificationPolicy: JSON.stringify({ mode: "ask_when_missing" }),
+    })
+    expect(
+      createHarnessTemplateInputSchema.parse({
+        name: "JSON Harness",
+        scenario: "feature",
+        targetAgent: "generic_agent",
+        templateBody,
+        requiredFields: '["title"]',
+        clarificationPolicy: '{"mode":"ask_when_missing"}',
+      }),
+    ).toMatchObject({
+      templateBody,
+      requiredFields: JSON.stringify(["title"]),
+      clarificationPolicy: JSON.stringify({ mode: "ask_when_missing" }),
+    })
+    expect(
+      harnessTemplateSchema.parse({ ...harnessTemplateResponse, templateBody }).templateBody,
+    ).toBe(templateBody)
+    expect(() =>
+      createHarnessTemplateInputSchema.parse({
+        name: "Blank Harness",
+        scenario: "feature",
+        targetAgent: "generic_agent",
+        templateBody: "  \n\t  ",
+      }),
+    ).toThrow(/templateBody/)
+    expect(() =>
+      createHarnessTemplateInputSchema.parse({
+        name: "Bad Fields Harness",
+        scenario: "feature",
+        targetAgent: "generic_agent",
+        templateBody,
+        requiredFields: { title: true },
+      }),
+    ).toThrow(/requiredFields/)
+    expect(() =>
+      createHarnessTemplateInputSchema.parse({
+        name: "Bad Policy Harness",
+        scenario: "feature",
+        targetAgent: "generic_agent",
+        templateBody,
+        clarificationPolicy: ["ask"],
+      }),
+    ).toThrow(/clarificationPolicy/)
   })
 
   it("exposes a typed menu action subscription without raw ipcRenderer", () => {
@@ -437,7 +750,48 @@ describe("Electron shell contract", () => {
         compareVersionId: "",
       }),
     ).toThrow(/compareVersionId/)
+    expect(() => handlers.duplicateHarnessTemplate({ id: "not-a-uuid" })).toThrow(/id/)
+    expect(() =>
+      handlers.createProjectContextProfile({ projectId: validProjectId, name: "" }),
+    ).toThrow(/name/)
+    expect(() => handlers.listProjectContextProfiles({ projectId: "not-a-uuid" })).toThrow(
+      /projectId/,
+    )
+    expect(() =>
+      handlers.buildProjectContextForCompiler({
+        projectId: validProjectId,
+        profileId: "not-a-uuid",
+      }),
+    ).toThrow(/profileId/)
     expect(called).toBe(false)
+  })
+
+  it("returns safe compiler context warnings for cross-project profile ownership mismatches", () => {
+    const inputs: { readonly projectId: string; readonly profileId: string }[] = []
+    const crossProjectResult = {
+      profileId: null,
+      profileName: null,
+      context: null,
+      sectionNames: [],
+      warnings: ["Selected project context profile is unavailable; profile context was excluded."],
+    }
+    const handlers = createPersistenceIpcHandlers({
+      ...createFailingServices(() => undefined),
+      buildCompilerContext: (input) => {
+        inputs.push(input)
+        return crossProjectResult
+      },
+    })
+
+    expect(
+      handlers.buildProjectContextForCompiler({
+        projectId: validProjectId,
+        profileId: validProjectContextProfileId,
+      }),
+    ).toEqual(crossProjectResult)
+    expect(inputs).toEqual([{ projectId: validProjectId, profileId: validProjectContextProfileId }])
+    expect(crossProjectResult.context).toBeNull()
+    expect(JSON.stringify(crossProjectResult)).not.toContain("A safe project summary.")
   })
 
   it("keeps renderer source free of direct database and Node access", async () => {
@@ -448,11 +802,54 @@ describe("Electron shell contract", () => {
 
     expect(rendererSource).not.toContain("better-sqlite3")
     expect(rendererSource).not.toContain("drizzle-orm")
+    expect(rendererSource).not.toContain('from "drizzle-orm"')
+    expect(rendererSource).not.toContain('from "electron"')
+    expect(rendererSource).not.toContain("from 'electron'")
     expect(rendererSource).not.toContain("electron/db")
     expect(rendererSource).not.toContain("ipcRenderer")
     expect(rendererSource).not.toContain("node:fs")
     expect(rendererSource).not.toContain("node:path")
+    expect(rendererSource).not.toContain("node:crypto")
+    expect(rendererSource).not.toContain("node:os")
+    expect(rendererSource).not.toContain("node:child_process")
     expect(rendererSource).not.toContain("process.env")
+  })
+
+  it("keeps forbidden native shortcut, bridge event, quick-capture settings, and run storage surfaces out of production source", async () => {
+    const productionSource = await readProductionSource()
+
+    expect(productionSource).not.toContain("globalShortcut")
+    expect(productionSource).not.toContain("appEvents")
+    expect(productionSource).not.toContain("window.prompter.appEvents")
+    expect(productionSource).not.toContain("window.prompter.shortcuts")
+    expect(productionSource).not.toContain("navigator.clipboard")
+    expect(productionSource).not.toContain("quick_capture_")
+    expect(productionSource).not.toContain("quick_capture_settings")
+    expect(productionSource).not.toContain("prompt_runs")
+    expect(productionSource).not.toContain("agent_runs")
+    expect(productionSource).not.toContain("execution_results")
+    expect(productionSource).not.toContain("validation_results")
+    expect(productionSource).not.toContain("run_logs")
+  })
+
+  it("allows repo path metadata while forbidding filesystem reads or scans from it", async () => {
+    const productionSource = await readProductionSource(["electron", "renderer/src"])
+    const repoPathReference = String.raw`\b(?:repoPath|repo_path)\b`
+
+    expect(productionSource).toContain("repoPath")
+    expect(productionSource).toContain("repo_path")
+    expect(productionSource).not.toMatch(
+      new RegExp(
+        String.raw`\b(?:readFile|readdir|opendir|stat|access|glob)\s*\([^)]*${repoPathReference}`,
+        "s",
+      ),
+    )
+    expect(productionSource).not.toMatch(
+      new RegExp(String.raw`\b(?:join|resolve)\s*\([^)]*${repoPathReference}`, "s"),
+    )
+    expect(productionSource).not.toMatch(
+      new RegExp(String.raw`\b(?:scan|crawl|walk)\w*\s*\([^)]*${repoPathReference}`, "s"),
+    )
   })
 
   it("keeps shell copy aligned with Phase 1 UI-only scope", async () => {

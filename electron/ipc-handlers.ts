@@ -7,12 +7,26 @@ import {
   PING_RESPONSE,
   payloadSchemas,
 } from "./ipc-contract.js"
-import type { PromptSearchResultItem, SearchPromptsResponse } from "./ipc-types.js"
+import type {
+  HarnessTemplate,
+  ListHarnessTemplatesInput,
+  PromptSearchResultItem,
+  SearchPromptsResponse,
+} from "./ipc-types.js"
 import type { PromptExportNativeService } from "./prompt-export-native.js"
 
 // allow: SIZE_OK - central IPC handler registry mirrors the typed channel contract.
 
-type IpcServices = PersistenceServices & PromptExportNativeService
+type HarnessTemplateContractServices = {
+  readonly listHarnessTemplates: (filter?: ListHarnessTemplatesInput) => readonly HarnessTemplate[]
+  readonly duplicateHarnessTemplate?: (id: string) => HarnessTemplate
+}
+type IpcServices = Omit<
+  PersistenceServices,
+  "listHarnessTemplates" | "duplicateHarnessTemplate" | "seedDefaultHarnessTemplates"
+> &
+  HarnessTemplateContractServices &
+  PromptExportNativeService
 
 function textPreview(value: string): string {
   const firstLine =
@@ -140,8 +154,8 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
     createHarnessTemplate: (payload: unknown) =>
       services.createHarnessTemplate(payloadSchemas.createHarnessTemplate.parse(payload)),
     listHarnessTemplates: (payload: unknown) => {
-      payloadSchemas.listHarnessTemplates.parse(payload)
-      return services.listHarnessTemplates()
+      const parsed = payloadSchemas.listHarnessTemplates.parse(payload)
+      return services.listHarnessTemplates(parsed)
     },
     getHarnessTemplate: (payload: unknown) =>
       services.getHarnessTemplate(payloadSchemas.getHarnessTemplate.parse(payload).id),
@@ -151,6 +165,48 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
     },
     deleteHarnessTemplate: (payload: unknown) =>
       services.deleteHarnessTemplate(payloadSchemas.deleteHarnessTemplate.parse(payload).id),
+    duplicateHarnessTemplate: (payload: unknown) => {
+      const parsed = payloadSchemas.duplicateHarnessTemplate.parse(payload)
+
+      if (services.duplicateHarnessTemplate === undefined) {
+        throw new Error("duplicateHarnessTemplate service is not available")
+      }
+
+      return services.duplicateHarnessTemplate(parsed.id)
+    },
+    createProjectContextProfile: (payload: unknown) =>
+      services.createProjectContextProfile(
+        payloadSchemas.createProjectContextProfile.parse(payload),
+      ),
+    listProjectContextProfiles: (payload: unknown) =>
+      services.listProjectContextProfiles(payloadSchemas.listProjectContextProfiles.parse(payload)),
+    getProjectContextProfile: (payload: unknown) =>
+      services.getProjectContextProfile(payloadSchemas.getProjectContextProfile.parse(payload)),
+    getDefaultProjectContextProfile: (payload: unknown) => {
+      const parsed = payloadSchemas.getDefaultProjectContextProfile.parse(payload)
+      return services.getDefaultProjectContextProfile(parsed.projectId)
+    },
+    updateProjectContextProfile: (payload: unknown) => {
+      const parsed = payloadSchemas.updateProjectContextProfile.parse(payload)
+      return services.updateProjectContextProfile(
+        { projectId: parsed.projectId, profileId: parsed.profileId },
+        parsed.input,
+      )
+    },
+    deleteProjectContextProfile: (payload: unknown) =>
+      services.deleteProjectContextProfile(
+        payloadSchemas.deleteProjectContextProfile.parse(payload),
+      ),
+    duplicateProjectContextProfile: (payload: unknown) =>
+      services.duplicateProjectContextProfile(
+        payloadSchemas.duplicateProjectContextProfile.parse(payload),
+      ),
+    setDefaultProjectContextProfile: (payload: unknown) =>
+      services.setDefaultProjectContextProfile(
+        payloadSchemas.setDefaultProjectContextProfile.parse(payload),
+      ),
+    buildProjectContextForCompiler: (payload: unknown) =>
+      services.buildCompilerContext(payloadSchemas.buildProjectContextForCompiler.parse(payload)),
     getSetting: (payload: unknown) =>
       services.getSetting(payloadSchemas.getSetting.parse(payload).key),
     setSetting: (payload: unknown) => {
@@ -289,6 +345,36 @@ export function registerIpcHandlers(services: IpcServices): void {
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.deleteHarnessTemplate, (_event, payload) =>
     handlers.deleteHarnessTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.duplicateHarnessTemplate, (_event, payload) =>
+    handlers.duplicateHarnessTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.createProjectContextProfile, (_event, payload) =>
+    handlers.createProjectContextProfile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.listProjectContextProfiles, (_event, payload) =>
+    handlers.listProjectContextProfiles(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getProjectContextProfile, (_event, payload) =>
+    handlers.getProjectContextProfile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getDefaultProjectContextProfile, (_event, payload) =>
+    handlers.getDefaultProjectContextProfile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.updateProjectContextProfile, (_event, payload) =>
+    handlers.updateProjectContextProfile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.deleteProjectContextProfile, (_event, payload) =>
+    handlers.deleteProjectContextProfile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.duplicateProjectContextProfile, (_event, payload) =>
+    handlers.duplicateProjectContextProfile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.setDefaultProjectContextProfile, (_event, payload) =>
+    handlers.setDefaultProjectContextProfile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.buildProjectContextForCompiler, (_event, payload) =>
+    handlers.buildProjectContextForCompiler(payload),
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.getSetting, (_event, payload) => handlers.getSetting(payload))
   ipcMain.handle(PERSISTENCE_CHANNELS.setSetting, (_event, payload) => handlers.setSetting(payload))

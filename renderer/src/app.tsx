@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
 
-import type { MenuAction } from "../../electron/app-menu"
-import type { PingResponse } from "../../electron/bridge"
+import type { MenuAction, PingResponse } from "../../electron/ipc-types"
+import { HarnessTemplateManager } from "./components/harness-template-manager"
+import { ProjectContextProfileManager } from "./components/project-context-profile-manager"
 import { ProjectSidebarSection } from "./components/project-sidebar-section"
 import { PromptCompilerPanel } from "./components/prompt-compiler-panel"
 import { PromptLibraryPanel } from "./components/prompt-library-panel"
@@ -10,6 +11,15 @@ import { SidebarSection, sidebarSections } from "./components/shell/sidebar-sect
 import { useProjectPrompts, useProjects } from "./hooks/use-prompter-library"
 
 type PingState = PingResponse | "pending"
+
+type HarnessTemplateChange = {
+  readonly deletedTemplateId?: string
+}
+
+type ProjectContextProfileChange = {
+  readonly changedProfileId?: string
+  readonly deletedProfileId?: string
+}
 
 function assertNever(value: never): never {
   throw new Error(`Unhandled menu action: ${value}`)
@@ -86,11 +96,47 @@ function handleMenuKeyDown(event: KeyboardEvent): void {
 export function App() {
   const [pingResult, setPingResult] = useState<PingState>("pending")
   const [tagRefreshSignal, setTagRefreshSignal] = useState(0)
+  const [harnessTemplateRefreshSignal, setHarnessTemplateRefreshSignal] = useState(0)
+  const [deletedHarnessTemplateIds, setDeletedHarnessTemplateIds] = useState<readonly string[]>([])
+  const [projectContextProfileRefreshSignal, setProjectContextProfileRefreshSignal] = useState(0)
+  const [changedProjectContextProfileId, setChangedProjectContextProfileId] = useState<
+    string | null
+  >(null)
+  const [deletedProjectContextProfileIds, setDeletedProjectContextProfileIds] = useState<
+    readonly string[]
+  >([])
   const projectLibrary = useProjects()
   const promptLibrary = useProjectPrompts(projectLibrary.selectedProject?.id ?? null)
 
   function refreshPromptTags(): void {
     setTagRefreshSignal((current) => current + 1)
+  }
+
+  function recordHarnessTemplateChange(change: HarnessTemplateChange = {}): void {
+    const deletedTemplateId = change.deletedTemplateId
+
+    if (deletedTemplateId !== undefined) {
+      setDeletedHarnessTemplateIds((current) =>
+        current.includes(deletedTemplateId) ? current : [...current, deletedTemplateId],
+      )
+    }
+
+    setHarnessTemplateRefreshSignal((current) => current + 1)
+  }
+
+  function recordProjectContextProfileChange(change: ProjectContextProfileChange = {}): void {
+    const changedProfileId = change.changedProfileId
+    const deletedProfileId = change.deletedProfileId
+
+    setChangedProjectContextProfileId(changedProfileId ?? null)
+
+    if (deletedProfileId !== undefined) {
+      setDeletedProjectContextProfileIds((current) =>
+        current.includes(deletedProfileId) ? current : [...current, deletedProfileId],
+      )
+    }
+
+    setProjectContextProfileRefreshSignal((current) => current + 1)
   }
 
   useEffect(() => {
@@ -146,15 +192,26 @@ export function App() {
               selectedProject={projectLibrary.selectedProject}
               status={projectLibrary.projectStatus}
             />
-            {sidebarSections.map((section) => (
-              <SidebarSection
-                key={section.title}
-                title={section.title}
-                emptyTitle={section.emptyTitle}
-                emptyDescription={section.emptyDescription}
-                items={section.items}
-              />
-            ))}
+            <ProjectContextProfileManager
+              selectedProject={projectLibrary.selectedProject}
+              onProfilesChanged={recordProjectContextProfileChange}
+            />
+            {sidebarSections.map((section) =>
+              section.title === "Harnesses" ? (
+                <HarnessTemplateManager
+                  key={section.title}
+                  onTemplatesChanged={recordHarnessTemplateChange}
+                />
+              ) : (
+                <SidebarSection
+                  key={section.title}
+                  title={section.title}
+                  emptyTitle={section.emptyTitle}
+                  emptyDescription={section.emptyDescription}
+                  items={section.items}
+                />
+              ),
+            )}
             <SettingsPanel />
           </div>
 
@@ -182,8 +239,13 @@ export function App() {
           compareVersions={promptLibrary.compareVersions}
           createNextVersion={promptLibrary.createNextVersion}
           createPrompt={promptLibrary.createPrompt}
+          changedProjectContextProfileId={changedProjectContextProfileId}
           currentVersion={promptLibrary.currentVersion}
+          deletedHarnessTemplateIds={deletedHarnessTemplateIds}
+          deletedProjectContextProfileIds={deletedProjectContextProfileIds}
           error={promptLibrary.versionError}
+          harnessTemplateRefreshSignal={harnessTemplateRefreshSignal}
+          projectContextProfileRefreshSignal={projectContextProfileRefreshSignal}
           selectedAsset={promptLibrary.selectedAsset}
           selectedVersion={promptLibrary.selectedVersion}
           selectedProject={projectLibrary.selectedProject}

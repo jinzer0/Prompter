@@ -14,6 +14,7 @@ export default defineConfig({
       "tests/electron-persistence.test.ts",
       "tests/electron-search-contract.test.ts",
       "tests/electron-search-persistence.test.ts",
+      "tests/project-context-profile.test.ts",
       "tests/prompt-compiler.test.ts",
       "tests/prompt-version-diff.test.ts",
       "tests/prompt-scope.test.ts",

@@ -1,21 +1,13 @@
 import type { MenuItemConstructorOptions } from "electron"
-import { z } from "zod"
+import {
+  MENU_ACTION_CHANNEL,
+  MENU_ACTIONS,
+  type MenuAction,
+  menuActionSchema,
+} from "./ipc-types.js"
 
-export const MENU_ACTION_CHANNEL = "prompter:menu-action" as const
-export const MENU_ACTIONS = [
-  "newPrompt",
-  "newProject",
-  "quickCaptureFromClipboard",
-  "focusSearch",
-  "savePrompt",
-  "copyCompiledPrompt",
-  "exportPrompt",
-  "openSettings",
-  "closeActivePanel",
-] as const
-
-export const menuActionSchema = z.enum(MENU_ACTIONS)
-export type MenuAction = (typeof MENU_ACTIONS)[number]
+export type { MenuAction }
+export { MENU_ACTION_CHANNEL, MENU_ACTIONS, menuActionSchema }
 
 type ApplicationMenuTemplateConfig = {
   readonly isDevelopment: boolean

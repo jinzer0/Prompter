@@ -1,10 +1,12 @@
-import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { access, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ElectronApplication, Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
 import { createNamedProject, launchPrompter, type RunningApp } from "./electron-playwright-helpers"
+import { exactHarnessQuickCaptureText } from "./phase12-harness-template-ui-helpers"
+import { readProductionSource } from "./source-guardrail-helpers"
 
 type ProjectCallback = (run: RunningApp) => Promise<void>
 
@@ -70,6 +72,21 @@ test("imports exact clipboard text from the button without LLM or persistence", 
     await expect(
       page.getByText("Add an OpenAI API key in Settings before using LLM prompt compilation."),
     ).toHaveCount(0)
+    await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue("")
+    expect(await storedPromptCount(page)).toBe(0)
+  })
+})
+
+test("quick capture preserves exact text after harness selector selection", async () => {
+  await withPrompterProject("prompter-phase11-harness-selector", async ({ app, page }) => {
+    await setClipboardText(app, exactHarnessQuickCaptureText)
+    await clickImportButton(page)
+
+    await expect(originalRequest(page)).toHaveValue(exactHarnessQuickCaptureText)
+    await page
+      .getByRole("combobox", { name: "Harness template" })
+      .selectOption({ label: "Feature Implementation" })
+    await expect(originalRequest(page)).toHaveValue(exactHarnessQuickCaptureText)
     await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue("")
     expect(await storedPromptCount(page)).toBe(0)
   })
@@ -182,38 +199,18 @@ test("imports from the app-focused quick capture accelerator", async () => {
 })
 
 test("keeps forbidden quick capture surfaces and run-result storage out of production source", async () => {
-  const productionFiles = (
-    await Promise.all(["electron", "renderer/src", "drizzle"].map(listFiles))
-  ).flat()
-  const productionSource = (
-    await Promise.all(productionFiles.map((filePath) => readFile(filePath, "utf8")))
-  ).join("\n")
+  const productionSource = await readProductionSource()
 
   expect(productionSource).not.toContain("globalShortcut")
   expect(productionSource).not.toContain("appEvents")
+  expect(productionSource).not.toContain("window.prompter.appEvents")
   expect(productionSource).not.toContain("window.prompter.shortcuts")
   expect(productionSource).not.toContain("navigator.clipboard")
   expect(productionSource).not.toContain("quick_capture_")
+  expect(productionSource).not.toContain("quick_capture_settings")
   expect(productionSource).not.toContain("prompt_runs")
   expect(productionSource).not.toContain("agent_runs")
   expect(productionSource).not.toContain("execution_results")
   expect(productionSource).not.toContain("validation_results")
   expect(productionSource).not.toContain("run_logs")
 })
-
-async function listFiles(directory: string): Promise<readonly string[]> {
-  const entries = await readdir(directory, { withFileTypes: true })
-  const files = await Promise.all(
-    entries.map(async (entry) => {
-      const filePath = join(directory, entry.name)
-
-      if (entry.isDirectory()) {
-        return listFiles(filePath)
-      }
-
-      return /\.(sql|ts|tsx)$/.test(entry.name) ? [filePath] : []
-    }),
-  )
-
-  return files.flat()
-}

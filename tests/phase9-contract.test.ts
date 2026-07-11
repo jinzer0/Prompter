@@ -124,6 +124,31 @@ function createPhase9Services(onServiceCall: () => void) {
       throw new Error("unused service")
     },
     deleteHarnessTemplate: (id: string) => ({ id }),
+    createProjectContextProfile: () => {
+      throw new Error("unused service")
+    },
+    listProjectContextProfiles: () => [],
+    getProjectContextProfile: () => null,
+    getDefaultProjectContextProfile: () => null,
+    updateProjectContextProfile: () => {
+      throw new Error("unused service")
+    },
+    deleteProjectContextProfile: (input: { readonly profileId: string }) => ({
+      id: input.profileId,
+    }),
+    duplicateProjectContextProfile: () => {
+      throw new Error("unused service")
+    },
+    setDefaultProjectContextProfile: () => {
+      throw new Error("unused service")
+    },
+    buildCompilerContext: () => ({
+      profileId: null,
+      profileName: null,
+      context: null,
+      sectionNames: [],
+      warnings: ["Selected project context profile is unavailable; profile context was excluded."],
+    }),
     getSetting: () => null,
     setSetting: (key: string, value: string) => ({ key, value, updatedAt: 1 }),
     listSettings: () => [],

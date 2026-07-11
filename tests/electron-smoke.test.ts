@@ -43,7 +43,8 @@ test("opens the main window and resolves the preload ping bridge", async ({
 
     await expect(page.getByText("No projects yet")).toBeVisible()
     await expect(page.getByText("No tags yet")).toBeVisible()
-    await expect(page.getByText("No harnesses yet")).toBeVisible()
+    await expect(page.getByRole("button", { name: /Feature Implementation/ })).toBeVisible()
+    await expect(page.getByRole("button", { name: /Bug Fix/ })).toBeVisible()
     await expect(page.getByText("Select a project to view prompts")).toBeVisible()
     await expect(page.getByText("Select a project first")).toBeVisible()
     await expect(page.getByRole("button", { name: "New Project" })).toBeVisible()

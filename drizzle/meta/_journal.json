@@ -22,6 +22,13 @@
       "when": 1783752366364,
       "tag": "0002_project_context_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783787813360,
+      "tag": "0003_lame_shocker",
+      "breakpoints": true
     }
   ]
 }

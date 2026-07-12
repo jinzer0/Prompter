@@ -9,7 +9,13 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core"
 
-import { SCENARIOS, TARGET_AGENTS } from "../ipc-contract.js"
+import {
+  PROMPT_QUALITY_GRADES,
+  PROMPT_QUALITY_REVIEW_MODES,
+  PROMPT_QUALITY_REVIEW_SOURCES,
+  SCENARIOS,
+  TARGET_AGENTS,
+} from "../ipc-contract.js"
 
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
@@ -99,6 +105,37 @@ export const promptVersions = sqliteTable(
     uniqueIndex("prompt_versions_prompt_asset_version_idx").on(
       table.promptAssetId,
       table.versionNumber,
+    ),
+  ],
+)
+
+export const promptQualityReviews = sqliteTable(
+  "prompt_quality_reviews",
+  {
+    id: text("id").primaryKey(),
+    promptVersionId: text("prompt_version_id")
+      .notNull()
+      .references(() => promptVersions.id, { onDelete: "cascade" }),
+    source: text("source", { enum: PROMPT_QUALITY_REVIEW_SOURCES }).notNull(),
+    reviewMode: text("review_mode", { enum: PROMPT_QUALITY_REVIEW_MODES }).notNull(),
+    overallScore: integer("overall_score").notNull(),
+    grade: text("grade", { enum: PROMPT_QUALITY_GRADES }).notNull(),
+    dimensionScores: text("dimension_scores").notNull(),
+    strengths: text("strengths").notNull(),
+    issues: text("issues").notNull(),
+    suggestions: text("suggestions").notNull(),
+    missingSections: text("missing_sections").notNull(),
+    warnings: text("warnings").notNull(),
+    recommendedClarifyingQuestions: text("recommended_clarifying_questions").notNull(),
+    scoreExplanation: text("score_explanation").notNull(),
+    snapshot: text("snapshot").notNull(),
+    improvedPromptDraft: text("improved_prompt_draft"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("prompt_quality_reviews_prompt_version_created_at_idx").on(
+      table.promptVersionId,
+      table.createdAt,
     ),
   ],
 )

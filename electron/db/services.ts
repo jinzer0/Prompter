@@ -5,6 +5,7 @@ import {
   type PromptCompilerClientFactory,
   type PromptCompilerServiceConfig,
 } from "../prompt-compiler/prompt-compiler-service.js"
+import { createPromptQualityService } from "../prompt-quality/prompt-quality-service.js"
 import {
   createUnavailableOpenAIKeyStore,
   type OpenAIKeyStore,
@@ -13,6 +14,7 @@ import type { AppDatabase } from "./repositories/common.js"
 import { createHarnessTemplateRepository } from "./repositories/harness-templates.js"
 import { createProjectContextProfileRepository } from "./repositories/project-context-profiles.js"
 import { createProjectRepository } from "./repositories/projects.js"
+import { createPromptQualityReviewRepository } from "./repositories/prompt-quality-reviews.js"
 import { createPromptRepository } from "./repositories/prompts.js"
 import { createSearchRepository } from "./repositories/search.js"
 import { createSettingsRepository } from "./repositories/settings.js"
@@ -33,6 +35,13 @@ export function createPersistenceServices(
   const tags = createTagRepository(db)
   const harnessTemplates = createHarnessTemplateRepository(db)
   const settings = createSettingsRepository(db)
+  const promptQualityReviews = createPromptQualityReviewRepository(db)
+  const promptQuality = createPromptQualityService({
+    getPromptAsset: (id) => prompts.getPromptAsset(id),
+    getPromptVersion: (id) => prompts.getPromptVersion(id),
+    getOpenAIKeyForMainProcessOnly: openAIKeyStore.getOpenAIKeyForMainProcessOnly,
+    reviews: promptQualityReviews,
+  })
   const promptCompilerConfig: PromptCompilerServiceConfig =
     promptCompilerClientFactory === undefined
       ? {
@@ -77,5 +86,6 @@ export function createPersistenceServices(
     ...settings,
     ...openAIKeyStore,
     ...promptCompiler,
+    ...promptQuality,
   }
 }

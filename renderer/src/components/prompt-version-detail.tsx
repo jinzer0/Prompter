@@ -4,6 +4,7 @@ import type { PromptExportBase } from "../lib/prompt-export"
 import type { PromptVersionMetadata } from "../lib/prompt-version-diff"
 import { targetAgentLabel } from "../lib/prompter-options"
 import { PromptExportActions } from "./prompt-export-actions"
+import { SavedPromptQualityPanel } from "./quality/saved-prompt-quality-panel"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
 
@@ -86,9 +87,14 @@ export function PromptVersionDetail({
         <DetailRow label="created_at" value={formatTimestamp(selectedVersion.createdAt)} />
         <DetailRow label="updated_at" value={formatTimestamp(selectedAsset.updatedAt)} />
         {metadata?.qualityScore !== null && metadata?.qualityScore !== undefined && (
-          <DetailRow label="quality_score" value={String(metadata.qualityScore)} />
+          <DetailRow label="saved_version_quality_score" value={String(metadata.qualityScore)} />
         )}
       </dl>
+      <SavedPromptQualityPanel
+        key={selectedVersion.id}
+        selectedAsset={selectedAsset}
+        selectedVersion={selectedVersion}
+      />
       <section className="space-y-2" aria-labelledby="original-input-heading">
         <h3 id="original-input-heading" className="font-mono text-[11px] text-muted">
           original_input

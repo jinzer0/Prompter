@@ -13,8 +13,6 @@ import { useCompilerProjectContext } from "../hooks/use-compiler-project-context
 import { useHarnessTemplates } from "../hooks/use-harness-templates"
 import { usePromptCompilerPanel } from "../hooks/use-prompt-compiler-panel"
 import type { LoadStatus } from "../hooks/use-prompter-library"
-import { exportBaseFromCompiled } from "../lib/prompt-export"
-import { CompiledPromptPreview } from "./compiled-prompt-preview"
 import { HarnessTemplateSelector } from "./harness-template-selector"
 import { ProjectContextProfileSelector } from "./project-context-profile-selector"
 import { PromptCompilerActions } from "./prompt-compiler-actions"
@@ -22,7 +20,7 @@ import { PromptCompilerAnalysis } from "./prompt-compiler-analysis"
 import { PromptCompilerClipboardImportCard } from "./prompt-compiler-clipboard-import-card"
 import { PromptCompilerForm } from "./prompt-compiler-form"
 import { PromptCompilerHeader } from "./prompt-compiler-header"
-import { PromptExportActions } from "./prompt-export-actions"
+import { PromptCompilerOutputPanel } from "./prompt-compiler-output-panel"
 import { PromptVersionManagement } from "./prompt-version-management"
 import { Panel } from "./shell/panel"
 import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card"
@@ -83,10 +81,6 @@ export function PromptCompilerPanel({
     selectedAsset,
     selectedProject,
   })
-  const compiledExportBase =
-    compiler.compiled === null
-      ? null
-      : exportBaseFromCompiled(compiler.compiled, compiler.editablePrompt, selectedProject)
   const originalRequestRef = useRef<HTMLTextAreaElement>(null)
   const projectContext = useCompilerProjectContext({
     changedProjectContextProfileId,
@@ -200,17 +194,15 @@ export function PromptCompilerPanel({
           onSuggestedTagChange={compiler.setSuggestedTagSelection}
           selectedSuggestedTags={compiler.selectedSuggestedTags}
         />
-        <CompiledPromptPreview
-          value={compiler.editablePrompt}
-          onChange={compiler.setEditablePrompt}
-        />
-        <PromptExportActions
-          copyButtonLabel="Copy compiled export"
-          exportBase={compiledExportBase}
-          formatLabel="Compiled preview export format"
-          rawContent={compiler.editablePrompt}
-          saveButtonLabel="Save compiled export"
-          title="Compiled preview export"
+        <PromptCompilerOutputPanel
+          compiled={compiler.compiled}
+          draft={compiler.draft}
+          editablePrompt={compiler.editablePrompt}
+          projectContextPreview={
+            projectContext.previewStatus === "ready" ? projectContext.preview : null
+          }
+          selectedProject={selectedProject}
+          onEditablePromptChange={compiler.setEditablePrompt}
         />
 
         {selectedProject === null && (

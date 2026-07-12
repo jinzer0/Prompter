@@ -7,6 +7,8 @@ import type {
   PromptCompilerCompileResult,
 } from "../electron/ipc-types"
 
+// allow: SIZE_OK - central Phase 9 settings and secrets contract uses a complete IPC service fake.
+
 const validProjectId = "22222222-2222-4222-8222-222222222222"
 const phase9SecretStatus = {
   hasKey: true,
@@ -64,6 +66,11 @@ const promptCompilerCompileFixture: PromptCompilerCompileResult = {
 }
 
 function createPhase9Services(onServiceCall: () => void) {
+  const promptQualityFailure = (): never => {
+    onServiceCall()
+    throw new Error("unused service")
+  }
+
   return {
     createProject: () => {
       throw new Error("unused service")
@@ -182,6 +189,14 @@ function createPhase9Services(onServiceCall: () => void) {
     async compile() {
       return promptCompilerCompileFixture
     },
+    reviewPromptQualityDraft: promptQualityFailure,
+    reviewPromptQualityWithLLM: async () => promptQualityFailure(),
+    reviewPromptQualityVersion: promptQualityFailure,
+    savePromptQualityReview: promptQualityFailure,
+    listPromptQualityReviewsForVersion: promptQualityFailure,
+    getLatestPromptQualityReview: promptQualityFailure,
+    getPromptQualityReview: promptQualityFailure,
+    applyPromptQualityScoreToVersion: promptQualityFailure,
     formatPromptForExport: () => ({
       format: "markdown" as const,
       filename: "prompt-export.md",

@@ -6,6 +6,7 @@ import {
   PING_CHANNEL,
   PING_RESPONSE,
   payloadSchemas,
+  responseSchemas,
 } from "./ipc-contract.js"
 import type {
   HarnessTemplate,
@@ -23,7 +24,11 @@ type HarnessTemplateContractServices = {
 }
 type IpcServices = Omit<
   PersistenceServices,
-  "listHarnessTemplates" | "duplicateHarnessTemplate" | "seedDefaultHarnessTemplates"
+  | "listHarnessTemplates"
+  | "duplicateHarnessTemplate"
+  | "seedDefaultHarnessTemplates"
+  | "analyze"
+  | "compile"
 > &
   HarnessTemplateContractServices &
   PromptExportNativeService
@@ -250,6 +255,48 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
       payloadSchemas.readText.parse(payload)
       return services.readText()
     },
+    reviewPromptQualityDraft: (payload: unknown) =>
+      responseSchemas.reviewPromptQualityDraft.parse(
+        services.reviewPromptQualityDraft(payloadSchemas.reviewPromptQualityDraft.parse(payload)),
+      ),
+    async reviewPromptQualityWithLLM(payload: unknown) {
+      payloadSchemas.reviewPromptQualityWithLLM.parse(payload)
+      return responseSchemas.reviewPromptQualityWithLLM.parse(
+        await services.reviewPromptQualityWithLLM(),
+      )
+    },
+    reviewPromptQualityVersion: (payload: unknown) => {
+      const parsed = payloadSchemas.reviewPromptQualityVersion.parse(payload)
+      return responseSchemas.reviewPromptQualityVersion.parse(
+        services.reviewPromptQualityVersion(parsed.promptVersionId),
+      )
+    },
+    savePromptQualityReview: (payload: unknown) =>
+      responseSchemas.savePromptQualityReview.parse(
+        services.savePromptQualityReview(payloadSchemas.savePromptQualityReview.parse(payload)),
+      ),
+    listPromptQualityReviewsForVersion: (payload: unknown) =>
+      responseSchemas.listPromptQualityReviewsForVersion.parse(
+        services.listPromptQualityReviewsForVersion(
+          payloadSchemas.listPromptQualityReviewsForVersion.parse(payload),
+        ),
+      ),
+    getLatestPromptQualityReview: (payload: unknown) =>
+      responseSchemas.getLatestPromptQualityReview.parse(
+        services.getLatestPromptQualityReview(
+          payloadSchemas.getLatestPromptQualityReview.parse(payload),
+        ),
+      ),
+    getPromptQualityReview: (payload: unknown) =>
+      responseSchemas.getPromptQualityReview.parse(
+        services.getPromptQualityReview(payloadSchemas.getPromptQualityReview.parse(payload)),
+      ),
+    applyPromptQualityScoreToVersion: (payload: unknown) =>
+      responseSchemas.applyPromptQualityScoreToVersion.parse(
+        services.applyPromptQualityScoreToVersion(
+          payloadSchemas.applyPromptQualityScoreToVersion.parse(payload),
+        ),
+      ),
   }
 }
 
@@ -413,4 +460,28 @@ export function registerIpcHandlers(services: IpcServices): void {
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.copyText, (_event, payload) => handlers.copyText(payload))
   ipcMain.handle(PERSISTENCE_CHANNELS.readText, (_event, payload) => handlers.readText(payload))
+  ipcMain.handle(PERSISTENCE_CHANNELS.reviewPromptQualityDraft, (_event, payload) =>
+    handlers.reviewPromptQualityDraft(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.reviewPromptQualityWithLLM, (_event, payload) =>
+    handlers.reviewPromptQualityWithLLM(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.reviewPromptQualityVersion, (_event, payload) =>
+    handlers.reviewPromptQualityVersion(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.savePromptQualityReview, (_event, payload) =>
+    handlers.savePromptQualityReview(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.listPromptQualityReviewsForVersion, (_event, payload) =>
+    handlers.listPromptQualityReviewsForVersion(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getLatestPromptQualityReview, (_event, payload) =>
+    handlers.getLatestPromptQualityReview(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getPromptQualityReview, (_event, payload) =>
+    handlers.getPromptQualityReview(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.applyPromptQualityScoreToVersion, (_event, payload) =>
+    handlers.applyPromptQualityScoreToVersion(payload),
+  )
 }

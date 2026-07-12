@@ -332,6 +332,64 @@ export function createElectronBridge(
           input,
         ),
     },
+    promptQuality: {
+      reviewDraft: (input) =>
+        request(
+          ch.reviewPromptQualityDraft,
+          payload.reviewPromptQualityDraft,
+          response.reviewPromptQualityDraft,
+          input,
+        ),
+      reviewVersion: (input) =>
+        request(
+          ch.reviewPromptQualityVersion,
+          payload.reviewPromptQualityVersion,
+          response.reviewPromptQualityVersion,
+          input,
+        ),
+      saveReview: (input) =>
+        request(
+          ch.savePromptQualityReview,
+          payload.savePromptQualityReview,
+          response.savePromptQualityReview,
+          input,
+        ),
+      listReviewsForVersion: (input) =>
+        request(
+          ch.listPromptQualityReviewsForVersion,
+          payload.listPromptQualityReviewsForVersion,
+          response.listPromptQualityReviewsForVersion,
+          input,
+        ),
+      getLatestReview: (input) =>
+        request(
+          ch.getLatestPromptQualityReview,
+          payload.getLatestPromptQualityReview,
+          response.getLatestPromptQualityReview,
+          input,
+        ),
+      getReview: (input) =>
+        request(
+          ch.getPromptQualityReview,
+          payload.getPromptQualityReview,
+          response.getPromptQualityReview,
+          input,
+        ),
+      applyScoreToVersion: (input) =>
+        request(
+          ch.applyPromptQualityScoreToVersion,
+          payload.applyPromptQualityScoreToVersion,
+          response.applyPromptQualityScoreToVersion,
+          input,
+        ),
+      reviewWithLLM: () =>
+        request(
+          ch.reviewPromptQualityWithLLM,
+          payload.reviewPromptQualityWithLLM,
+          response.reviewPromptQualityWithLLM,
+          undefined,
+        ),
+    },
     exports: {
       formatPrompt: (input) =>
         request(

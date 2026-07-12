@@ -63,7 +63,7 @@ function metadataLines(input: ExportPromptInput): readonly string[] {
     optionalBullet("Project", input.projectName),
     optionalBullet("Prompt asset ID", input.promptAssetId),
     `- Prompt version ID: ${input.promptVersionId}`,
-    numberBullet("Quality score", input.qualityScore),
+    numberBullet("Quality score (compiler/saved summary)", input.qualityScore),
     optionalBullet("Created at", formatTimestamp(input.createdAt)),
     optionalBullet("Updated at", formatTimestamp(input.updatedAt)),
     input.tags === undefined ? null : `- Tags: ${input.tags.map((tag) => tag.name).join(", ")}`,

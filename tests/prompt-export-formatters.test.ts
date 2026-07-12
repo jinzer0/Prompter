@@ -121,7 +121,7 @@ describe("prompt export formatter contract", () => {
     expect(result.content).toContain("# Prompt Export / Test: 01")
     expect(result.content).toContain("## Metadata")
     expect(result.content).toContain("Project: Prompter")
-    expect(result.content).toContain("Quality score: 88")
+    expect(result.content).toContain("Quality score (compiler/saved summary): 88")
     expect(result.content).toContain("## Original Input")
     expect(result.content).toContain("## Compiled Prompt")
     expect(result.content).toContain("## Clarification")

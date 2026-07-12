@@ -55,7 +55,7 @@ export function PromptAssetCard({
         <span>{targetAgentLabel(asset.targetAgent)}</span>
         <span>Updated {formatTimestamp(asset.updatedAt)}</span>
         {metadata?.qualityScore !== null && metadata?.qualityScore !== undefined && (
-          <span>Quality {metadata.qualityScore}</span>
+          <span>Saved quality score {metadata.qualityScore}</span>
         )}
       </span>
       <span className="mt-3 line-clamp-2 block text-[12px] leading-5 text-muted-strong">

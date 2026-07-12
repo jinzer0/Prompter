@@ -31,7 +31,7 @@ export function PromptSearchResultCard({
       <span className="mt-2 flex flex-wrap gap-2 text-[12px] text-muted">
         <span>{scenarioLabel(item.scenario)}</span>
         <span>{targetAgentLabel(item.targetAgent)}</span>
-        {item.qualityScore !== null && <span>Quality {item.qualityScore}</span>}
+        {item.qualityScore !== null && <span>Saved quality score {item.qualityScore}</span>}
       </span>
       {item.tags.length > 0 && (
         <span className="mt-3 flex flex-wrap gap-2">

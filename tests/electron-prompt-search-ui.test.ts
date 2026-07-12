@@ -22,7 +22,9 @@ type PromptSeed = {
 }
 
 async function createPrompt(page: Page, seed: PromptSeed): Promise<void> {
-  await page.getByRole("button", { name: "New Prompt" }).click()
+  const promptLibrary = page.getByTestId("prompt-library")
+
+  await promptLibrary.getByRole("button", { name: /^New Prompt$/ }).click()
   await page.getByRole("textbox", { name: "Prompt title" }).fill(seed.title)
   await page.getByRole("combobox", { exact: true, name: "Scenario" }).selectOption(seed.scenario)
   await page
@@ -30,8 +32,8 @@ async function createPrompt(page: Page, seed: PromptSeed): Promise<void> {
     .selectOption(seed.targetAgent)
   await page.getByRole("textbox", { name: "Original input" }).fill(seed.originalInput)
   await page.getByRole("textbox", { name: "Compiled prompt" }).fill(seed.compiledPrompt)
-  await page.getByRole("button", { name: "Save Prompt" }).click()
-  await expect(page.getByRole("button", { name: new RegExp(seed.title) })).toBeVisible()
+  await promptLibrary.getByRole("button", { name: /^Save Prompt$/ }).click()
+  await expect(promptLibrary.getByRole("button", { name: new RegExp(seed.title) })).toBeVisible()
 }
 
 test("searches prompts with filters and saves LLM suggested tags", async ({
@@ -62,22 +64,25 @@ test("searches prompts with filters and saves LLM suggested tags", async ({
       originalInput: "Summarize onboarding docs.",
       compiledPrompt: "Summarize documentation for onboarding reviewers.",
     })
+    const promptLibrary = page.getByTestId("prompt-library")
 
-    await page.getByRole("button", { name: /Command Palette Builder/ }).click()
-    await page.getByRole("textbox", { name: "Prompt tag name" }).fill("frontend")
-    await page.getByRole("button", { name: "Add tag to prompt" }).click()
-    await expect(page.getByRole("button", { name: "Filter tag frontend" })).toBeVisible()
+    await promptLibrary.getByRole("button", { name: /Command Palette Builder/ }).click()
+    await promptLibrary.getByRole("textbox", { name: "Prompt tag name" }).fill("frontend")
+    await promptLibrary.getByRole("button", { name: "Add tag to prompt" }).click()
+    await expect(promptLibrary.getByRole("button", { name: "Filter tag frontend" })).toBeVisible()
 
-    await page.getByRole("textbox", { name: "Search prompts" }).fill("React command")
-    await page.getByRole("combobox", { name: "Scenario filter" }).selectOption("feature")
-    await page.getByRole("combobox", { name: "Target agent filter" }).selectOption("codex")
-    await page.getByRole("button", { name: "Filter tag frontend" }).click()
-    await expect(page.getByRole("button", { name: /Command Palette Builder/ })).toBeVisible()
-    await expect(page.getByRole("button", { name: /Docs Summarizer/ })).toHaveCount(0)
+    await promptLibrary.getByRole("textbox", { name: "Search prompts" }).fill("React command")
+    await promptLibrary.getByRole("combobox", { name: "Scenario filter" }).selectOption("feature")
+    await promptLibrary.getByRole("combobox", { name: "Target agent filter" }).selectOption("codex")
+    await promptLibrary.getByRole("button", { name: "Filter tag frontend" }).click()
+    await expect(
+      promptLibrary.getByRole("button", { name: /Command Palette Builder/ }),
+    ).toBeVisible()
+    await expect(promptLibrary.getByRole("button", { name: /Docs Summarizer/ })).toHaveCount(0)
 
-    await page.getByRole("textbox", { name: "Search prompts" }).fill('" OR * : ( ) - + ?')
-    await expect(page.getByText("No prompts match your filters")).toBeVisible()
-    await page.getByRole("button", { name: "Clear search filters" }).click()
+    await promptLibrary.getByRole("textbox", { name: "Search prompts" }).fill('" OR * : ( ) - + ?')
+    await expect(promptLibrary.getByText("No prompts match your filters")).toBeVisible()
+    await promptLibrary.getByRole("button", { name: "Clear search filters" }).click()
 
     await page.getByRole("textbox", { name: "OpenAI API key" }).fill(phase5PlaintextKey)
     await page.getByRole("button", { name: "Save API key" }).click()

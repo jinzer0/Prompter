@@ -232,7 +232,7 @@ test.describe("project context profile management", () => {
           .fill("Profile include payloads.")
         await page.getByRole("button", { name: "최종 프롬프트 생성" }).click()
         await expect(generatedPreview(page)).toContainText("# Objective")
-        await expect(page.getByText("Quality score: 91")).toBeVisible()
+        await expect(page.getByText("Compiler quality score: 91")).toBeVisible()
 
         const snapshot = await promptCompilerIpcSnapshot(app)
         expect(snapshot.analyze).toBe(1)

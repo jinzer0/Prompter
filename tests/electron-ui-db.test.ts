@@ -25,12 +25,14 @@ async function createProject(page: Page): Promise<void> {
 }
 
 async function createPrompt(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "New Prompt" }).click()
-  await page.getByRole("button", { name: "Save Prompt" }).click()
+  const promptLibrary = page.getByTestId("prompt-library")
+
+  await promptLibrary.getByRole("button", { name: /^New Prompt$/ }).click()
+  await promptLibrary.getByRole("button", { name: /^Save Prompt$/ }).click()
   await expect(page.getByText("Prompt title is required")).toBeVisible()
 
   await page.getByRole("textbox", { name: "Prompt title" }).fill("Phase 3 Prompt")
-  await page.getByRole("button", { name: "Save Prompt" }).click()
+  await promptLibrary.getByRole("button", { name: /^Save Prompt$/ }).click()
   await expect(page.getByText("Original input is required")).toBeVisible()
 
   await page.getByRole("combobox", { exact: true, name: "Scenario" }).selectOption("feature")
@@ -38,16 +40,17 @@ async function createPrompt(page: Page): Promise<void> {
   await page
     .getByRole("textbox", { name: "Original input" })
     .fill("Turn a vague feature request into implementation steps.")
-  await page.getByRole("button", { name: "Save Prompt" }).click()
+  await promptLibrary.getByRole("button", { name: /^Save Prompt$/ }).click()
   await expect(page.getByText("Compiled prompt is required")).toBeVisible()
 
   await page
     .getByRole("textbox", { name: "Compiled prompt" })
     .fill("Compiled phase 3 instructions for the selected project.")
-  await page.getByRole("button", { name: "Save Prompt" }).click()
+  await promptLibrary.getByRole("button", { name: /^Save Prompt$/ }).click()
 
-  await expect(page.getByRole("button", { name: /Phase 3 Prompt/ })).toBeVisible()
-  await expect(page.getByText(/Updated/)).toBeVisible()
+  const promptCard = promptLibrary.getByRole("button", { name: /Phase 3 Prompt/ })
+  await expect(promptCard).toBeVisible()
+  await expect(promptCard).toContainText("Updated")
   await expect(
     page.getByText("Compiled phase 3 instructions for the selected project."),
   ).toBeVisible()

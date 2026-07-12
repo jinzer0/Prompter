@@ -116,6 +116,11 @@ const exportPromptResultFixture: ExportPromptResult = {
 }
 
 export function createFailingServices(onServiceCall: () => void) {
+  const promptQualityFailure = (): never => {
+    onServiceCall()
+    throw new Error("prompt quality service should not be called")
+  }
+
   return {
     createProject: () => {
       onServiceCall()
@@ -216,12 +221,14 @@ export function createFailingServices(onServiceCall: () => void) {
       onServiceCall()
       return promptCompilerCompileFixture
     },
-    async analyze() {
-      return promptCompilerAnalyzeFixture
-    },
-    async compile() {
-      return promptCompilerCompileFixture
-    },
+    reviewPromptQualityDraft: promptQualityFailure,
+    reviewPromptQualityWithLLM: async () => promptQualityFailure(),
+    reviewPromptQualityVersion: promptQualityFailure,
+    savePromptQualityReview: promptQualityFailure,
+    listPromptQualityReviewsForVersion: promptQualityFailure,
+    getLatestPromptQualityReview: promptQualityFailure,
+    getPromptQualityReview: promptQualityFailure,
+    applyPromptQualityScoreToVersion: promptQualityFailure,
     formatPromptForExport: () => {
       onServiceCall()
       return exportPromptResultFixture

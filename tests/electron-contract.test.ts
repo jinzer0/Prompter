@@ -14,6 +14,11 @@ import {
   PERSISTENCE_CHANNELS,
 } from "../electron/ipc-contract"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
+import type {
+  PromptQualityLLMReviewResult,
+  PromptQualityReviewResult,
+  PromptQualityReviewSnapshot,
+} from "../electron/ipc-types"
 import { createWindowOptions } from "../electron/window-options"
 import {
   createFailingServices,
@@ -61,6 +66,58 @@ const compareVersionResponse = {
   versionNumber: 2,
   compiledPrompt: "Compiled prompt\nwith changes",
 } as const
+const promptQualitySnapshot = {
+  compiledPrompt: "# Objective\n\nDefine the expected change.",
+  originalInput: "Improve the prompt instructions.",
+  scenario: "feature",
+  targetAgent: "codex",
+  harnessTemplateId: null,
+  projectContextProfileId: null,
+  includeProjectContextProfile: false,
+  projectContext: null,
+  constraints: "Preserve the existing public contract.",
+  acceptanceCriteria: "The new behavior is covered by tests.",
+  validationCommands: "npm test",
+} satisfies PromptQualityReviewSnapshot
+const promptQualityReviewResponse = {
+  id: "33333333-3333-4333-8333-333333333333",
+  source: "prompt_version",
+  promptVersionId: validPromptVersionId,
+  reviewMode: "local",
+  overallScore: 82,
+  grade: "good",
+  dimensionScores: {
+    clarity: 88,
+    context: 78,
+    scope: 84,
+    constraints: 81,
+    acceptanceCriteria: 85,
+    validation: 76,
+    safety: 90,
+    ambiguityRisk: 20,
+  },
+  strengths: ["The objective is explicit."],
+  issues: [],
+  suggestions: [],
+  missingSections: [],
+  warnings: [],
+  recommendedClarifyingQuestions: [],
+  scoreExplanation: "The prompt is clear but needs focused validation guidance.",
+  snapshot: promptQualitySnapshot,
+  createdAt: 1,
+  improvedPromptDraft: null,
+} satisfies PromptQualityReviewResult
+const draftPromptQualityReviewResponse = {
+  ...promptQualityReviewResponse,
+  id: null,
+  source: "draft",
+  promptVersionId: null,
+} satisfies PromptQualityReviewResult
+const unavailableLLMReviewResponse = {
+  ok: false,
+  code: "llm_review_unavailable",
+  message: "LLM prompt review is not available yet. Use local review instead.",
+} satisfies PromptQualityLLMReviewResult
 const validHarnessTemplateId = "44444444-4444-4444-8444-444444444444"
 const harnessTemplateResponse = {
   id: validHarnessTemplateId,
@@ -314,6 +371,7 @@ describe("Electron shell contract", () => {
       "settings",
       "secrets",
       "promptCompiler",
+      "promptQuality",
       "exports",
       "clipboard",
     ])
@@ -379,6 +437,16 @@ describe("Electron shell contract", () => {
       "deleteOpenAIKey",
     ])
     expect(Object.keys(bridge.promptCompiler)).toEqual(["analyze", "compile"])
+    expect(Object.keys(bridge.promptQuality)).toEqual([
+      "reviewDraft",
+      "reviewVersion",
+      "saveReview",
+      "listReviewsForVersion",
+      "getLatestReview",
+      "getReview",
+      "applyScoreToVersion",
+      "reviewWithLLM",
+    ])
     expect(Object.keys(bridge.exports)).toEqual(["formatPrompt", "savePromptToFile"])
     expect(Object.keys(bridge.clipboard)).toEqual(["copyText", "readText"])
     await expect(bridge.projects.list()).resolves.toEqual([])
@@ -766,6 +834,165 @@ describe("Electron shell contract", () => {
     expect(called).toBe(false)
   })
 
+  it("routes prompt-quality bridge methods through exact parsed IPC channels", async () => {
+    const calls: { readonly channel: string; readonly payload: unknown }[] = []
+    const bridge = createElectronBridge(async (channel, payload) => {
+      calls.push({ channel, payload })
+
+      if (channel === PERSISTENCE_CHANNELS.reviewPromptQualityDraft) {
+        return draftPromptQualityReviewResponse
+      }
+      if (channel === PERSISTENCE_CHANNELS.reviewPromptQualityWithLLM) {
+        return unavailableLLMReviewResponse
+      }
+      if (
+        channel === PERSISTENCE_CHANNELS.reviewPromptQualityVersion ||
+        channel === PERSISTENCE_CHANNELS.savePromptQualityReview ||
+        channel === PERSISTENCE_CHANNELS.getLatestPromptQualityReview ||
+        channel === PERSISTENCE_CHANNELS.getPromptQualityReview
+      ) {
+        return promptQualityReviewResponse
+      }
+      if (channel === PERSISTENCE_CHANNELS.listPromptQualityReviewsForVersion) {
+        return [promptQualityReviewResponse]
+      }
+      if (channel === PERSISTENCE_CHANNELS.applyPromptQualityScoreToVersion) {
+        return { promptVersionId: validPromptVersionId, qualityScore: 82 }
+      }
+
+      throw new Error(`Unexpected channel ${channel}`)
+    })
+    const draftInput = { ...promptQualitySnapshot, reviewMode: "local" } as const
+    const versionInput = { promptVersionId: validPromptVersionId, reviewMode: "local" } as const
+
+    await expect(bridge.promptQuality.reviewDraft(draftInput)).resolves.toEqual(
+      draftPromptQualityReviewResponse,
+    )
+    await expect(bridge.promptQuality.reviewWithLLM()).resolves.toEqual(
+      unavailableLLMReviewResponse,
+    )
+    await expect(bridge.promptQuality.reviewVersion(versionInput)).resolves.toEqual(
+      promptQualityReviewResponse,
+    )
+    await expect(
+      bridge.promptQuality.saveReview({
+        promptVersionId: validPromptVersionId,
+        review: promptQualityReviewResponse,
+      }),
+    ).resolves.toEqual(promptQualityReviewResponse)
+    await expect(
+      bridge.promptQuality.listReviewsForVersion({ promptVersionId: validPromptVersionId }),
+    ).resolves.toEqual([promptQualityReviewResponse])
+    await expect(
+      bridge.promptQuality.getLatestReview({ promptVersionId: validPromptVersionId }),
+    ).resolves.toEqual(promptQualityReviewResponse)
+    await expect(
+      bridge.promptQuality.getReview({ reviewId: promptQualityReviewResponse.id }),
+    ).resolves.toEqual(promptQualityReviewResponse)
+    await expect(
+      bridge.promptQuality.applyScoreToVersion({
+        promptVersionId: validPromptVersionId,
+        reviewId: promptQualityReviewResponse.id,
+        qualityScore: 82,
+      }),
+    ).resolves.toEqual({ promptVersionId: validPromptVersionId, qualityScore: 82 })
+
+    expect(calls).toEqual([
+      { channel: "prompter:prompt-quality:review-draft", payload: draftInput },
+      { channel: "prompter:prompt-quality:review-llm", payload: undefined },
+      { channel: "prompter:prompt-quality:review-version", payload: versionInput },
+      {
+        channel: "prompter:prompt-quality:save-review",
+        payload: { promptVersionId: validPromptVersionId, review: promptQualityReviewResponse },
+      },
+      {
+        channel: "prompter:prompt-quality:list-for-version",
+        payload: { promptVersionId: validPromptVersionId, limit: 50, offset: 0 },
+      },
+      {
+        channel: "prompter:prompt-quality:get-latest",
+        payload: { promptVersionId: validPromptVersionId },
+      },
+      {
+        channel: "prompter:prompt-quality:get",
+        payload: { reviewId: promptQualityReviewResponse.id },
+      },
+      {
+        channel: "prompter:prompt-quality:apply-score-to-version",
+        payload: {
+          promptVersionId: validPromptVersionId,
+          reviewId: promptQualityReviewResponse.id,
+          qualityScore: 82,
+        },
+      },
+    ])
+  })
+
+  it("rejects malformed prompt-quality payloads before service calls", () => {
+    let called = false
+    const handlers = createPersistenceIpcHandlers(
+      createFailingServices(() => {
+        called = true
+      }),
+    )
+
+    expect(() =>
+      handlers.reviewPromptQualityVersion({
+        promptVersionId: "not-a-uuid",
+        reviewMode: "local",
+      }),
+    ).toThrow(/promptVersionId/)
+    expect(() =>
+      handlers.reviewPromptQualityDraft({
+        ...promptQualitySnapshot,
+        compiledPrompt: "   ",
+        reviewMode: "local",
+      }),
+    ).toThrow(/compiledPrompt/)
+    expect(() =>
+      handlers.reviewPromptQualityVersion({
+        promptVersionId: validPromptVersionId,
+        reviewMode: "automatic",
+      }),
+    ).toThrow(/reviewMode/)
+    expect(() =>
+      handlers.reviewPromptQualityDraft({
+        ...promptQualitySnapshot,
+        scenario: "run",
+        reviewMode: "local",
+      }),
+    ).toThrow(/scenario/)
+    expect(() =>
+      handlers.savePromptQualityReview({
+        promptVersionId: validPromptVersionId,
+        review: { ...promptQualityReviewResponse, grade: "excellent_plus" },
+      }),
+    ).toThrow(/grade/)
+    expect(() =>
+      handlers.applyPromptQualityScoreToVersion({
+        promptVersionId: validPromptVersionId,
+        reviewId: promptQualityReviewResponse.id,
+        qualityScore: 101,
+      }),
+    ).toThrow(/qualityScore/)
+    expect(called).toBe(false)
+  })
+
+  it("rejects malformed prompt-quality service and bridge responses", async () => {
+    const handlers = createPersistenceIpcHandlers({
+      ...createFailingServices(() => undefined),
+      reviewPromptQualityDraft: () => ({ ...draftPromptQualityReviewResponse, overallScore: 101 }),
+    })
+    const bridge = createElectronBridge(async () => ({
+      ...draftPromptQualityReviewResponse,
+      overallScore: 101,
+    }))
+    const draftInput = { ...promptQualitySnapshot, reviewMode: "local" } as const
+
+    expect(() => handlers.reviewPromptQualityDraft(draftInput)).toThrow(/overallScore/)
+    await expect(bridge.promptQuality.reviewDraft(draftInput)).rejects.toThrow(/overallScore/)
+  })
+
   it("returns safe compiler context warnings for cross-project profile ownership mismatches", () => {
     const inputs: { readonly projectId: string; readonly profileId: string }[] = []
     const crossProjectResult = {
@@ -794,7 +1021,7 @@ describe("Electron shell contract", () => {
     expect(JSON.stringify(crossProjectResult)).not.toContain("A safe project summary.")
   })
 
-  it("keeps renderer source free of direct database and Node access", async () => {
+  it("keeps renderer source free of direct database, Node, OpenAI, and main-only quality imports", async () => {
     const rendererFiles = await listFiles("renderer/src")
     const sourceFiles = rendererFiles.filter((filePath) => /\.(ts|tsx)$/.test(filePath))
     const contents = await Promise.all(sourceFiles.map((filePath) => readFile(filePath, "utf8")))
@@ -813,6 +1040,10 @@ describe("Electron shell contract", () => {
     expect(rendererSource).not.toContain("node:os")
     expect(rendererSource).not.toContain("node:child_process")
     expect(rendererSource).not.toContain("process.env")
+    expect(rendererSource).not.toMatch(
+      /from\s+["'][^"']*electron\/prompt-quality(?!-contract(?:\.js)?["'])[^"']*["']/,
+    )
+    expect(rendererSource).not.toMatch(/from\s+["']openai(?:\/[^"']*)?["']/)
   })
 
   it("keeps forbidden native shortcut, bridge event, quick-capture settings, and run storage surfaces out of production source", async () => {
@@ -820,8 +1051,13 @@ describe("Electron shell contract", () => {
 
     expect(productionSource).not.toContain("globalShortcut")
     expect(productionSource).not.toContain("appEvents")
+    expect(productionSource).not.toContain("PromptRunSchema")
+    expect(productionSource).not.toContain("ExecutionResultSchema")
+    expect(productionSource).not.toContain("QuickCaptureSettingsSchema")
+    expect(productionSource).not.toContain("RegisterGlobalShortcutInputSchema")
     expect(productionSource).not.toContain("window.prompter.appEvents")
     expect(productionSource).not.toContain("window.prompter.shortcuts")
+    expect(productionSource).not.toContain("saveImprovedPromptAsNewVersion")
     expect(productionSource).not.toContain("navigator.clipboard")
     expect(productionSource).not.toContain("quick_capture_")
     expect(productionSource).not.toContain("quick_capture_settings")

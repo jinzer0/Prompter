@@ -17,6 +17,15 @@ export const APP_THEMES = ["system", "light", "dark"] as const
 export const RISK_LEVELS = ["low", "medium", "high"] as const
 export const SEARCH_SORTS = ["relevance", "updated_at", "title"] as const
 export const SORT_DIRECTIONS = ["asc", "desc"] as const
+export const PROMPT_QUALITY_REVIEW_MODES = ["local", "llm"] as const
+export const PROMPT_QUALITY_GRADES = ["excellent", "good", "needs_work", "weak"] as const
+export const PROMPT_QUALITY_ISSUE_SEVERITIES = ["critical", "high", "medium", "low"] as const
+export const PROMPT_QUALITY_SUGGESTION_PRIORITIES = ["high", "medium", "low"] as const
+export const PROMPT_QUALITY_REVIEW_SOURCES = ["draft", "prompt_version"] as const
+export const PROMPT_QUALITY_LLM_REVIEW_CODES = [
+  "missing_openai_key",
+  "llm_review_unavailable",
+] as const
 export const PROMPT_COMPILER_ERROR_CODES = [
   "missing_openai_key",
   "openai_key_unavailable",
@@ -147,6 +156,14 @@ export const PERSISTENCE_CHANNELS = {
   savePromptToFile: "prompter:exports:save-prompt-to-file",
   copyText: "prompter:clipboard:copy-text",
   readText: "prompter:clipboard:read-text",
+  reviewPromptQualityDraft: "prompter:prompt-quality:review-draft",
+  reviewPromptQualityWithLLM: "prompter:prompt-quality:review-llm",
+  reviewPromptQualityVersion: "prompter:prompt-quality:review-version",
+  savePromptQualityReview: "prompter:prompt-quality:save-review",
+  listPromptQualityReviewsForVersion: "prompter:prompt-quality:list-for-version",
+  getLatestPromptQualityReview: "prompter:prompt-quality:get-latest",
+  getPromptQualityReview: "prompter:prompt-quality:get",
+  applyPromptQualityScoreToVersion: "prompter:prompt-quality:apply-score-to-version",
 } as const
 
 export type PingResponse = typeof PING_RESPONSE
@@ -172,6 +189,12 @@ const appThemeSchema = z.enum(APP_THEMES)
 const riskLevelSchema = z.enum(RISK_LEVELS)
 const searchSortSchema = z.enum(SEARCH_SORTS)
 const sortDirectionSchema = z.enum(SORT_DIRECTIONS)
+export const promptQualityReviewModeSchema = z.enum(PROMPT_QUALITY_REVIEW_MODES)
+export const promptQualityGradeSchema = z.enum(PROMPT_QUALITY_GRADES)
+export const promptQualityIssueSeveritySchema = z.enum(PROMPT_QUALITY_ISSUE_SEVERITIES)
+export const promptQualitySuggestionPrioritySchema = z.enum(PROMPT_QUALITY_SUGGESTION_PRIORITIES)
+export const promptQualityReviewSourceSchema = z.enum(PROMPT_QUALITY_REVIEW_SOURCES)
+export const promptQualityLLMReviewCodeSchema = z.enum(PROMPT_QUALITY_LLM_REVIEW_CODES)
 const promptCompilerErrorCodeSchema = z.enum(PROMPT_COMPILER_ERROR_CODES)
 export const exportFormatSchema = z.enum(EXPORT_FORMATS)
 
@@ -347,6 +370,68 @@ export const createNextPromptVersionResultSchema = z.object({
 export const comparePromptVersionsResultSchema = z.object({
   baseVersion: promptVersionSchema,
   compareVersion: promptVersionSchema,
+})
+
+const promptQualityScoreSchema = z.number().int().min(0).max(100)
+export const promptQualityDimensionScoresSchema = z.object({
+  clarity: promptQualityScoreSchema,
+  context: promptQualityScoreSchema,
+  scope: promptQualityScoreSchema,
+  constraints: promptQualityScoreSchema,
+  acceptanceCriteria: promptQualityScoreSchema,
+  validation: promptQualityScoreSchema,
+  safety: promptQualityScoreSchema,
+  ambiguityRisk: promptQualityScoreSchema,
+})
+export const promptQualityIssueSchema = z.object({
+  id: nameSchema,
+  severity: promptQualityIssueSeveritySchema,
+  title: nameSchema,
+  description: requiredTextSchema,
+  evidence: requiredTextSchema,
+})
+export const promptQualitySuggestionSchema = z.object({
+  id: nameSchema,
+  priority: promptQualitySuggestionPrioritySchema,
+  title: nameSchema,
+  description: requiredTextSchema,
+})
+export const promptQualityReviewSnapshotSchema = z.object({
+  compiledPrompt: requiredPreservedTextSchema,
+  originalInput: z.string(),
+  scenario: scenarioSchema,
+  targetAgent: targetAgentSchema,
+  harnessTemplateId: idSchema.nullable(),
+  projectContextProfileId: idSchema.nullable(),
+  includeProjectContextProfile: z.boolean(),
+  projectContext: nullableTextSchema,
+  constraints: nullableTextSchema,
+  acceptanceCriteria: nullableTextSchema,
+  validationCommands: nullableTextSchema,
+})
+export const promptQualityReviewResultSchema = z.object({
+  id: idSchema.nullable(),
+  source: promptQualityReviewSourceSchema,
+  promptVersionId: idSchema.nullable(),
+  reviewMode: promptQualityReviewModeSchema,
+  overallScore: promptQualityScoreSchema,
+  grade: promptQualityGradeSchema,
+  dimensionScores: promptQualityDimensionScoresSchema,
+  strengths: z.array(requiredTextSchema),
+  issues: z.array(promptQualityIssueSchema),
+  suggestions: z.array(promptQualitySuggestionSchema),
+  missingSections: z.array(requiredTextSchema),
+  warnings: z.array(requiredTextSchema),
+  recommendedClarifyingQuestions: z.array(requiredTextSchema),
+  scoreExplanation: requiredTextSchema,
+  snapshot: promptQualityReviewSnapshotSchema,
+  createdAt: timestampSchema,
+  improvedPromptDraft: z.string().nullable(),
+})
+export const promptQualityLLMReviewResultSchema = z.object({
+  ok: z.literal(false),
+  code: promptQualityLLMReviewCodeSchema,
+  message: requiredTextSchema,
 })
 
 export const tagSchema = z.object({ id: idSchema, name: nameSchema, createdAt: timestampSchema })
@@ -732,6 +817,34 @@ export const comparePromptVersionsInputSchema = z.object({
   baseVersionId: idSchema,
   compareVersionId: idSchema,
 })
+export const reviewPromptQualityDraftInputSchema = promptQualityReviewSnapshotSchema.extend({
+  reviewMode: promptQualityReviewModeSchema,
+})
+export const reviewPromptQualityWithLLMInputSchema = noPayloadSchema
+export const reviewPromptQualityVersionInputSchema = z.object({
+  promptVersionId: idSchema,
+  reviewMode: promptQualityReviewModeSchema,
+})
+export const savePromptQualityReviewInputSchema = z.object({
+  promptVersionId: idSchema,
+  review: promptQualityReviewResultSchema,
+})
+export const listPromptQualityReviewsForVersionInputSchema = z.object({
+  promptVersionId: idSchema,
+  limit: z.number().int().min(1).max(100).default(50),
+  offset: z.number().int().min(0).default(0),
+})
+export const getLatestPromptQualityReviewInputSchema = z.object({ promptVersionId: idSchema })
+export const getPromptQualityReviewInputSchema = z.object({ reviewId: idSchema })
+export const applyPromptQualityScoreToVersionInputSchema = z.object({
+  promptVersionId: idSchema,
+  reviewId: idSchema,
+  qualityScore: promptQualityScoreSchema,
+})
+export const applyPromptQualityScoreToVersionResultSchema = z.object({
+  promptVersionId: idSchema,
+  qualityScore: promptQualityScoreSchema,
+})
 export const keyPayloadSchema = z.object({ key: keySchema })
 
 export const payloadSchemas = {
@@ -793,6 +906,14 @@ export const payloadSchemas = {
   savePromptToFile: savePromptToFileInputSchema,
   copyText: copyTextInputSchema,
   readText: noPayloadSchema,
+  reviewPromptQualityDraft: reviewPromptQualityDraftInputSchema,
+  reviewPromptQualityWithLLM: reviewPromptQualityWithLLMInputSchema,
+  reviewPromptQualityVersion: reviewPromptQualityVersionInputSchema,
+  savePromptQualityReview: savePromptQualityReviewInputSchema,
+  listPromptQualityReviewsForVersion: listPromptQualityReviewsForVersionInputSchema,
+  getLatestPromptQualityReview: getLatestPromptQualityReviewInputSchema,
+  getPromptQualityReview: getPromptQualityReviewInputSchema,
+  applyPromptQualityScoreToVersion: applyPromptQualityScoreToVersionInputSchema,
 } as const
 
 export const responseSchemas = {
@@ -854,6 +975,14 @@ export const responseSchemas = {
   savePromptToFile: savePromptToFileResultSchema,
   copyText: copyTextResultSchema,
   readText: clipboardReadTextResultSchema,
+  reviewPromptQualityDraft: promptQualityReviewResultSchema,
+  reviewPromptQualityWithLLM: promptQualityLLMReviewResultSchema,
+  reviewPromptQualityVersion: promptQualityReviewResultSchema,
+  savePromptQualityReview: promptQualityReviewResultSchema,
+  listPromptQualityReviewsForVersion: z.array(promptQualityReviewResultSchema),
+  getLatestPromptQualityReview: promptQualityReviewResultSchema.nullable(),
+  getPromptQualityReview: promptQualityReviewResultSchema.nullable(),
+  applyPromptQualityScoreToVersion: applyPromptQualityScoreToVersionResultSchema,
 } as const
 
 export type ProjectContextProfile = z.infer<typeof projectContextProfileSchema>

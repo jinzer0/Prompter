@@ -1,6 +1,8 @@
 import { z } from "zod"
 
 import type {
+  applyPromptQualityScoreToVersionInputSchema,
+  applyPromptQualityScoreToVersionResultSchema,
   clipboardReadTextResultSchema,
   comparePromptVersionsInputSchema,
   comparePromptVersionsResultSchema,
@@ -19,8 +21,11 @@ import type {
   exportPromptInputSchema,
   exportPromptResultSchema,
   formatPromptForExportInputSchema,
+  getLatestPromptQualityReviewInputSchema,
+  getPromptQualityReviewInputSchema,
   harnessTemplateSchema,
   listHarnessTemplatesInputSchema,
+  listPromptQualityReviewsForVersionInputSchema,
   openAIKeyStatusSchema,
   PingResponse,
   payloadSchemas,
@@ -36,11 +41,19 @@ import type {
   promptCompilerCompileOutputSchema,
   promptCompilerCompileResultSchema,
   promptCompilerErrorSchema,
+  promptQualityGradeSchema,
+  promptQualityLLMReviewResultSchema,
+  promptQualityReviewModeSchema,
+  promptQualityReviewResultSchema,
+  promptQualityReviewSnapshotSchema,
   promptSearchFilterSchema,
   promptSearchResultItemSchema,
   promptSearchResultSchema,
   promptVersionSchema,
+  reviewPromptQualityDraftInputSchema,
+  reviewPromptQualityVersionInputSchema,
   saveOpenAIKeyInputSchema,
+  savePromptQualityReviewInputSchema,
   savePromptToFileInputSchema,
   savePromptToFileResultSchema,
   settingSchema,
@@ -55,6 +68,8 @@ import type {
   updatePromptAssetInputSchema,
   updateTagInputSchema,
 } from "./ipc-contract.js"
+
+// allow: SIZE_OK - central renderer-facing IPC type surface mirrors the typed contract.
 
 export const MENU_ACTION_CHANNEL = "prompter:menu-action" as const
 export const MENU_ACTIONS = [
@@ -120,6 +135,27 @@ export type PromptCompilerCompileOutput = z.infer<typeof promptCompilerCompileOu
 export type PromptCompilerError = z.infer<typeof promptCompilerErrorSchema>
 export type PromptCompilerAnalyzeResult = z.input<typeof promptCompilerAnalyzeResultSchema>
 export type PromptCompilerCompileResult = z.infer<typeof promptCompilerCompileResultSchema>
+export type PromptQualityReviewMode = z.infer<typeof promptQualityReviewModeSchema>
+export type PromptQualityGrade = z.infer<typeof promptQualityGradeSchema>
+export type PromptQualityReviewSnapshot = z.infer<typeof promptQualityReviewSnapshotSchema>
+export type PromptQualityReviewResult = z.infer<typeof promptQualityReviewResultSchema>
+export type PromptQualityLLMReviewResult = z.infer<typeof promptQualityLLMReviewResultSchema>
+export type ReviewPromptQualityDraftInput = z.input<typeof reviewPromptQualityDraftInputSchema>
+export type ReviewPromptQualityVersionInput = z.input<typeof reviewPromptQualityVersionInputSchema>
+export type SavePromptQualityReviewInput = z.output<typeof savePromptQualityReviewInputSchema>
+export type ListPromptQualityReviewsForVersionInput = z.input<
+  typeof listPromptQualityReviewsForVersionInputSchema
+>
+export type GetLatestPromptQualityReviewInput = z.output<
+  typeof getLatestPromptQualityReviewInputSchema
+>
+export type GetPromptQualityReviewInput = z.output<typeof getPromptQualityReviewInputSchema>
+export type ApplyPromptQualityScoreToVersionInput = z.output<
+  typeof applyPromptQualityScoreToVersionInputSchema
+>
+export type ApplyPromptQualityScoreToVersionResult = z.infer<
+  typeof applyPromptQualityScoreToVersionResultSchema
+>
 export type DeleteResult = z.infer<typeof deleteResultSchema>
 export type CreateProjectInput = z.output<typeof createProjectInputSchema>
 export type UpdateProjectInput = z.output<typeof updateProjectInputSchema>
@@ -238,6 +274,28 @@ export type ElectronBridge = {
   readonly promptCompiler: {
     readonly analyze: (input: PromptCompilerAnalyzeInput) => Promise<PromptCompilerAnalyzeResult>
     readonly compile: (input: PromptCompilerCompileInput) => Promise<PromptCompilerCompileResult>
+  }
+  readonly promptQuality: {
+    readonly reviewDraft: (
+      input: ReviewPromptQualityDraftInput,
+    ) => Promise<PromptQualityReviewResult>
+    readonly reviewVersion: (
+      input: ReviewPromptQualityVersionInput,
+    ) => Promise<PromptQualityReviewResult>
+    readonly saveReview: (input: SavePromptQualityReviewInput) => Promise<PromptQualityReviewResult>
+    readonly listReviewsForVersion: (
+      input: ListPromptQualityReviewsForVersionInput,
+    ) => Promise<readonly PromptQualityReviewResult[]>
+    readonly getLatestReview: (
+      input: GetLatestPromptQualityReviewInput,
+    ) => Promise<PromptQualityReviewResult | null>
+    readonly getReview: (
+      input: GetPromptQualityReviewInput,
+    ) => Promise<PromptQualityReviewResult | null>
+    readonly applyScoreToVersion: (
+      input: ApplyPromptQualityScoreToVersionInput,
+    ) => Promise<ApplyPromptQualityScoreToVersionResult>
+    readonly reviewWithLLM: () => Promise<PromptQualityLLMReviewResult>
   }
   readonly exports: {
     readonly formatPrompt: (input: FormatPromptForExportInput) => Promise<ExportPromptResult>

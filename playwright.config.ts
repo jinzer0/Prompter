@@ -12,6 +12,7 @@ export default defineConfig({
     "phase11-quick-capture-ui.test.ts",
     "phase12-harness-template-ui.test.ts",
     "phase13-project-context-profiles-ui.test.ts",
+    "phase14-prompt-quality-ui.test.ts",
   ],
   timeout: 30_000,
   workers: 1,

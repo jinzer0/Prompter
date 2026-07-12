@@ -53,7 +53,7 @@ test("analyzes, compiles, and saves an LLM prompt through the compiler panel", a
     const preview = run.page.getByRole("textbox", { name: "Generated prompt preview" })
     await expect(preview).toContainText("# Objective")
     await expect(preview).toContainText("# Final Response Format")
-    await expect(run.page.getByText("Quality score: 91")).toBeVisible()
+    await expect(run.page.getByText("Compiler quality score: 91")).toBeVisible()
     await expect(run.page.getByText("Confirm OpenAI key exists before compiling.")).toBeVisible()
 
     await run.page.getByRole("button", { name: "Save compiled prompt" }).click()

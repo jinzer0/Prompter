@@ -1,12 +1,16 @@
 import { readFile } from "node:fs/promises"
 import { describe, expect, it } from "vitest"
 
-import { listProductionSourceFiles, readProductionSource } from "./source-guardrail-helpers"
-
-type ProductionSourceFile = {
-  readonly path: string
-  readonly source: string
-}
+import {
+  extractPromptTemplateTableDefinitions,
+  matchesAny,
+  matchingSourcePaths,
+  readProductionSource,
+  readProductionSourceFiles,
+  rendererIsolationPatterns,
+  repoPathFilesystemPatterns,
+  repoPathReference,
+} from "./source-guardrail-helpers"
 
 const executionAndStoragePatterns = [
   /\bprompt_runs\b/,
@@ -27,68 +31,38 @@ const prohibitedShortcutPatterns = [
   /\bquick_capture_/,
 ] as const
 
-const forbiddenRendererDependencyPatterns = [
-  /(?:from\s+|import\s*\()\s*["'](?:better-sqlite3|drizzle(?:-orm)?(?:\/[^"']*)?|openai(?:\/[^"']*)?|(?:node:)?(?:fs|path|process)(?:\/[^"']*)?)["']/,
-  /\brequire\s*\(\s*["'](?:electron|better-sqlite3|drizzle(?:-orm)?|openai|(?:node:)?(?:fs|path|process))[^"']*["']\s*\)/,
-  /\b(?:safeStorage|ipcRenderer)\b/,
-  /\b(?:fs|path|process)\s*\./,
-  /\b(?:new\s+OpenAI|getOpenAIKeyForMainProcessOnly)\b/,
-] as const
-
-const forbiddenRendererElectronImport =
-  /(?:from\s+|import\s*\()\s*["'](?:electron|[^"']*electron\/(?!ipc-types(?:\.js)?["']|prompt-quality-contract(?:\.js)?["']))["']/
-
-const runtimeIpcTypesImport =
-  /(?:^|\n)\s*import\s+(?!type\b)(?:(?!\n\s*import\b)[\s\S])*?\s+from\s+["'][^"']*electron\/ipc-types(?:\.js)?["']/
-
-const runtimeIpcTypesDynamicImport =
-  /\bimport\s*\(\s*["'][^"']*electron\/ipc-types(?:\.js)?["']\s*\)/
-
-const sideEffectElectronImport =
-  /(?:^|\n)\s*import\s+["'](?:electron|[^"']*electron\/(?!prompt-quality-contract(?:\.js)?["']))["']/
-
-const sideEffectRendererDependencyImport =
-  /(?:^|\n)\s*import\s+["'](?:better-sqlite3|drizzle(?:-orm)?(?:\/[^"']*)?|openai(?:\/[^"']*)?|(?:node:)?(?:fs|path|process)(?:\/[^"']*)?)["']/
-
 const promptBodyLogPattern =
   /(?:console|logger|log)\.(?:log|debug|info|warn|error)\s*\((?:(?!\)\s*;)[\s\S]){0,240}\b(?:compiledPrompt|originalInput|projectContext|constraints|acceptanceCriteria|validationCommands|improvedPromptDraft|promptBody|promptText|prompt)\b/
 
-const repoPathReference = /\brepo(?:Path|_path)\b/
-const filesystemReadOrScan =
-  /\b(?:readFile|readFileSync|readdir|readdirSync|opendir|stat|statSync|lstat|lstatSync|realpath|realpathSync|glob|scan(?:Directory|Repository|Files)?)\s*\(/
-
-const rendererIsolationPatterns = [
-  forbiddenRendererElectronImport,
-  runtimeIpcTypesImport,
-  runtimeIpcTypesDynamicImport,
-  sideEffectElectronImport,
-  sideEffectRendererDependencyImport,
-  ...forbiddenRendererDependencyPatterns,
+const phase15ForbiddenSurfacePatterns = [
+  /\bprompt_asset_lineage\b/,
+  /\bprompt_runs\b/,
+  /\bagent_runs\b/,
+  /\bexecution_results\b/,
+  /\bvalidation_results\b/,
+  /\brun_logs\b/,
+  /\bPromptRunSchema\b/,
+  /\bExecutionResultSchema\b/,
+  /\bQuickCaptureSettingsSchema\b/,
+  /\bRegisterGlobalShortcutInputSchema\b/,
+  /\bglobalShortcut\b/,
+  /\bwindow\.prompter\.(?:appEvents|shortcuts)\b/,
+  /\bquick_capture_[A-Za-z0-9_]*\b/,
 ] as const
 
-async function readProductionSourceFiles(
-  roots: readonly string[],
-): Promise<readonly ProductionSourceFile[]> {
-  const paths = await listProductionSourceFiles(roots)
+const forbiddenPromptTemplateApiPatterns = [
+  /\bpromptTemplates\s*\.\s*(?:preview|extractVariables)\b/,
+  /\b(?:readonly\s+)?(?:preview|extractVariables)\s*:\s*\([^)]*\)\s*=>/,
+  /\b(?:preview|extractVariables)\s*\([^)]*\)\s*\{/,
+  /\b(?:previewPromptTemplate|extractPromptTemplateVariables)\b/,
+  /\bprompter:prompt-templates:(?:preview|extract-variables)\b/,
+  /\blistChildren\b/,
+] as const
 
-  return Promise.all(
-    paths.map(async (path) => ({
-      path,
-      source: await readFile(path, "utf8"),
-    })),
-  )
-}
-
-function matchingSourcePaths(
-  sourceFiles: readonly ProductionSourceFile[],
-  patterns: readonly RegExp[],
-): readonly string[] {
-  return sourceFiles.filter(({ source }) => matchesAny(source, patterns)).map(({ path }) => path)
-}
-
-function matchesAny(source: string, patterns: readonly RegExp[]): boolean {
-  return patterns.some((pattern) => pattern.test(source))
-}
+const forbiddenPromptTemplateColumnPatterns = [
+  /^\s*[`"]?(?:variables|tags)[`"]?\s+(?:text|integer|real|blob|numeric)\b/im,
+  /\b(?:variables|tags)\s*:/,
+] as const
 
 describe("Phase 14 prompt quality source guardrails", () => {
   it("keeps execution, run-result storage, and prohibited shortcut surfaces out of production", async () => {
@@ -141,6 +115,7 @@ describe("Phase 14 prompt quality source guardrails", () => {
       'import path from "path"',
       'import posix from "path/posix"',
       'import process from "process"',
+      'import crypto from "node:crypto"',
       'void import("node:process")',
       'import Database from "better-sqlite3"',
       'void import("../../electron/ipc-types")',
@@ -204,6 +179,129 @@ describe("Phase 14 prompt quality source guardrails", () => {
 
     // Then: storage is retained while readFile(profile.repoPath)-style behavior is rejected.
     expect(repoPathSourceFiles).not.toEqual([])
-    expect(matchingSourcePaths(repoPathSourceFiles, [filesystemReadOrScan])).toEqual([])
+    expect(matchingSourcePaths(repoPathSourceFiles, repoPathFilesystemPatterns)).toEqual([])
+  })
+
+  it("rejects seeded repo-path reads and scans without rejecting metadata storage", () => {
+    // Given: direct repo-path I/O attempts and the existing metadata-only forms.
+    const forbiddenSources = [
+      "readFile(profile.repoPath, 'utf8')",
+      "resolve(project.repo_path, 'AGENTS.md')",
+      "scanRepository(repoPath)",
+    ]
+    const allowedSources = ["repoPath: nullableTextSchema", 'repoPath: text("repo_path")']
+
+    // When: repo-path I/O patterns scan both source groups.
+
+    // Then: I/O is rejected while storage and contract metadata remain valid.
+    expect(forbiddenSources.every((source) => matchesAny(source, repoPathFilesystemPatterns))).toBe(
+      true,
+    )
+    expect(allowedSources.some((source) => matchesAny(source, repoPathFilesystemPatterns))).toBe(
+      false,
+    )
+  })
+
+  it("keeps Phase 15 forbidden schemas, tables, settings, and bridge surfaces absent", async () => {
+    // Given: current production Electron, renderer, and migration sources.
+    const productionSource = await readProductionSource()
+
+    // When: exact Phase 15 forbidden identifiers are scanned.
+
+    // Then: execution, shortcut namespace, and quick-capture settings additions stay absent.
+    expect(productionSource).not.toMatch(
+      new RegExp(phase15ForbiddenSurfacePatterns.map((pattern) => pattern.source).join("|")),
+    )
+  })
+
+  it("keeps template preview, variable extraction, and listChildren out of IPC and bridge files", async () => {
+    // Given: every registry and renderer-facing bridge file that can expose an IPC surface.
+    const bridgeSource = (
+      await Promise.all(
+        [
+          "electron/ipc-contract.ts",
+          "electron/ipc-types.ts",
+          "electron/bridge.ts",
+          "electron/bridge-types.ts",
+          "electron/preload.ts",
+        ].map((path) => readFile(path, "utf8")),
+      )
+    ).join("\n")
+
+    // When: forbidden prompt-template API spellings and channels are scanned.
+
+    // Then: only local renderer preview/extraction can be introduced in later Phase 15 work.
+    expect(matchesAny(bridgeSource, forbiddenPromptTemplateApiPatterns)).toBe(false)
+  })
+
+  it("rejects seeded Phase 15 forbidden surfaces", () => {
+    // Given: one malformed source fixture for each forbidden contract or bridge category.
+    const forbiddenSources = [
+      'export const promptAssetLineage = sqliteTable("prompt_asset_lineage", {})',
+      "export const PromptRunSchema = z.object({})",
+      "export const ExecutionResultSchema = z.object({})",
+      "export const QuickCaptureSettingsSchema = z.object({})",
+      "export const RegisterGlobalShortcutInputSchema = z.object({})",
+      'import { globalShortcut } from "electron"',
+      "window.prompter.appEvents.onReady(callback)",
+      "window.prompter.shortcuts.register(input)",
+      'settings.set("quick_capture_enabled", true)',
+      "window.prompter.promptTemplates.preview(input)",
+      "window.prompter.promptTemplates.extractVariables(body)",
+      "window.prompter.promptTemplates.listChildren(id)",
+      "readonly preview: (input: PreviewInput) => Promise<PreviewResult>",
+      "extractVariables: (body: string) => []",
+    ]
+    const allForbiddenPatterns = [
+      ...phase15ForbiddenSurfacePatterns,
+      ...forbiddenPromptTemplateApiPatterns,
+    ]
+
+    // When: the Phase 15 source guardrails scan every malformed fixture.
+
+    // Then: each forbidden addition is independently detectable.
+    expect(forbiddenSources.every((source) => matchesAny(source, allForbiddenPatterns))).toBe(true)
+  })
+
+  it("forbids variables and tags only as prompt_templates database columns", async () => {
+    // Given: current schema/migrations plus valid and invalid prompt_templates definitions.
+    const databaseSource = await readProductionSource(["electron/db", "drizzle"])
+    const currentDefinitions = extractPromptTemplateTableDefinitions(databaseSource)
+    const validDefinition = extractPromptTemplateTableDefinitions(`
+      CREATE TABLE \`prompt_templates\` (
+        \`id\` text PRIMARY KEY NOT NULL,
+        \`template_body\` text NOT NULL
+      );
+    `)
+    const invalidDefinitions = extractPromptTemplateTableDefinitions(`
+      CREATE TABLE \`prompt_templates\` (
+        \`id\` text PRIMARY KEY NOT NULL,
+        \`variables\` text,
+        \`tags\` text
+      );
+      const promptTemplates = sqliteTable("prompt_templates", {
+        id: text("id").primaryKey(),
+        variables: text("variables"),
+        tags: text("tags"),
+      })
+    `)
+
+    // When: only extracted prompt_templates table bodies are checked for forbidden columns.
+
+    // Then: unrelated tags remain allowed, while variables/tags columns are rejected.
+    expect(
+      currentDefinitions.some((source) =>
+        matchesAny(source, forbiddenPromptTemplateColumnPatterns),
+      ),
+    ).toBe(false)
+    expect(
+      validDefinition.some((source) => matchesAny(source, forbiddenPromptTemplateColumnPatterns)),
+    ).toBe(false)
+    expect(invalidDefinitions).toHaveLength(2)
+    expect(
+      invalidDefinitions.every((source) =>
+        matchesAny(source, forbiddenPromptTemplateColumnPatterns),
+      ),
+    ).toBe(true)
   })
 })

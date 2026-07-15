@@ -26,6 +26,8 @@ const selectedAsset = {
   targetAgent: "codex",
   currentVersionId: promptVersionId,
   parentPromptId: null,
+  parentPromptVersionId: null,
+  derivationType: null,
   createdAt: 1,
   updatedAt: 2,
 } satisfies PromptAsset

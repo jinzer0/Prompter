@@ -11,6 +11,8 @@ const baseAsset: PromptAsset = {
   targetAgent: "codex",
   currentVersionId: "version-a",
   parentPromptId: null,
+  parentPromptVersionId: null,
+  derivationType: null,
   createdAt: 1,
   updatedAt: 2,
 }

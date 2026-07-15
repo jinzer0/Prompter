@@ -8,6 +8,7 @@ import type {
 import { exportBaseFromVersion } from "../lib/prompt-export"
 import { parsePromptVersionMetadata } from "../lib/prompt-version-diff"
 import { scenarioLabel, targetAgentLabel } from "../lib/prompter-options"
+import { PromptLineagePanel } from "./prompt-lineage-panel"
 import { PromptVersionCompare } from "./prompt-version-compare"
 import { PromptVersionDetail } from "./prompt-version-detail"
 import { Badge } from "./ui/badge"
@@ -23,10 +24,15 @@ type PromptVersionManagementProps = {
   readonly currentVersion: PromptVersion | null
   readonly projectName: string | null
   readonly selectedAsset: PromptAsset
+  readonly sameProjectAssets: readonly PromptAsset[]
   readonly selectedVersion: PromptVersion | null
   readonly selectVersion: (id: string) => void
   readonly setCurrentVersion: (promptAssetId: string, versionId: string) => Promise<void>
   readonly versions: readonly PromptVersion[]
+  readonly onDerivePrompt: (asset: PromptAsset, version: PromptVersion) => void
+  readonly onDuplicatePrompt: (asset: PromptAsset, version: PromptVersion) => Promise<void>
+  readonly onNavigatePrompt: (promptAssetId: string) => void
+  readonly onPromptTemplateSaved: () => void
 }
 
 type DetailTab = "version" | "compare"
@@ -40,10 +46,15 @@ export function PromptVersionManagement({
   currentVersion,
   projectName,
   selectedAsset,
+  sameProjectAssets,
   selectedVersion,
   selectVersion,
   setCurrentVersion,
   versions,
+  onDerivePrompt,
+  onDuplicatePrompt,
+  onNavigatePrompt,
+  onPromptTemplateSaved,
 }: PromptVersionManagementProps) {
   const [activeTab, setActiveTab] = useState<DetailTab>("version")
   const [isSettingCurrent, setIsSettingCurrent] = useState(false)
@@ -147,6 +158,9 @@ export function PromptVersionManagement({
                   selectedAsset={selectedAsset}
                   selectedVersion={selectedVersion}
                   onMakeSelectedCurrent={makeSelectedCurrent}
+                  onDuplicatePrompt={() => onDuplicatePrompt(selectedAsset, selectedVersion)}
+                  onDerivePrompt={() => onDerivePrompt(selectedAsset, selectedVersion)}
+                  onPromptTemplateSaved={onPromptTemplateSaved}
                 />
               )}
             </TabsContent>
@@ -162,6 +176,11 @@ export function PromptVersionManagement({
             />
           )}
         </Tabs>
+        <PromptLineagePanel
+          sameProjectAssets={sameProjectAssets}
+          selectedAsset={selectedAsset}
+          onNavigate={onNavigatePrompt}
+        />
       </CardContent>
     </Card>
   )

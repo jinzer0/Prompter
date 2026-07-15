@@ -13,6 +13,5 @@ export function versionInputFromCompiled(
     answers: JSON.stringify(compiled.answers ?? []),
     acceptanceCriteria: compiled.acceptanceCriteria.join("\n"),
     validationCommands: compiled.validationCommands.join("\n"),
-    qualityScore: compiled.qualityScore,
   }
 }

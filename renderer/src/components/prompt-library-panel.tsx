@@ -1,9 +1,5 @@
-import type {
-  CreatePromptAssetInput,
-  CreatePromptVersionInput,
-  Project,
-  PromptAsset,
-} from "../../../electron/ipc-types"
+import type { Project, PromptAsset } from "../../../electron/ipc-types"
+import type { CreatePrompt } from "../hooks/prompt-library-data"
 import { usePromptLibraryPanel } from "../hooks/use-prompt-library-panel"
 import type { LoadStatus, PromptVersionSummary } from "../hooks/use-prompter-library"
 import { PromptAssetCard } from "./prompt-asset-card"
@@ -19,10 +15,7 @@ import { EmptyState } from "./ui/empty-state"
 type PromptLibraryPanelProps = {
   readonly assets: readonly PromptAsset[]
   readonly currentVersionSummaries: readonly PromptVersionSummary[]
-  readonly createPrompt: (
-    assetInput: CreatePromptAssetInput,
-    versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
-  ) => Promise<PromptAsset>
+  readonly createPrompt: CreatePrompt
   readonly error: string | null
   readonly onTagsChanged: () => void
   readonly selectAsset: (id: string) => void

@@ -15,6 +15,7 @@ type PromptCompilerDraftReviewProps = {
   readonly compiled: CompiledPromptResult | null
   readonly draft: PromptCompilerInput
   readonly editablePrompt: string
+  readonly outputRevision: number
   readonly projectContextPreview: ProjectContextCompilerBuildResult | null
   readonly onUseImprovedPrompt: (prompt: string) => void
 }
@@ -60,6 +61,7 @@ export function PromptCompilerDraftReview({
   compiled,
   draft,
   editablePrompt,
+  outputRevision,
   projectContextPreview,
   onUseImprovedPrompt,
 }: PromptCompilerDraftReviewProps) {
@@ -69,7 +71,11 @@ export function PromptCompilerDraftReview({
     editablePrompt,
     projectContextPreview,
   })
-  const quality = usePromptQuality({ currentSnapshot, promptVersionId: null })
+  const quality = usePromptQuality({
+    currentSnapshot,
+    promptVersionId: null,
+    sourceRevision: outputRevision,
+  })
   const reviewStatus = draftPromptQualityReviewStatus(currentSnapshot, quality.review)
   const statusCopy = reviewStatusCopy[reviewStatus]
   const draftReviewReason =

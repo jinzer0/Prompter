@@ -25,7 +25,7 @@ async function assertNoExecutionUi(page: Page): Promise<void> {
 }
 
 async function createInitialPrompt(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "New Prompt" }).click()
+  await page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }).click()
   await page.getByRole("textbox", { name: "Prompt title" }).fill("Phase 6 Prompt")
   await page.getByRole("combobox", { exact: true, name: "Scenario" }).selectOption("feature")
   await page.getByRole("combobox", { exact: true, name: "Target agent" }).selectOption("codex")

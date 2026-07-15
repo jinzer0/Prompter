@@ -63,3 +63,15 @@ textarea {
     var(--layout-sidebar-width) minmax(var(--layout-library-min), 1fr)
     var(--layout-compiler-width);
 }
+
+.backup-action-button {
+  display: block;
+  width: 100%;
+  min-height: var(--space-8);
+  height: auto;
+  padding-block: var(--space-2);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  text-align: center;
+}

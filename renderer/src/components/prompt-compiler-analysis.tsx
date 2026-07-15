@@ -104,9 +104,11 @@ export function PromptCompilerAnalysis({
             {compiled.summary !== undefined && (
               <p className="text-[12px] leading-5 text-muted-strong">{compiled.summary}</p>
             )}
-            <p className="font-mono text-[11px] text-muted-strong">
-              Compiler quality score: {compiled.qualityScore}
-            </p>
+            {compiled.qualityScore !== undefined && (
+              <p className="font-mono text-[11px] text-muted-strong">
+                Compiler quality score: {compiled.qualityScore}
+              </p>
+            )}
             {compiled.suggestedTags !== undefined && compiled.suggestedTags.length > 0 && (
               <div className="space-y-2">
                 <p className="font-mono text-[11px] text-muted">suggested_tags</p>

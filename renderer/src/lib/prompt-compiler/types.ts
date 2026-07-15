@@ -22,7 +22,7 @@ export type PromptCompilerInput = {
   readonly additionalNotes?: string
 }
 
-export type CompiledPromptResult = {
+export type SaveableCompiledOutput = {
   readonly title: string
   readonly originalInput: string
   readonly compiledPrompt: string
@@ -34,9 +34,19 @@ export type CompiledPromptResult = {
   readonly answers?: PromptCompilerCompileOutput["answers"]
   readonly acceptanceCriteria: readonly string[]
   readonly validationCommands: readonly string[]
+}
+
+export type CompiledPromptResult = SaveableCompiledOutput & {
   readonly suggestedTags?: readonly string[]
-  readonly qualityScore: number
+  readonly qualityScore?: number
   readonly warnings?: readonly string[]
+}
+
+export type PromptTemplateProvenance = {
+  readonly templateId: string
+  readonly templateName: string
+  readonly sourcePromptAssetId: string | null
+  readonly sourcePromptVersionId: string | null
 }
 
 export type LoadedHarnessTemplate = Pick<HarnessTemplate, "id" | "templateBody" | "requiredFields">

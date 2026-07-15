@@ -1,8 +1,10 @@
 import type {
   ComparePromptVersionsResult,
+  CreateDerivedPromptAssetInput,
   CreateNextPromptVersionInput,
-  CreatePromptAssetInput,
-  CreatePromptVersionInput,
+  CreatePromptWithInitialVersionInput,
+  CreatePromptWithInitialVersionResult,
+  DuplicatePromptAssetInput,
   Project,
   PromptAsset,
   PromptVersion,
@@ -25,17 +27,25 @@ export type ScopedPromptVersionSummaries = {
   readonly summaries: readonly PromptVersionSummary[]
 }
 
-type PromptAssetsSnapshot = {
+export type CreatePrompt = (
+  input: CreatePromptWithInitialVersionInput,
+) => Promise<CreatePromptWithInitialVersionResult>
+
+export type PromptAssetsSnapshot = {
   readonly assets: readonly PromptAsset[]
   readonly summaries: readonly PromptVersionSummary[]
 }
 
-type CreatedPromptVersionSnapshot = PromptAssetsSnapshot & {
+export type SelectionOptions = {
+  readonly preserveSelection?: boolean
+}
+
+export type CreatedPromptVersionSnapshot = PromptAssetsSnapshot & {
   readonly asset: PromptAsset
   readonly version: PromptVersion
 }
 
-type PromptVersionMutationSnapshot = CreatedPromptVersionSnapshot & {
+export type PromptVersionMutationSnapshot = CreatedPromptVersionSnapshot & {
   readonly versions: readonly PromptVersion[]
 }
 
@@ -46,9 +56,14 @@ export function errorMessage(error: unknown): string {
 export function selectedProjectId(
   current: string | null,
   projects: readonly Project[],
+  options: SelectionOptions = {},
 ): string | null {
   if (current !== null && projects.some((project) => project.id === current)) {
     return current
+  }
+
+  if (options.preserveSelection === true) {
+    return null
   }
 
   return projects[0]?.id ?? null
@@ -57,9 +72,14 @@ export function selectedProjectId(
 export function selectedAssetId(
   current: string | null,
   assets: readonly PromptAsset[],
+  options: SelectionOptions = {},
 ): string | null {
   if (current !== null && assets.some((asset) => asset.id === current)) {
     return current
+  }
+
+  if (options.preserveSelection === true) {
+    return null
   }
 
   return assets[0]?.id ?? null
@@ -103,18 +123,32 @@ export async function loadPromptAssets(projectId: string): Promise<PromptAssetsS
 
 export async function createPromptWithVersion(
   projectId: string,
-  assetInput: CreatePromptAssetInput,
-  versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
+  input: CreatePromptWithInitialVersionInput,
 ): Promise<CreatedPromptVersionSnapshot> {
-  const asset = await window.prompter.prompts.createAsset(assetInput)
-  const version = await window.prompter.prompts.createVersion({
-    ...versionInput,
-    promptAssetId: asset.id,
-  })
-  const currentAsset = await window.prompter.prompts.setCurrentVersion(asset.id, version.id)
+  const result = await window.prompter.prompts.createWithInitialVersion(input)
   const { assets, summaries } = await loadPromptAssets(projectId)
 
-  return { asset: currentAsset, assets, summaries, version }
+  return { ...result, assets, summaries }
+}
+
+export async function duplicatePromptAssetState(
+  projectId: string,
+  input: DuplicatePromptAssetInput,
+): Promise<CreatedPromptVersionSnapshot> {
+  const result = await window.prompter.prompts.duplicateAsset(input)
+  const { assets, summaries } = await loadPromptAssets(projectId)
+
+  return { ...result, assets, summaries }
+}
+
+export async function createDerivedPromptAssetState(
+  projectId: string,
+  input: CreateDerivedPromptAssetInput,
+): Promise<CreatedPromptVersionSnapshot> {
+  const result = await window.prompter.prompts.createDerivedAsset(input)
+  const { assets, summaries } = await loadPromptAssets(projectId)
+
+  return { ...result, assets, summaries }
 }
 
 export async function createNextPromptVersionState(

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
 
-import { createNamedProject, launchPrompter } from "./electron-playwright-helpers"
+import { closePrompter, createNamedProject, launchPrompter } from "./electron-playwright-helpers"
 import {
   phase5AnalyzeResponse,
   phase5CompiledPrompt,
@@ -90,7 +90,7 @@ test("analyzes, compiles, and saves an LLM prompt through the compiler panel", a
       compiledPrompt: phase5CompiledPrompt,
       promptCount: 1,
       promptTitle: "Generate Phase 5 compiler prompt",
-      qualityScore: 91,
+      qualityScore: null,
       rendererHasPlaintextGetter: false,
     })
     expect(stored.answers).toContain("Compiler UI with prompt library refresh after save.")
@@ -102,7 +102,7 @@ test("analyzes, compiles, and saves an LLM prompt through the compiler panel", a
       path: phase5ScreenshotPath,
       contentType: "image/png",
     })
-    await run.app.close()
+    await closePrompter(run.app)
   } finally {
     await rm(userDataDirectory, { recursive: true, force: true })
   }

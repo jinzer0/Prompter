@@ -5,6 +5,7 @@ import type { PromptVersionMetadata } from "../lib/prompt-version-diff"
 import { targetAgentLabel } from "../lib/prompter-options"
 import { PromptExportActions } from "./prompt-export-actions"
 import { SavedPromptQualityPanel } from "./quality/saved-prompt-quality-panel"
+import { SavePromptTemplateFromVersion } from "./save-prompt-template-from-version"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
 
@@ -17,6 +18,9 @@ type PromptVersionDetailProps = {
   readonly selectedAsset: PromptAsset
   readonly selectedVersion: PromptVersion
   readonly onMakeSelectedCurrent: () => Promise<void>
+  readonly onDuplicatePrompt: () => Promise<void>
+  readonly onDerivePrompt: () => void
+  readonly onPromptTemplateSaved: () => void
 }
 
 function DetailRow({ label, value }: { readonly label: string; readonly value: string }) {
@@ -60,6 +64,9 @@ export function PromptVersionDetail({
   selectedAsset,
   selectedVersion,
   onMakeSelectedCurrent,
+  onDuplicatePrompt,
+  onDerivePrompt,
+  onPromptTemplateSaved,
 }: PromptVersionDetailProps) {
   return (
     <>
@@ -77,6 +84,17 @@ export function PromptVersionDetail({
             현재 버전으로 지정
           </Button>
         )}
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={() => void onDuplicatePrompt()}
+        >
+          Duplicate Prompt
+        </Button>
+        <Button type="button" size="sm" variant="secondary" onClick={onDerivePrompt}>
+          Derive Draft
+        </Button>
       </div>
       {currentMessage !== null && <p className="text-[12px] text-muted-strong">{currentMessage}</p>}
       <dl className="grid gap-3">
@@ -118,6 +136,11 @@ export function PromptVersionDetail({
         rawContent={selectedVersion.compiledPrompt}
         saveButtonLabel="Save version export"
         title="Version export"
+      />
+      <SavePromptTemplateFromVersion
+        selectedAsset={selectedAsset}
+        selectedVersion={selectedVersion}
+        onSaved={onPromptTemplateSaved}
       />
       {metadata !== null && (
         <div className="grid gap-3">

@@ -101,6 +101,15 @@ export function createApplicationMenuTemplate({
           click: () => sendAction("exportPrompt"),
         },
         { type: "separator" },
+        {
+          label: "Export Full Backup...",
+          click: () => sendAction("exportFullBackup"),
+        },
+        {
+          label: "Import Backup...",
+          click: () => sendAction("importBackup"),
+        },
+        { type: "separator" },
         { role: isMac ? "close" : "quit" },
       ],
     },
@@ -127,6 +136,15 @@ export function createApplicationMenuTemplate({
       ],
     },
     { label: "View", submenu: viewSubmenu },
+    {
+      label: "Tools",
+      submenu: [
+        {
+          label: "Library Maintenance",
+          click: () => sendAction("openLibraryMaintenance"),
+        },
+      ],
+    },
     {
       label: "Window",
       submenu: windowSubmenu,

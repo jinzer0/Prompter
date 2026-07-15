@@ -49,7 +49,7 @@ type SavedReviewSnapshot = {
 }
 
 async function createSavedPromptViaUi(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "New Prompt" }).click()
+  await page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }).click()
   await page.getByRole("textbox", { name: "Prompt title" }).fill(savedPromptTitle)
   await page.getByRole("combobox", { exact: true, name: "Scenario" }).selectOption("feature")
   await page.getByRole("combobox", { exact: true, name: "Target agent" }).selectOption("codex")

@@ -3,20 +3,24 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import type { CreateProjectInput, Project } from "../../../electron/ipc-types"
 import { errorMessage, type LoadStatus, selectedProjectId } from "./prompt-library-data"
 
+type ReloadProjectsOptions = {
+  readonly preserveSelection?: boolean
+}
+
 export function useProjects() {
   const [projects, setProjects] = useState<readonly Project[]>([])
   const [projectStatus, setProjectStatus] = useState<LoadStatus>("loading")
   const [projectError, setProjectError] = useState<string | null>(null)
   const [projectId, setProjectId] = useState<string | null>(null)
 
-  const loadProjects = useCallback(async () => {
+  const reloadProjects = useCallback(async (options: ReloadProjectsOptions = {}) => {
     setProjectStatus("loading")
     setProjectError(null)
 
     try {
       const loadedProjects = await window.prompter.projects.list()
       setProjects(loadedProjects)
-      setProjectId((current) => selectedProjectId(current, loadedProjects))
+      setProjectId((current) => selectedProjectId(current, loadedProjects, options))
       setProjectStatus("ready")
     } catch (error) {
       setProjectError(errorMessage(error))
@@ -25,8 +29,8 @@ export function useProjects() {
   }, [])
 
   useEffect(() => {
-    void loadProjects()
-  }, [loadProjects])
+    void reloadProjects()
+  }, [reloadProjects])
 
   const createProject = useCallback(async (input: CreateProjectInput): Promise<Project> => {
     const project = await window.prompter.projects.create(input)
@@ -45,6 +49,7 @@ export function useProjects() {
     projectError,
     projects,
     projectStatus,
+    reloadProjects,
     selectProject: setProjectId,
     selectedProject,
   }

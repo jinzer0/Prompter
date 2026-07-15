@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 
 import type {
-  CreatePromptAssetInput,
-  CreatePromptVersionInput,
   Project,
   PromptAsset,
   PromptSearchResultItem,
@@ -12,12 +10,7 @@ import type {
 import type { ScenarioFilter, TargetAgentFilter } from "../components/prompt-library-filters"
 import type { PromptDraft } from "../components/prompt-library-new-prompt-form"
 import { emptyPromptDraft } from "../components/prompt-library-new-prompt-form"
-import type { LoadStatus, PromptVersionSummary } from "./prompt-library-data"
-
-type CreatePrompt = (
-  assetInput: CreatePromptAssetInput,
-  versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
-) => Promise<PromptAsset>
+import type { CreatePrompt, LoadStatus, PromptVersionSummary } from "./prompt-library-data"
 
 type VisiblePromptAsset = {
   readonly asset: PromptAsset
@@ -179,16 +172,14 @@ export function usePromptLibraryPanel({
     setMessage(null)
 
     try {
-      await createPrompt(
-        {
-          projectId: selectedProject.id,
-          title,
-          scenario: draft.scenario,
-          targetAgent: draft.targetAgent,
-        },
-        { originalInput, compiledPrompt },
-      )
-      await window.prompter.search.rebuildIndex()
+      await createPrompt({
+        projectId: selectedProject.id,
+        title,
+        scenario: draft.scenario,
+        targetAgent: draft.targetAgent,
+        originalInput,
+        compiledPrompt,
+      })
       setDraft(emptyPromptDraft)
       setIsFormOpen(false)
     } catch (error) {

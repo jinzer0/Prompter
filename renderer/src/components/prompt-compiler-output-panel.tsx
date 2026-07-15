@@ -9,6 +9,7 @@ type PromptCompilerOutputPanelProps = {
   readonly compiled: CompiledPromptResult | null
   readonly draft: PromptCompilerInput
   readonly editablePrompt: string
+  readonly outputRevision: number
   readonly projectContextPreview: ProjectContextCompilerBuildResult | null
   readonly selectedProject: Project | null
   readonly onEditablePromptChange: (prompt: string) => void
@@ -18,6 +19,7 @@ export function PromptCompilerOutputPanel({
   compiled,
   draft,
   editablePrompt,
+  outputRevision,
   projectContextPreview,
   selectedProject,
   onEditablePromptChange,
@@ -32,6 +34,7 @@ export function PromptCompilerOutputPanel({
         compiled={compiled}
         draft={draft}
         editablePrompt={editablePrompt}
+        outputRevision={outputRevision}
         projectContextPreview={projectContextPreview}
         onUseImprovedPrompt={onEditablePromptChange}
       />

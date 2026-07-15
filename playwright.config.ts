@@ -13,6 +13,8 @@ export default defineConfig({
     "phase12-harness-template-ui.test.ts",
     "phase13-project-context-profiles-ui.test.ts",
     "phase14-prompt-quality-ui.test.ts",
+    "phase15-prompt-template-lineage-ui.test.ts",
+    "phase17-maintenance-settings-ui.test.ts",
   ],
   timeout: 30_000,
   workers: 1,

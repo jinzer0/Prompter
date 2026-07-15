@@ -1,9 +1,26 @@
+import type { BackupImportResult, Project } from "../../../electron/ipc-types"
 import { useSettingsPanel } from "../hooks/use-settings-panel"
+import { BackupSettingsPanel } from "./backup/backup-settings-panel"
+import { MaintenanceWorkbench } from "./maintenance/maintenance-workbench"
 import { OpenAIKeyCard } from "./openai-key-card"
 import { SettingsDefaultsForm } from "./settings-defaults-form"
 import { Badge } from "./ui/badge"
 
-export function SettingsPanel() {
+type SettingsPanelProps = {
+  readonly projects: readonly Project[]
+  readonly selectedPromptAssetId: string | null
+  readonly selectedProjectId: string | null
+  readonly onBackupImportComplete: (result: BackupImportResult) => Promise<void> | void
+  readonly onViewImportedProject: (projectId: string) => void
+}
+
+export function SettingsPanel({
+  onBackupImportComplete,
+  onViewImportedProject,
+  projects,
+  selectedPromptAssetId,
+  selectedProjectId,
+}: SettingsPanelProps) {
   const settings = useSettingsPanel()
 
   return (
@@ -37,6 +54,16 @@ export function SettingsPanel() {
         onDelete={settings.deleteKey}
         onSave={settings.saveKey}
         status={settings.keyStatus}
+      />
+
+      <MaintenanceWorkbench projects={projects} selectedProjectId={selectedProjectId} />
+
+      <BackupSettingsPanel
+        projects={projects}
+        selectedPromptAssetId={selectedPromptAssetId}
+        selectedProjectId={selectedProjectId}
+        onImportComplete={onBackupImportComplete}
+        onViewImportedProject={onViewImportedProject}
       />
     </section>
   )

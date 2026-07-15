@@ -1,41 +1,46 @@
 import { type FormEvent, useEffect, useRef } from "react"
 import type {
   ComparePromptVersionsResult,
+  CreateDerivedPromptAssetInput,
   CreateNextPromptVersionInput,
-  CreatePromptAssetInput,
-  CreatePromptVersionInput,
+  CreatePromptWithInitialVersionResult,
+  DuplicatePromptAssetInput,
   Project,
   PromptAsset,
   PromptVersion,
 } from "../../../electron/ipc-types"
+import type { CreatePrompt } from "../hooks/prompt-library-data"
 import { useAvailableHarnessTemplates } from "../hooks/use-available-harness-templates"
 import { useCompilerProjectContext } from "../hooks/use-compiler-project-context"
 import { useHarnessTemplates } from "../hooks/use-harness-templates"
 import { usePromptCompilerPanel } from "../hooks/use-prompt-compiler-panel"
+import { usePromptTemplates } from "../hooks/use-prompt-templates"
 import type { LoadStatus } from "../hooks/use-prompter-library"
+import { buildDerivedPromptDraft, duplicatePromptInput } from "../lib/prompt-derivation"
 import { HarnessTemplateSelector } from "./harness-template-selector"
 import { ProjectContextProfileSelector } from "./project-context-profile-selector"
 import { PromptCompilerActions } from "./prompt-compiler-actions"
-import { PromptCompilerAnalysis } from "./prompt-compiler-analysis"
 import { PromptCompilerClipboardImportCard } from "./prompt-compiler-clipboard-import-card"
+import { PromptCompilerDetailSection } from "./prompt-compiler-detail-section"
 import { PromptCompilerForm } from "./prompt-compiler-form"
 import { PromptCompilerHeader } from "./prompt-compiler-header"
-import { PromptCompilerOutputPanel } from "./prompt-compiler-output-panel"
-import { PromptVersionManagement } from "./prompt-version-management"
+import { PromptCompilerOutputWorkspace } from "./prompt-compiler-output-workspace"
 import { Panel } from "./shell/panel"
-import { Card, CardDescription, CardHeader, CardTitle } from "./ui/card"
-import { EmptyState } from "./ui/empty-state"
 
 type PromptCompilerPanelProps = {
+  readonly assets: readonly PromptAsset[]
   readonly compareVersions: (
     baseVersionId: string,
     compareVersionId: string,
   ) => Promise<ComparePromptVersionsResult>
+  readonly createDerivedAsset: (
+    input: CreateDerivedPromptAssetInput,
+  ) => Promise<CreatePromptWithInitialVersionResult>
   readonly createNextVersion: (input: CreateNextPromptVersionInput) => Promise<PromptVersion>
-  readonly createPrompt: (
-    assetInput: CreatePromptAssetInput,
-    versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
-  ) => Promise<PromptAsset>
+  readonly createPrompt: CreatePrompt
+  readonly duplicateAsset: (
+    input: DuplicatePromptAssetInput,
+  ) => Promise<CreatePromptWithInitialVersionResult>
   readonly changedProjectContextProfileId: string | null
   readonly currentVersion: PromptVersion | null
   readonly deletedHarnessTemplateIds: readonly string[]
@@ -43,20 +48,26 @@ type PromptCompilerPanelProps = {
   readonly error: string | null
   readonly harnessTemplateRefreshSignal: number
   readonly projectContextProfileRefreshSignal: number
+  readonly promptTemplateRefreshSignal: number
   readonly selectedAsset: PromptAsset | null
   readonly selectedVersion: PromptVersion | null
   readonly selectedProject: Project | null
+  readonly selectAsset: (id: string) => void
   readonly selectVersion: (id: string) => void
   readonly setCurrentVersion: (promptAssetId: string, versionId: string) => Promise<void>
   readonly status: LoadStatus
   readonly versions: readonly PromptVersion[]
+  readonly onPromptTemplatesChanged: () => void
   readonly onTagsChanged: () => void
 }
 
 export function PromptCompilerPanel({
+  assets,
   compareVersions,
+  createDerivedAsset,
   createNextVersion,
   createPrompt,
+  duplicateAsset,
   changedProjectContextProfileId,
   currentVersion,
   deletedHarnessTemplateIds,
@@ -64,17 +75,22 @@ export function PromptCompilerPanel({
   error,
   harnessTemplateRefreshSignal,
   projectContextProfileRefreshSignal,
+  promptTemplateRefreshSignal,
   selectedAsset,
   selectedVersion,
   selectedProject,
+  selectAsset,
   selectVersion,
   setCurrentVersion,
   status,
   versions,
+  onPromptTemplatesChanged,
   onTagsChanged,
 }: PromptCompilerPanelProps) {
   const harnessTemplates = useHarnessTemplates()
+  const promptTemplates = usePromptTemplates()
   const compiler = usePromptCompilerPanel({
+    createDerivedAsset,
     createNextVersion,
     createPrompt,
     onTagsChanged,
@@ -106,6 +122,18 @@ export function PromptCompilerPanel({
   }, [harnessTemplates.loadTemplates, harnessTemplates.status])
 
   useEffect(() => {
+    if (promptTemplates.status === "idle") {
+      void promptTemplates.loadTemplates({})
+    }
+  }, [promptTemplates.loadTemplates, promptTemplates.status])
+
+  useEffect(() => {
+    if (promptTemplateRefreshSignal > 0) {
+      void promptTemplates.loadTemplates({})
+    }
+  }, [promptTemplateRefreshSignal, promptTemplates.loadTemplates])
+
+  useEffect(() => {
     if (compiler.originalRequestFocusSignal > 0) {
       originalRequestRef.current?.focus()
     }
@@ -116,6 +144,17 @@ export function PromptCompilerPanel({
     const profileBuildResult =
       projectContext.previewStatus === "ready" ? projectContext.preview : null
     compiler.compileStatic(selectedTemplate, profileBuildResult)
+  }
+
+  async function duplicateSelectedPrompt(
+    asset: PromptAsset,
+    version: PromptVersion,
+  ): Promise<void> {
+    await duplicateAsset(duplicatePromptInput(asset.id, version.id))
+  }
+
+  function deriveSelectedPrompt(asset: PromptAsset, version: PromptVersion): void {
+    compiler.seedDerivedPrompt(buildDerivedPromptDraft(asset, version))
   }
 
   return (
@@ -170,7 +209,7 @@ export function PromptCompilerPanel({
             compiler.compiled !== null &&
             compiler.editablePrompt.trim().length > 0
           }
-          canSavePrompt={selectedProject !== null && compiler.compiled !== null}
+          canSavePrompt={compiler.saveDisabledReasons.length === 0}
           isAnalyzing={compiler.isAnalyzing}
           isCompilingLLM={compiler.isCompilingLLM}
           isReadingClipboard={compiler.isReadingClipboard}
@@ -186,69 +225,32 @@ export function PromptCompilerPanel({
       </form>
 
       <div className="mt-4 flex flex-1 flex-col gap-4">
-        <PromptCompilerAnalysis
-          analysis={compiler.analysis}
-          answers={compiler.answers}
-          compiled={compiler.compiled}
-          onAnswerChange={compiler.setAnswer}
-          onSuggestedTagChange={compiler.setSuggestedTagSelection}
-          selectedSuggestedTags={compiler.selectedSuggestedTags}
-        />
-        <PromptCompilerOutputPanel
-          compiled={compiler.compiled}
-          draft={compiler.draft}
-          editablePrompt={compiler.editablePrompt}
+        <PromptCompilerOutputWorkspace
+          compiler={compiler}
           projectContextPreview={
             projectContext.previewStatus === "ready" ? projectContext.preview : null
           }
+          promptTemplates={promptTemplates}
           selectedProject={selectedProject}
-          onEditablePromptChange={compiler.setEditablePrompt}
         />
 
-        {selectedProject === null && (
-          <EmptyState
-            label="Detail state"
-            title="Select a project first"
-            description="Compile previews are local, but saving requires a selected project."
-          />
-        )}
-
-        {selectedProject !== null && selectedAsset === null && (
-          <EmptyState
-            label="Detail state"
-            title="Select a prompt to view details"
-            description="New prompts will show their current version here."
-          />
-        )}
-
-        {selectedAsset !== null && status === "loading" && (
-          <p className="text-[12px] text-muted">Loading prompt detail...</p>
-        )}
-        {selectedAsset !== null && status === "error" && (
-          <p className="text-[12px] text-muted-strong">{error}</p>
-        )}
-
-        {selectedAsset !== null && status === "ready" && currentVersion === null && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{selectedAsset.title}</CardTitle>
-              <CardDescription>No current version is set for this prompt asset.</CardDescription>
-            </CardHeader>
-          </Card>
-        )}
-
-        {selectedAsset !== null && status === "ready" && currentVersion !== null && (
-          <PromptVersionManagement
-            compareVersions={compareVersions}
-            currentVersion={currentVersion}
-            selectedAsset={selectedAsset}
-            selectedVersion={selectedVersion}
-            projectName={selectedProject?.name ?? null}
-            selectVersion={selectVersion}
-            setCurrentVersion={setCurrentVersion}
-            versions={versions}
-          />
-        )}
+        <PromptCompilerDetailSection
+          assets={assets}
+          compareVersions={compareVersions}
+          currentVersion={currentVersion}
+          error={error}
+          selectedAsset={selectedAsset}
+          selectedProject={selectedProject}
+          selectedVersion={selectedVersion}
+          status={status}
+          versions={versions}
+          onDerivePrompt={deriveSelectedPrompt}
+          onDuplicatePrompt={duplicateSelectedPrompt}
+          onNavigatePrompt={selectAsset}
+          onPromptTemplatesChanged={onPromptTemplatesChanged}
+          onSelectVersion={selectVersion}
+          onSetCurrentVersion={setCurrentVersion}
+        />
       </div>
     </Panel>
   )

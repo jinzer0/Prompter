@@ -1,6 +1,7 @@
-import { useCallback, useMemo, useReducer } from "react"
+import { useCallback, useMemo, useReducer, useRef } from "react"
 
 import type { PromptQualityReviewSnapshot } from "../../../electron/ipc-types"
+import { resolveCurrentRevisionResponse } from "../lib/prompt-compiler/output-revision"
 import {
   initialPromptQualityState,
   promptQualityActionState,
@@ -10,10 +11,17 @@ import {
 export type UsePromptQualityConfig = {
   readonly currentSnapshot: PromptQualityReviewSnapshot | null
   readonly promptVersionId: string | null
+  readonly sourceRevision?: number
 }
 
-export function usePromptQuality({ currentSnapshot, promptVersionId }: UsePromptQualityConfig) {
+export function usePromptQuality({
+  currentSnapshot,
+  promptVersionId,
+  sourceRevision,
+}: UsePromptQualityConfig) {
   const [state, dispatch] = useReducer(reducePromptQualityState, initialPromptQualityState)
+  const sourceRevisionRef = useRef(sourceRevision)
+  sourceRevisionRef.current = sourceRevision
   const actionState = useMemo(
     () =>
       promptQualityActionState({
@@ -57,22 +65,37 @@ export function usePromptQuality({ currentSnapshot, promptVersionId }: UsePrompt
       return
     }
 
+    const requestedRevision = sourceRevision
     dispatch({ kind: "operation_started", operation: "reviewing_local" })
 
     try {
-      const review = await window.prompter.promptQuality.reviewDraft({
-        ...currentSnapshot,
-        reviewMode: "local",
-      })
+      const review = await resolveCurrentRevisionResponse(
+        window.prompter.promptQuality.reviewDraft({
+          ...currentSnapshot,
+          reviewMode: "local",
+        }),
+        requestedRevision,
+        () => sourceRevisionRef.current,
+      )
+      if (review === null) {
+        dispatch({ kind: "operation_failed", message: "Draft changed; late review discarded." })
+        return
+      }
       dispatch({ kind: "review_received", review })
     } catch (error) {
       if (!(error instanceof Error)) {
         throw error
       }
 
-      dispatch({ kind: "operation_failed", message: "Local review could not be completed." })
+      dispatch({
+        kind: "operation_failed",
+        message:
+          sourceRevisionRef.current === requestedRevision
+            ? "Local review could not be completed."
+            : "Draft changed; late review discarded.",
+      })
     }
-  }, [actionState.reviewDraftLocally, currentSnapshot])
+  }, [actionState.reviewDraftLocally, currentSnapshot, sourceRevision])
 
   const reviewVersionLocally = useCallback(async (): Promise<void> => {
     if (!actionState.reviewVersionLocally.isEnabled || promptVersionId === null) {
@@ -110,19 +133,34 @@ export function usePromptQuality({ currentSnapshot, promptVersionId }: UsePrompt
       return
     }
 
+    const requestedRevision = sourceRevision
     dispatch({ kind: "operation_started", operation: "reviewing_llm" })
 
     try {
-      const result = await window.prompter.promptQuality.reviewWithLLM()
+      const result = await resolveCurrentRevisionResponse(
+        window.prompter.promptQuality.reviewWithLLM(),
+        requestedRevision,
+        () => sourceRevisionRef.current,
+      )
+      if (result === null) {
+        dispatch({ kind: "operation_failed", message: "Draft changed; late review discarded." })
+        return
+      }
       dispatch({ kind: "llm_review_received", result })
     } catch (error) {
       if (!(error instanceof Error)) {
         throw error
       }
 
-      dispatch({ kind: "operation_failed", message: "LLM review could not be completed." })
+      dispatch({
+        kind: "operation_failed",
+        message:
+          sourceRevisionRef.current === requestedRevision
+            ? "LLM review could not be completed."
+            : "Draft changed; late review discarded.",
+      })
     }
-  }, [actionState.runLLMReview])
+  }, [actionState.runLLMReview, sourceRevision])
 
   const saveReview = useCallback(async (): Promise<void> => {
     const review = state.review

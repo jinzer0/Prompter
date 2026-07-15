@@ -48,7 +48,9 @@ test("opens the main window and resolves the preload ping bridge", async ({
     await expect(page.getByText("Select a project to view prompts")).toBeVisible()
     await expect(page.getByText("Select a project first")).toBeVisible()
     await expect(page.getByRole("button", { name: "New Project" })).toBeVisible()
-    await expect(page.getByRole("button", { name: "New Prompt" })).toBeDisabled()
+    await expect(
+      page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }),
+    ).toBeDisabled()
     await expect(page.getByRole("button", { name: "Add Tags" })).toHaveCount(0)
     await expect(page.getByRole("button", { name: "Add Harnesses" })).toHaveCount(0)
 
@@ -136,10 +138,9 @@ test("opens the main window and resolves the preload ping bridge", async ({
       await expect(page.getByRole("heading", { name: "Harnesses" })).toBeVisible()
       await expect(page.getByRole("heading", { name: "Prompt Library" })).toBeVisible()
       await expect(page.getByRole("heading", { name: "Prompt Compiler" })).toBeVisible()
-      await expect(page.getByRole("button", { name: "New Prompt" })).toHaveCSS(
-        "white-space",
-        "nowrap",
-      )
+      await expect(
+        page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }),
+      ).toHaveCSS("white-space", "nowrap")
     }
     await testInfo.attach("electron-window-title", {
       body: await page.title(),

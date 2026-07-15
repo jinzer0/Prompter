@@ -67,7 +67,7 @@ export function exportBaseFromCompiled(
   compiledPrompt: string,
   selectedProject: Project | null,
 ): PromptExportBase {
-  return {
+  const base = {
     promptVersionId: unsavedPromptVersionId,
     title: compiled.title,
     scenario: compiled.scenario,
@@ -80,8 +80,11 @@ export function exportBaseFromCompiled(
     acceptanceCriteria: mutableLines(compiled.acceptanceCriteria),
     validationCommands: mutableLines(compiled.validationCommands),
     projectName: selectedProject?.name ?? null,
-    qualityScore: compiled.qualityScore,
   }
+
+  return compiled.qualityScore === undefined
+    ? base
+    : { ...base, qualityScore: compiled.qualityScore }
 }
 
 export type VersionExportBaseInput = {

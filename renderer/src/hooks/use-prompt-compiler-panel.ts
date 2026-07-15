@@ -1,65 +1,44 @@
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react"
 
 import type {
+  CreateDerivedPromptAssetInput,
   CreateNextPromptVersionInput,
-  CreatePromptAssetInput,
-  CreatePromptVersionInput,
+  CreatePromptWithInitialVersionResult,
   Project,
   ProjectContextCompilerBuildResult,
   PromptAsset,
-  PromptCompilerAnalyzeOutput,
   PromptVersion,
 } from "../../../electron/ipc-types"
+import { promptCompilerDraftChangeResetsStaleState } from "../lib/prompt-compiler/draft-state"
+import { emptyCompilerInput } from "../lib/prompt-compiler/llm-compiler-flow"
 import {
-  analyzeInput,
-  type ClarificationAnswersById,
-  compiledFromLLM,
-  compileInput,
-  emptyCompilerInput,
-  missingRequiredQuestion,
-} from "../lib/prompt-compiler/llm-compiler-flow"
+  createOutputRevisionGate,
+  type OutputRevisionGate,
+} from "../lib/prompt-compiler/output-revision"
 import { compileStaticPrompt } from "../lib/prompt-compiler/static-prompt-compiler"
 import type {
   CompiledPromptResult,
   LoadedHarnessTemplate,
   PromptCompilerInput,
 } from "../lib/prompt-compiler/types"
+import type { CreatePrompt } from "./prompt-library-data"
 import { useCompilerDefaults } from "./use-compiler-defaults"
+import { useCompilerLlmActions } from "./use-compiler-llm-actions"
 import { useCompilerPersistenceActions } from "./use-compiler-persistence-actions"
 import { useCompilerQuickCapture } from "./use-compiler-quick-capture"
 import { useCompilerSuggestedTags } from "./use-compiler-suggested-tags"
-
-type CreatePrompt = (
-  assetInput: CreatePromptAssetInput,
-  versionInput: Omit<CreatePromptVersionInput, "promptAssetId">,
-) => Promise<PromptAsset>
+import { useCompilerTemplateDraftController } from "./use-compiler-template-draft-controller"
+import { useDerivedCompilerDraft } from "./use-derived-compiler-draft"
 
 type CreateNextVersion = (input: CreateNextPromptVersionInput) => Promise<PromptVersion>
+type CreateDerivedAsset = (
+  input: CreateDerivedPromptAssetInput,
+) => Promise<CreatePromptWithInitialVersionResult>
 
-const staleStateDraftFields = [
-  "title",
-  "originalInput",
-  "scenario",
-  "targetAgent",
-  "harnessTemplateId",
-  "projectContextProfileId",
-  "includeProjectContextProfile",
-  "projectContext",
-  "techStack",
-  "constraints",
-  "acceptanceCriteria",
-  "validationCommands",
-  "additionalNotes",
-] as const satisfies readonly (keyof PromptCompilerInput)[]
-
-export function promptCompilerDraftChangeResetsStaleState(
-  current: PromptCompilerInput,
-  next: PromptCompilerInput,
-): boolean {
-  return staleStateDraftFields.some((field) => current[field] !== next[field])
-}
+export { promptCompilerDraftChangeResetsStaleState }
 
 type UsePromptCompilerPanelConfig = {
+  readonly createDerivedAsset: CreateDerivedAsset
   readonly createPrompt: CreatePrompt
   readonly createNextVersion: CreateNextVersion
   readonly onTagsChanged: () => void
@@ -68,6 +47,7 @@ type UsePromptCompilerPanelConfig = {
 }
 
 export function usePromptCompilerPanel({
+  createDerivedAsset,
   createNextVersion,
   createPrompt,
   onTagsChanged,
@@ -76,23 +56,78 @@ export function usePromptCompilerPanel({
 }: UsePromptCompilerPanelConfig) {
   const [draft, setDraft] = useState<PromptCompilerInput>(emptyCompilerInput)
   const draftRef = useRef<PromptCompilerInput>(emptyCompilerInput)
-  const [analysis, setAnalysis] = useState<PromptCompilerAnalyzeOutput | null>(null)
-  const [answers, setAnswers] = useState<ClarificationAnswersById>({})
   const [compiled, setCompiled] = useState<CompiledPromptResult | null>(null)
-  const [editablePrompt, setEditablePrompt] = useState("")
+  const [editablePrompt, setEditablePromptValue] = useState("")
   const [message, setMessage] = useState<string | null>(null)
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [isCompilingLLM, setIsCompilingLLM] = useState(false)
+  const template = useCompilerTemplateDraftController()
+  const outputRevisionGateRef = useRef<OutputRevisionGate | null>(null)
+
+  if (outputRevisionGateRef.current === null) {
+    outputRevisionGateRef.current = createOutputRevisionGate()
+  }
+
+  const outputRevisionGate = outputRevisionGateRef.current
+  const [outputRevision, setOutputRevision] = useState(outputRevisionGate.current())
   const suggestedTags = useCompilerSuggestedTags({ onTagsChanged })
 
+  const replaceEditablePrompt = useCallback(
+    (prompt: string): number => {
+      const revision = outputRevisionGate.advance()
+      setEditablePromptValue(prompt)
+      setOutputRevision(revision)
+      return revision
+    },
+    [outputRevisionGate],
+  )
+  const derivedPrompt = useDerivedCompilerDraft({
+    clearSuggestedTags: suggestedTags.clearSuggestedTags,
+    draftRef,
+    replaceEditablePrompt,
+    resetTemplateDraft: template.resetTemplateDraft,
+    setCompiled,
+    setDraft,
+    setMessage,
+  })
+
+  const acceptCompiled = useCallback(
+    (result: CompiledPromptResult): void => {
+      setCompiled(result)
+      derivedPrompt.clearDerivedPrompt()
+      replaceEditablePrompt(result.compiledPrompt)
+      template.resetTemplateDraft()
+      suggestedTags.clearSuggestedTags()
+    },
+    [
+      derivedPrompt.clearDerivedPrompt,
+      replaceEditablePrompt,
+      suggestedTags.clearSuggestedTags,
+      template.resetTemplateDraft,
+    ],
+  )
+
+  const llm = useCompilerLlmActions({
+    draft,
+    onCompiled: acceptCompiled,
+    outputRevisionGate,
+    selectedProject,
+    setMessage,
+  })
+
   const resetStaleDraftState = useCallback((): void => {
-    setAnalysis(null)
-    setAnswers({})
+    llm.clearDerivedState()
     setCompiled(null)
-    setEditablePrompt("")
+    derivedPrompt.clearDerivedPrompt()
+    replaceEditablePrompt("")
+    template.resetTemplateDraft()
     suggestedTags.clearSuggestedTags()
     setMessage(null)
-  }, [suggestedTags.clearSuggestedTags])
+  }, [
+    derivedPrompt.clearDerivedPrompt,
+    llm.clearDerivedState,
+    replaceEditablePrompt,
+    suggestedTags.clearSuggestedTags,
+    template.resetTemplateDraft,
+  ])
 
   const setCompilerDraft = useCallback<Dispatch<SetStateAction<PromptCompilerInput>>>(
     (update) => {
@@ -111,27 +146,22 @@ export function usePromptCompilerPanel({
 
   useCompilerDefaults(setCompilerDraft, setMessage)
 
-  function resetImportedDraftState(): void {
-    resetStaleDraftState()
-  }
-
   const quickCapture = useCompilerQuickCapture({
     draft,
-    resetImportedDraftState,
+    resetImportedDraftState: resetStaleDraftState,
     setDraft: setCompilerDraft,
     setMessage,
   })
 
   const persistenceActions = useCompilerPersistenceActions({
     compiled,
+    createDerivedAsset,
     createNextVersion,
     createPrompt,
+    derivedPromptSource: derivedPrompt.source,
     editablePrompt,
-    onSavedNextVersion: () => {
-      setCompiled(null)
-      setEditablePrompt("")
-      suggestedTags.clearSuggestedTags()
-    },
+    onTagsChanged,
+    onSavedNextVersion: resetStaleDraftState,
     selectedAsset,
     selectedProject,
     setMessage,
@@ -147,101 +177,25 @@ export function usePromptCompilerPanel({
       return
     }
 
-    const result = compileStaticPrompt(
-      { ...draft, projectContextProfileBuildResult },
-      selectedHarnessTemplate,
+    acceptCompiled(
+      compileStaticPrompt({ ...draft, projectContextProfileBuildResult }, selectedHarnessTemplate),
     )
-    setCompiled(result)
-    setEditablePrompt(result.compiledPrompt)
-    suggestedTags.clearSuggestedTags()
     setMessage("Compiled prompt is ready to review.")
   }
 
-  async function analyzeWithLLM(): Promise<void> {
-    if (draft.originalInput.trim().length === 0) {
-      setMessage("Original request is required")
+  function confirmTemplateApply(): void {
+    const applied = template.createAppliedOutput(draft, outputRevisionGate.current())
+
+    if (applied === null) {
       return
     }
 
-    setIsAnalyzing(true)
-    setMessage(null)
-
-    try {
-      const result = await window.prompter.promptCompiler.analyze(
-        analyzeInput(draft, selectedProject),
-      )
-
-      if (!result.ok) {
-        setMessage(result.message)
-        return
-      }
-
-      setAnalysis(result.value)
-      setAnswers((current) => {
-        const nextAnswers: Record<string, string> = {}
-
-        for (const question of result.value.questions) {
-          nextAnswers[question.id] = current[question.id] ?? ""
-        }
-
-        return nextAnswers
-      })
-      setMessage("Analysis is ready.")
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error
-      }
-
-      setMessage("Prompt analysis could not be completed.")
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  async function compileWithLLM(): Promise<void> {
-    if (draft.originalInput.trim().length === 0) {
-      setMessage("Original request is required")
-      return
-    }
-
-    const missingQuestion = missingRequiredQuestion(analysis, answers)
-
-    if (missingQuestion !== null) {
-      setMessage(`Answer required: ${missingQuestion.question}`)
-      return
-    }
-
-    setIsCompilingLLM(true)
-    setMessage(null)
-
-    try {
-      const result = await window.prompter.promptCompiler.compile(
-        compileInput(draft, selectedProject, analysis, answers),
-      )
-
-      if (!result.ok) {
-        setMessage(result.message)
-        return
-      }
-
-      const nextCompiled = compiledFromLLM(result.value, draft.originalInput)
-      setCompiled(nextCompiled)
-      setEditablePrompt(result.value.compiledPrompt)
-      suggestedTags.clearSuggestedTags()
-      setMessage("LLM compiled prompt is ready to review.")
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error
-      }
-
-      setMessage("LLM prompt compilation could not be completed.")
-    } finally {
-      setIsCompilingLLM(false)
-    }
-  }
-
-  function setAnswer(questionId: string, answer: string): void {
-    setAnswers((current) => ({ ...current, [questionId]: answer }))
+    llm.clearDerivedState()
+    setCompiled(applied.compiled)
+    replaceEditablePrompt(applied.editablePrompt)
+    suggestedTags.clearSuggestedTags()
+    template.commitTemplateApplication(applied.provenance)
+    setMessage("Template output applied to the compiled prompt draft.")
   }
 
   function setHarnessTemplateId(id: string | null): void {
@@ -249,34 +203,51 @@ export function usePromptCompilerPanel({
   }
 
   return {
-    analysis,
-    answers,
-    analyzeWithLLM,
+    analysis: llm.analysis,
+    answers: llm.answers,
+    analyzeWithLLM: llm.analyzeWithLLM,
     cancelClipboardImport: quickCapture.cancelClipboardImport,
+    cancelTemplateApply: template.cancelTemplateApply,
     clearStaleOutput: resetStaleDraftState,
+    clearTemplateProvenance: template.clearTemplateProvenance,
     compileStatic,
-    compileWithLLM,
+    compileWithLLM: llm.compileWithLLM,
     compiled,
     confirmClipboardImport: quickCapture.confirmClipboardImport,
+    confirmTemplateApply,
     copyPrompt: persistenceActions.copyPrompt,
+    derivedPromptSourceTitle: derivedPrompt.sourceTitle,
     draft,
     editablePrompt,
     importFromClipboard: quickCapture.importFromClipboard,
-    isAnalyzing,
-    isCompilingLLM,
+    isAnalyzing: llm.isAnalyzing,
+    isCompilingLLM: llm.isCompilingLLM,
     isReadingClipboard: quickCapture.isReadingClipboard,
     isSaving: persistenceActions.isSaving,
     isSavingNextVersion: persistenceActions.isSavingNextVersion,
+    isTemplateApplyConfirmationPending: template.isTemplateApplyConfirmationPending,
     message,
     originalRequestFocusSignal: quickCapture.originalRequestFocusSignal,
+    outputRevision,
     pendingClipboardImport: quickCapture.pendingClipboardImport,
+    pendingTemplate: template.pendingTemplate,
+    previewTemplate: template.previewTemplate,
+    requestTemplateApply: template.requestTemplateApply,
+    saveDisabledReasons: persistenceActions.saveDisabledReasons,
     saveNextVersion: persistenceActions.saveNextVersion,
     savePrompt: persistenceActions.savePrompt,
-    setAnswer,
-    setDraft: setCompilerDraft,
-    setEditablePrompt,
-    setHarnessTemplateId,
+    selectPromptTemplate: template.selectPromptTemplate,
+    seedDerivedPrompt: derivedPrompt.seedDerivedPrompt,
     selectedSuggestedTags: suggestedTags.selectedSuggestedTags,
+    setAnswer: llm.setAnswer,
+    setDraft: setCompilerDraft,
+    setEditablePrompt: replaceEditablePrompt,
+    setHarnessTemplateId,
     setSuggestedTagSelection: suggestedTags.setSuggestedTagSelection,
+    setTemplateVariable: template.setTemplateVariable,
+    templatePreview: template.templatePreview,
+    templateProvenance: template.templateProvenance,
+    templateVariableNames: template.templateVariableNames,
+    templateVariableValues: template.templateVariableValues,
   }
 }

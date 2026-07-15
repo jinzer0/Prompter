@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react"
 
-import type { MenuAction, PingResponse } from "../../electron/ipc-types"
+import type { BackupImportResult, PingResponse } from "../../electron/ipc-types"
 import { HarnessTemplateManager } from "./components/harness-template-manager"
 import { ProjectContextProfileManager } from "./components/project-context-profile-manager"
 import { ProjectSidebarSection } from "./components/project-sidebar-section"
 import { PromptCompilerPanel } from "./components/prompt-compiler-panel"
 import { PromptLibraryPanel } from "./components/prompt-library-panel"
+import { PromptTemplateManager } from "./components/prompt-template-manager"
 import { SettingsPanel } from "./components/settings-panel"
 import { SidebarSection, sidebarSections } from "./components/shell/sidebar-section"
 import { useProjectPrompts, useProjects } from "./hooks/use-prompter-library"
+import { handleMenuAction, handleMenuKeyDown } from "./lib/menu-actions"
 
 type PingState = PingResponse | "pending"
 
@@ -21,82 +23,11 @@ type ProjectContextProfileChange = {
   readonly deletedProfileId?: string
 }
 
-function assertNever(value: never): never {
-  throw new Error(`Unhandled menu action: ${value}`)
-}
-
-function clickMenuTarget(target: string): void {
-  const element = document.querySelector<HTMLElement>(`[data-menu-action-target="${target}"]`)
-
-  if (element instanceof HTMLButtonElement && element.disabled) {
-    return
-  }
-
-  element?.click()
-}
-
-function focusMenuTarget(target: string): void {
-  const element = document.querySelector<HTMLElement>(`[data-menu-action-target="${target}"]`)
-  element?.focus()
-  element?.scrollIntoView({ block: "nearest" })
-}
-
-function handleMenuAction(action: MenuAction): void {
-  switch (action) {
-    case "newPrompt":
-      clickMenuTarget("new-prompt")
-      return
-    case "newProject":
-      clickMenuTarget("new-project")
-      return
-    case "quickCaptureFromClipboard":
-      clickMenuTarget("quick-capture-from-clipboard")
-      return
-    case "focusSearch":
-      focusMenuTarget("search-prompts")
-      return
-    case "savePrompt":
-      clickMenuTarget("save-compiled-prompt")
-      return
-    case "copyCompiledPrompt":
-      clickMenuTarget("copy-compiled-prompt")
-      return
-    case "exportPrompt":
-      clickMenuTarget("save-compiled-export")
-      return
-    case "openSettings":
-      focusMenuTarget("settings-panel")
-      return
-    case "closeActivePanel":
-      document.activeElement instanceof HTMLElement && document.activeElement.blur()
-      return
-    default:
-      assertNever(action)
-  }
-}
-
-function handleMenuKeyDown(event: KeyboardEvent): void {
-  if (event.defaultPrevented) {
-    return
-  }
-
-  if (event.key.toLowerCase() === "v" && event.shiftKey && (event.metaKey || event.ctrlKey)) {
-    event.preventDefault()
-    handleMenuAction("quickCaptureFromClipboard")
-    return
-  }
-
-  if (event.key !== "Escape") {
-    return
-  }
-
-  handleMenuAction("closeActivePanel")
-}
-
 export function App() {
   const [pingResult, setPingResult] = useState<PingState>("pending")
   const [tagRefreshSignal, setTagRefreshSignal] = useState(0)
   const [harnessTemplateRefreshSignal, setHarnessTemplateRefreshSignal] = useState(0)
+  const [promptTemplateRefreshSignal, setPromptTemplateRefreshSignal] = useState(0)
   const [deletedHarnessTemplateIds, setDeletedHarnessTemplateIds] = useState<readonly string[]>([])
   const [projectContextProfileRefreshSignal, setProjectContextProfileRefreshSignal] = useState(0)
   const [changedProjectContextProfileId, setChangedProjectContextProfileId] = useState<
@@ -110,6 +41,10 @@ export function App() {
 
   function refreshPromptTags(): void {
     setTagRefreshSignal((current) => current + 1)
+  }
+
+  function refreshPromptTemplates(): void {
+    setPromptTemplateRefreshSignal((current) => current + 1)
   }
 
   function recordHarnessTemplateChange(change: HarnessTemplateChange = {}): void {
@@ -137,6 +72,15 @@ export function App() {
     }
 
     setProjectContextProfileRefreshSignal((current) => current + 1)
+  }
+
+  async function refreshAfterBackupImport(_result: BackupImportResult): Promise<void> {
+    await projectLibrary.reloadProjects({ preserveSelection: true })
+    await promptLibrary.reloadAssets({ preserveSelection: true })
+    refreshPromptTags()
+    refreshPromptTemplates()
+    recordHarnessTemplateChange()
+    recordProjectContextProfileChange()
   }
 
   useEffect(() => {
@@ -196,6 +140,10 @@ export function App() {
               selectedProject={projectLibrary.selectedProject}
               onProfilesChanged={recordProjectContextProfileChange}
             />
+            <PromptTemplateManager
+              refreshSignal={promptTemplateRefreshSignal}
+              onTemplatesChanged={refreshPromptTemplates}
+            />
             {sidebarSections.map((section) =>
               section.title === "Harnesses" ? (
                 <HarnessTemplateManager
@@ -212,7 +160,13 @@ export function App() {
                 />
               ),
             )}
-            <SettingsPanel />
+            <SettingsPanel
+              projects={projectLibrary.projects}
+              selectedPromptAssetId={promptLibrary.selectedAsset?.id ?? null}
+              selectedProjectId={projectLibrary.selectedProject?.id ?? null}
+              onBackupImportComplete={refreshAfterBackupImport}
+              onViewImportedProject={projectLibrary.selectProject}
+            />
           </div>
 
           <div className="mt-5 rounded-card border border-border bg-panel-muted p-3 text-[12px] text-muted">
@@ -236,9 +190,12 @@ export function App() {
           onTagsChanged={refreshPromptTags}
         />
         <PromptCompilerPanel
+          assets={promptLibrary.assets}
           compareVersions={promptLibrary.compareVersions}
+          createDerivedAsset={promptLibrary.createDerivedAsset}
           createNextVersion={promptLibrary.createNextVersion}
           createPrompt={promptLibrary.createPrompt}
+          duplicateAsset={promptLibrary.duplicateAsset}
           changedProjectContextProfileId={changedProjectContextProfileId}
           currentVersion={promptLibrary.currentVersion}
           deletedHarnessTemplateIds={deletedHarnessTemplateIds}
@@ -246,13 +203,16 @@ export function App() {
           error={promptLibrary.versionError}
           harnessTemplateRefreshSignal={harnessTemplateRefreshSignal}
           projectContextProfileRefreshSignal={projectContextProfileRefreshSignal}
+          promptTemplateRefreshSignal={promptTemplateRefreshSignal}
           selectedAsset={promptLibrary.selectedAsset}
           selectedVersion={promptLibrary.selectedVersion}
           selectedProject={projectLibrary.selectedProject}
+          selectAsset={promptLibrary.selectAsset}
           selectVersion={promptLibrary.selectVersion}
           setCurrentVersion={promptLibrary.setCurrentVersion}
           status={promptLibrary.versionStatus}
           versions={promptLibrary.versions}
+          onPromptTemplatesChanged={refreshPromptTemplates}
           onTagsChanged={refreshPromptTags}
         />
       </div>

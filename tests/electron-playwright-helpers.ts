@@ -16,6 +16,12 @@ export type RunningApp = {
   readonly page: Page
 }
 
+export async function closePrompter(app: ElectronApplication): Promise<void> {
+  const closed = app.waitForEvent("close")
+  await app.close()
+  await closed
+}
+
 export async function launchPrompter(
   userDataDirectory: string,
   extraEnv: Readonly<Record<string, string>> = {},

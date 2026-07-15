@@ -1,7 +1,13 @@
 import type Database from "better-sqlite3"
 import { z } from "zod"
 import { promptAssetSchema, promptVersionSchema, tagSchema } from "../../ipc-contract.js"
-import type { PromptSearchFilter, PromptSearchResult, PromptSearchTag } from "../../ipc-types.js"
+import type {
+  PromptAsset,
+  PromptSearchFilter,
+  PromptSearchResult,
+  PromptSearchTag,
+  PromptVersion,
+} from "../../ipc-types.js"
 
 const searchRowSchema = z.object({ promptAssetId: z.string().uuid() })
 const searchRowsSchema = z.array(searchRowSchema)
@@ -13,6 +19,8 @@ type SearchRow = z.infer<typeof searchRowSchema>
 
 export type SearchRepository = {
   readonly rebuildSearchIndex: () => void
+  readonly upsertPromptInSearchIndex: (asset: PromptAsset, version: PromptVersion) => void
+  readonly deletePromptFromSearchIndex: (promptAssetId: string) => void
   readonly searchPrompts: (filter: PromptSearchFilter) => readonly PromptSearchResult[]
 }
 
@@ -90,6 +98,8 @@ function findPromptResult(sqlite: Database.Database, row: SearchRow): PromptSear
             target_agent AS targetAgent,
             current_version_id AS currentVersionId,
             parent_prompt_id AS parentPromptId,
+            parent_prompt_version_id AS parentPromptVersionId,
+            derivation_type AS derivationType,
             created_at AS createdAt,
             updated_at AS updatedAt
           FROM prompt_assets
@@ -142,10 +152,40 @@ function findPromptResult(sqlite: Database.Database, row: SearchRow): PromptSear
   }
 }
 
+export function rebuildSearchIndexAtomically(sqlite: Database.Database): void {
+  sqlite.transaction(() => {
+    sqlite.prepare("DELETE FROM prompt_search_fts").run()
+    sqlite
+      .prepare(
+        `
+          INSERT INTO prompt_search_fts (
+            prompt_asset_id,
+            title,
+            original_input,
+            compiled_prompt
+          )
+          SELECT
+            prompt_assets.id,
+            prompt_assets.title,
+            prompt_versions.original_input,
+            prompt_versions.compiled_prompt
+          FROM prompt_assets
+          INNER JOIN prompt_versions
+            ON prompt_versions.id = prompt_assets.current_version_id
+            AND prompt_versions.prompt_asset_id = prompt_assets.id
+        `,
+      )
+      .run()
+  })()
+}
+
 export function createSearchRepository(sqlite: Database.Database): SearchRepository {
   return {
     rebuildSearchIndex() {
-      sqlite.prepare("DELETE FROM prompt_search_fts").run()
+      rebuildSearchIndexAtomically(sqlite)
+    },
+    upsertPromptInSearchIndex(asset, version) {
+      sqlite.prepare("DELETE FROM prompt_search_fts WHERE prompt_asset_id = ?").run(asset.id)
       sqlite
         .prepare(
           `
@@ -154,19 +194,13 @@ export function createSearchRepository(sqlite: Database.Database): SearchReposit
               title,
               original_input,
               compiled_prompt
-            )
-            SELECT
-              prompt_assets.id,
-              prompt_assets.title,
-              prompt_versions.original_input,
-              prompt_versions.compiled_prompt
-            FROM prompt_assets
-            INNER JOIN prompt_versions
-              ON prompt_versions.id = prompt_assets.current_version_id
-              AND prompt_versions.prompt_asset_id = prompt_assets.id
+            ) VALUES (?, ?, ?, ?)
           `,
         )
-        .run()
+        .run(asset.id, asset.title, version.originalInput, version.compiledPrompt)
+    },
+    deletePromptFromSearchIndex(promptAssetId) {
+      sqlite.prepare("DELETE FROM prompt_search_fts WHERE prompt_asset_id = ?").run(promptAssetId)
     },
     searchPrompts(filter) {
       const query = ftsQuery(filter.query)

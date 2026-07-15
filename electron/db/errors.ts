@@ -8,6 +8,37 @@ export class PersistenceNotFoundError extends Error {
   }
 }
 
+export class PromptVersionOwnershipError extends Error {
+  constructor(
+    readonly promptAssetId: string,
+    readonly promptVersionId: string,
+  ) {
+    super(`prompt version ${promptVersionId} does not belong to prompt asset ${promptAssetId}`)
+    this.name = "PromptVersionOwnershipError"
+  }
+}
+
+export class PromptLineageCycleError extends Error {
+  constructor(readonly promptAssetId: string) {
+    super(`prompt lineage contains a cycle at prompt asset ${promptAssetId}`)
+    this.name = "PromptLineageCycleError"
+  }
+}
+
+export class PromptInitialVersionError extends Error {
+  constructor(readonly promptAssetId: string) {
+    super(`prompt asset already has an initial version: ${promptAssetId}`)
+    this.name = "PromptInitialVersionError"
+  }
+}
+
+export class PromptTemplateSourceOverrideError extends Error {
+  constructor() {
+    super("prompt template scenario and target agent are derived from the source asset")
+    this.name = "PromptTemplateSourceOverrideError"
+  }
+}
+
 export class PromptQualityReviewAssociationError extends Error {
   constructor(readonly promptVersionId: string) {
     super(`Prompt quality review must belong to prompt version: ${promptVersionId}`)

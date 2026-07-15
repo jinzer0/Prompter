@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises"
 import { describe, expect, it } from "vitest"
+import { z } from "zod"
 
 import {
   createApplicationMenuTemplate,
@@ -8,6 +9,7 @@ import {
   menuActionSchema,
 } from "../electron/app-menu"
 import { createElectronBridge, PING_RESPONSE } from "../electron/bridge"
+import * as ipcContract from "../electron/ipc-contract"
 import {
   createHarnessTemplateInputSchema,
   harnessTemplateSchema,
@@ -15,13 +17,22 @@ import {
 } from "../electron/ipc-contract"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
 import type {
+  CreateDerivedPromptAssetInput,
+  CreatePromptTemplateFromVersionInput,
+  CreatePromptTemplateInput,
+  CreatePromptWithInitialVersionInput,
+  DuplicatePromptAssetInput,
+  ListPromptTemplatesInput,
+  MenuAction,
+  PromptLineage,
+  PromptLineageSummary,
   PromptQualityLLMReviewResult,
   PromptQualityReviewResult,
   PromptQualityReviewSnapshot,
+  UpdatePromptTemplateInput,
 } from "../electron/ipc-types"
 import { createWindowOptions } from "../electron/window-options"
 import {
-  createFailingServices,
   listFiles,
   projectContextCompilerBuildFixture,
   projectContextProfileFixture,
@@ -29,6 +40,7 @@ import {
   validProjectId,
   validPromptAssetId,
 } from "./electron-contract-helpers"
+import { createFailingServices } from "./electron-contract-service-fixture"
 import { readProductionSource } from "./source-guardrail-helpers"
 
 // allow: SIZE_OK - central Electron shell contract covers bridge, IPC validation, and renderer boundaries.
@@ -43,6 +55,8 @@ const promptAssetResponse = {
   targetAgent: "codex",
   currentVersionId: validPromptVersionId,
   parentPromptId: null,
+  parentPromptVersionId: null,
+  derivationType: null,
   createdAt: 1,
   updatedAt: 2,
 } as const
@@ -65,6 +79,62 @@ const compareVersionResponse = {
   id: comparePromptVersionId,
   versionNumber: 2,
   compiledPrompt: "Compiled prompt\nwith changes",
+} as const
+const promptAssetVersionResponse = {
+  asset: promptAssetResponse,
+  version: promptVersionResponse,
+} as const
+const promptLineageChild = {
+  promptAssetId: validPromptAssetId,
+  promptVersionId: validPromptVersionId,
+  title: "Derived Child",
+  versionNumber: 1,
+  derivationType: "derived",
+} satisfies PromptLineageSummary
+const promptLineageResponse = {
+  parent: null,
+  children: [promptLineageChild],
+} satisfies PromptLineage
+const promptTemplateResponse = {
+  id: "55555555-5555-4555-8555-555555555555",
+  name: "Feature Template",
+  description: null,
+  sourcePromptAssetId: null,
+  sourcePromptVersionId: null,
+  scenario: "feature",
+  targetAgent: "codex",
+  templateBody: "# Objective\n{{objective}}",
+  createdAt: 1,
+  updatedAt: 2,
+} as const
+const createPromptWithInitialVersionInput = {
+  projectId: validProjectId,
+  title: "Atomic Prompt",
+  scenario: "feature",
+  targetAgent: "codex",
+  originalInput: "Create an atomic prompt.",
+  compiledPrompt: "# Objective\nCreate an atomic prompt.",
+} as const
+const createDerivedPromptAssetInput = {
+  sourcePromptAssetId: validPromptAssetId,
+  sourcePromptVersionId: validPromptVersionId,
+  title: "Derived Prompt",
+  originalInput: "Derive this prompt.",
+  compiledPrompt: "# Objective\nDerive this prompt.",
+} as const
+const createPromptTemplateInput = {
+  name: "Feature Template",
+  description: null,
+  scenario: "feature",
+  targetAgent: "codex",
+  templateBody: "# Objective\n{{objective}}",
+} as const
+const createPromptTemplateFromVersionInput = {
+  sourcePromptAssetId: validPromptAssetId,
+  sourcePromptVersionId: validPromptVersionId,
+  name: "Version Template",
+  description: null,
+  templateBody: "# Objective\n{{objective}}",
 } as const
 const promptQualitySnapshot = {
   compiledPrompt: "# Objective\n\nDefine the expected change.",
@@ -131,6 +201,16 @@ const harnessTemplateResponse = {
   updatedAt: 2,
 } as const
 type MenuTemplateItem = ReturnType<typeof createApplicationMenuTemplate>[number]
+
+function registeredSchema(registry: object, name: string): z.ZodType {
+  const schema = Reflect.get(registry, name)
+
+  if (!(schema instanceof z.ZodType)) {
+    throw new Error(`IPC schema is not registered: ${name}`)
+  }
+
+  return schema
+}
 
 function findMenuItem(items: readonly MenuTemplateItem[], label: string): MenuTemplateItem {
   for (const item of items) {
@@ -210,6 +290,11 @@ describe("Electron shell contract", () => {
 
   it("maps menu shortcuts to the intended renderer targets", async () => {
     const appSource = await readFile("renderer/src/app.tsx", "utf8")
+    const menuActionSource = await readFile("renderer/src/lib/menu-actions.ts", "utf8")
+    const maintenanceWorkbenchSource = await readFile(
+      "renderer/src/components/maintenance/maintenance-workbench.tsx",
+      "utf8",
+    )
     const compilerSource = await readFile(
       "renderer/src/components/prompt-compiler-panel.tsx",
       "utf8",
@@ -241,10 +326,17 @@ describe("Electron shell contract", () => {
     expect(llmCompileButton).not.toContain('data-menu-action-target="save-compiled-prompt"')
     expect(compilerSource).toContain("onAnalyzeWithLLM={compiler.analyzeWithLLM}")
     expect(compilerSource).toContain("onSavePrompt={compiler.savePrompt}")
-    expect(appSource).toContain('case "quickCaptureFromClipboard"')
-    expect(appSource).toContain('clickMenuTarget("quick-capture-from-clipboard")')
-    expect(appSource).toContain('event.key !== "Escape"')
-    expect(appSource).toContain('handleMenuAction("closeActivePanel")')
+    expect(menuActionSource).toContain('case "quickCaptureFromClipboard"')
+    expect(menuActionSource).toContain('clickMenuTarget("quick-capture-from-clipboard")')
+    expect(menuActionSource).toContain('case "exportFullBackup"')
+    expect(menuActionSource).toContain('clickMenuTarget("backup-export-full")')
+    expect(menuActionSource).toContain('case "importBackup"')
+    expect(menuActionSource).toContain('clickMenuTarget("backup-import-open")')
+    expect(menuActionSource).toContain('case "openLibraryMaintenance"')
+    expect(menuActionSource).toContain('focusMenuTarget("settings-maintenance")')
+    expect(maintenanceWorkbenchSource).toContain('data-menu-action-target="settings-maintenance"')
+    expect(menuActionSource).toContain('event.key !== "Escape"')
+    expect(menuActionSource).toContain('handleMenuAction("closeActivePanel")')
     expect(appSource).toContain('window.addEventListener("keydown", handleMenuKeyDown)')
   })
 
@@ -271,11 +363,17 @@ describe("Electron shell contract", () => {
       "savePrompt",
       "copyCompiledPrompt",
       "exportPrompt",
+      "exportFullBackup",
+      "importBackup",
       "openSettings",
+      "openLibraryMaintenance",
       "closeActivePanel",
     ])
     expect(menuActionSchema.parse("focusSearch")).toBe("focusSearch")
     expect(menuActionSchema.parse("quickCaptureFromClipboard")).toBe("quickCaptureFromClipboard")
+    expect(menuActionSchema.parse("exportFullBackup")).toBe("exportFullBackup")
+    expect(menuActionSchema.parse("importBackup")).toBe("importBackup")
+    expect(menuActionSchema.parse("openLibraryMaintenance")).toBe("openLibraryMaintenance")
     expect(() => menuActionSchema.parse("runPrompt")).toThrow()
   })
 
@@ -292,6 +390,7 @@ describe("Electron shell contract", () => {
       "File",
       "Edit",
       "View",
+      "Tools",
       "Window",
       "Help",
     ])
@@ -305,20 +404,29 @@ describe("Electron shell contract", () => {
     expect(findMenuItem(template, "Copy Compiled Prompt").accelerator).toBe("CmdOrCtrl+Shift+C")
     expect(findMenuItem(template, "Close Active Panel").accelerator).toBe("Esc")
     expect(findMenuItem(template, "Settings...").accelerator).toBe("CmdOrCtrl+,")
+    expect(findMenuItem(template, "Export Full Backup...").label).toBe("Export Full Backup...")
+    expect(findMenuItem(template, "Import Backup...").label).toBe("Import Backup...")
+    expect(findMenuItem(template, "Library Maintenance").accelerator).toBeUndefined()
 
     clickMenuItem(findMenuItem(template, "New Prompt"))
     clickMenuItem(findMenuItem(template, "New Project"))
     clickMenuItem(findMenuItem(template, "Quick Capture from Clipboard"))
+    clickMenuItem(findMenuItem(template, "Export Full Backup..."))
+    clickMenuItem(findMenuItem(template, "Import Backup..."))
     clickMenuItem(findMenuItem(template, "Search"))
     clickMenuItem(findMenuItem(template, "Copy Compiled Prompt"))
+    clickMenuItem(findMenuItem(template, "Library Maintenance"))
     clickMenuItem(findMenuItem(template, "Close Active Panel"))
 
     expect(actions).toEqual([
       "newPrompt",
       "newProject",
       "quickCaptureFromClipboard",
+      "exportFullBackup",
+      "importBackup",
       "focusSearch",
       "copyCompiledPrompt",
+      "openLibraryMaintenance",
       "closeActivePanel",
     ])
     expect(() => findMenuItem(template, "Toggle Developer Tools")).toThrow()
@@ -365,7 +473,9 @@ describe("Electron shell contract", () => {
       "projects",
       "projectContextProfiles",
       "prompts",
+      "promptTemplates",
       "search",
+      "maintenance",
       "tags",
       "harnessTemplates",
       "settings",
@@ -374,6 +484,7 @@ describe("Electron shell contract", () => {
       "promptQuality",
       "exports",
       "clipboard",
+      "backup",
     ])
     expect(Object.keys(bridge)).not.toContain("appEvents")
     expect(Object.keys(bridge)).not.toContain("shortcuts")
@@ -403,7 +514,33 @@ describe("Electron shell contract", () => {
       "getCurrentVersion",
       "setCurrentVersion",
       "compareVersions",
+      "createWithInitialVersion",
+      "duplicateAsset",
+      "createDerivedAsset",
+      "getLineage",
     ])
+    expect(Object.keys(bridge.prompts)).not.toContain("listChildren")
+    expect(Object.keys(bridge.promptTemplates)).toEqual([
+      "create",
+      "list",
+      "get",
+      "update",
+      "duplicate",
+      "delete",
+      "createFromVersion",
+    ])
+    expect(Object.keys(bridge.promptTemplates)).not.toContain("preview")
+    expect(Object.keys(bridge.promptTemplates)).not.toContain("extractVariables")
+    expect(Object.keys(bridge.search)).toEqual(["searchPrompts", "rebuildIndex"])
+    expect(Object.keys(bridge.maintenance)).toEqual([
+      "scanLibrary",
+      "prepareAction",
+      "executeAction",
+      "cancelActionSession",
+    ])
+    expect(Object.keys(bridge.maintenance)).not.toEqual(
+      expect.arrayContaining(["mergeTags", "deleteTags", "repairVersions", "rebuildIndex"]),
+    )
     expect(Object.keys(bridge.tags)).toEqual([
       "create",
       "list",
@@ -449,6 +586,16 @@ describe("Electron shell contract", () => {
     ])
     expect(Object.keys(bridge.exports)).toEqual(["formatPrompt", "savePromptToFile"])
     expect(Object.keys(bridge.clipboard)).toEqual(["copyText", "readText"])
+    expect(Object.keys(bridge.backup)).toEqual([
+      "exportFullBackup",
+      "exportProjectBackup",
+      "exportPromptAssetsBackup",
+      "exportPromptTemplatesPack",
+      "exportHarnessTemplatesPack",
+      "validateBackupFile",
+      "importBackup",
+      "cancelImportSession",
+    ])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()
   })
@@ -698,8 +845,717 @@ describe("Electron shell contract", () => {
     ).toThrow(/clarificationPolicy/)
   })
 
+  it("registers only the approved Phase 15 derivation and template channels", () => {
+    // Given: the Phase 15 persistence channel registry.
+    const approvedChannels = {
+      createPromptWithInitialVersion: "prompter:prompt-assets:create-with-initial-version",
+      duplicateAsset: "prompter:prompt-assets:duplicate",
+      createDerivedAsset: "prompter:prompt-assets:create-derived",
+      getLineage: "prompter:prompt-assets:get-lineage",
+      createPromptTemplate: "prompter:prompt-templates:create",
+      listPromptTemplates: "prompter:prompt-templates:list",
+      getPromptTemplate: "prompter:prompt-templates:get",
+      updatePromptTemplate: "prompter:prompt-templates:update",
+      duplicatePromptTemplate: "prompter:prompt-templates:duplicate",
+      deletePromptTemplate: "prompter:prompt-templates:delete",
+      createPromptTemplateFromVersion: "prompter:prompt-templates:create-from-version",
+    } as const
+
+    // When: the approved channel names are read from the registry.
+    const registeredChannels = Object.fromEntries(
+      Object.keys(approvedChannels).map((name) => [name, Reflect.get(PERSISTENCE_CHANNELS, name)]),
+    )
+
+    // Then: every approved channel is exact and forbidden alternatives remain absent.
+    expect(registeredChannels).toEqual(approvedChannels)
+    expect(PERSISTENCE_CHANNELS).not.toHaveProperty("listChildren")
+    expect(PERSISTENCE_CHANNELS).not.toHaveProperty("previewPromptTemplate")
+    expect(PERSISTENCE_CHANNELS).not.toHaveProperty("extractPromptTemplateVariables")
+  })
+
+  it("parses atomic prompt creation with trimmed optional tags", () => {
+    // Given: a complete normal-save payload with version metadata and optional tags.
+    const input = {
+      projectId: validProjectId,
+      title: "Atomic Prompt",
+      scenario: "feature",
+      targetAgent: "codex",
+      originalInput: "Create an atomic save path.",
+      compiledPrompt: "# Objective\nCreate an atomic save path.",
+      assumptions: null,
+      questions: null,
+      answers: null,
+      acceptanceCriteria: "Asset and version commit together.",
+      validationCommands: "npm test",
+      qualityScore: 85,
+      tagIds: [validHarnessTemplateId],
+      tagNames: ["  atomic  ", "phase15"],
+    } as const
+    const schema = registeredSchema(ipcContract, "createPromptWithInitialVersionInputSchema")
+
+    // When: the payload crosses the IPC schema boundary.
+    const parsed = schema.parse(input)
+
+    // Then: all approved fields remain and tag names are normalized.
+    expect(parsed).toEqual({ ...input, tagNames: ["atomic", "phase15"] })
+    expect(() => schema.parse({ ...input, tagNames: ["   "] })).toThrow(/tagNames/)
+  })
+
+  it("rejects renderer-controlled lineage and source fields on general prompt mutations", () => {
+    // Given: general prompt create and update inputs plus prohibited provenance fields.
+    const createSchema = registeredSchema(ipcContract, "createPromptAssetInputSchema")
+    const updateSchema = registeredSchema(ipcContract, "updatePromptAssetInputSchema")
+    const createInput = {
+      projectId: validProjectId,
+      title: "General Prompt",
+      scenario: "feature",
+      targetAgent: "codex",
+    } as const
+
+    // When: renderer-controlled lineage/source fields are supplied.
+    const createResults = [
+      createSchema.safeParse({ ...createInput, parentPromptId: validPromptAssetId }),
+      createSchema.safeParse({ ...createInput, parentPromptVersionId: validPromptVersionId }),
+      createSchema.safeParse({ ...createInput, derivationType: "derived" }),
+      createSchema.safeParse({ ...createInput, sourcePromptAssetId: validPromptAssetId }),
+    ]
+    const updateResults = [
+      updateSchema.safeParse({ parentPromptId: validPromptAssetId }),
+      updateSchema.safeParse({ parentPromptVersionId: validPromptVersionId }),
+      updateSchema.safeParse({ derivationType: "duplicate" }),
+      updateSchema.safeParse({ sourcePromptVersionId: validPromptVersionId }),
+    ]
+
+    // Then: every provenance mutation is rejected instead of stripped.
+    expect([...createResults, ...updateResults].every((result) => !result.success)).toBe(true)
+  })
+
+  it("parses same-project duplicate and derived commands with exact result envelopes", () => {
+    // Given: dedicated same-project derivation payloads and a valid asset/version result.
+    const duplicateSchema = registeredSchema(ipcContract, "duplicatePromptAssetInputSchema")
+    const derivedSchema = registeredSchema(ipcContract, "createDerivedPromptAssetInputSchema")
+    const duplicateResultSchema = registeredSchema(ipcContract.responseSchemas, "duplicateAsset")
+    const derivedResultSchema = registeredSchema(ipcContract.responseSchemas, "createDerivedAsset")
+    const duplicateInput = {
+      sourcePromptAssetId: validPromptAssetId,
+      sourcePromptVersionId: validPromptVersionId,
+    }
+    const derivedInput = {
+      sourcePromptAssetId: validPromptAssetId,
+      sourcePromptVersionId: validPromptVersionId,
+      title: "Derived Prompt",
+      originalInput: "Derive this prompt.",
+      compiledPrompt: "# Objective\nDerive this prompt.",
+      assumptions: null,
+      questions: null,
+      answers: null,
+      acceptanceCriteria: null,
+      validationCommands: null,
+      qualityScore: null,
+      tagIds: [validHarnessTemplateId],
+      tagNames: ["derived"],
+    } as const
+    const result = { asset: promptAssetResponse, version: promptVersionResponse }
+
+    // When: the dedicated inputs and response envelopes are parsed.
+    const parsedDuplicate = duplicateSchema.parse(duplicateInput)
+    const parsedDerived = derivedSchema.parse(derivedInput)
+
+    // Then: defaults and exact same-project contracts are enforced.
+    expect(parsedDuplicate).toEqual({ ...duplicateInput, copyTags: true })
+    expect(parsedDerived).toEqual(derivedInput)
+    expect(duplicateResultSchema.parse(result)).toEqual(result)
+    expect(derivedResultSchema.parse(result)).toEqual(result)
+    expect(() =>
+      duplicateSchema.parse({ ...duplicateInput, targetProjectId: validProjectId }),
+    ).toThrow()
+    expect(() => duplicateSchema.parse({ ...duplicateInput, projectId: validProjectId })).toThrow()
+    expect(() =>
+      derivedSchema.parse({ ...derivedInput, targetProjectId: validProjectId }),
+    ).toThrow()
+    expect(() => derivedSchema.parse({ ...derivedInput, projectId: validProjectId })).toThrow()
+    expect(() => duplicateResultSchema.parse({ ...result, extra: true })).toThrow()
+  })
+
+  it("parses prompt lineage as one nullable-parent and children response", () => {
+    // Given: exact parent and child summaries plus the deleted-parent state.
+    const lineageSchema = registeredSchema(ipcContract, "promptLineageSchema")
+    const parent = {
+      promptAssetId: validPromptAssetId,
+      promptVersionId: validPromptVersionId,
+      title: "Source Prompt",
+      versionNumber: 1,
+      derivationType: "duplicate",
+    } as const
+    const child = {
+      promptAssetId: comparePromptVersionId,
+      promptVersionId: validHarnessTemplateId,
+      title: "Derived Child",
+      versionNumber: 2,
+      derivationType: "derived",
+    } as const
+
+    // When: the aggregate lineage response is parsed.
+    const lineage = lineageSchema.parse({ parent, children: [child] })
+
+    // Then: only complete summaries are accepted, including a nullable parent.
+    expect(lineage).toEqual({ parent, children: [child] })
+    expect(lineageSchema.parse({ parent: null, children: [] })).toEqual({
+      parent: null,
+      children: [],
+    })
+    expect(() =>
+      lineageSchema.parse({
+        parent: { ...parent, projectId: validProjectId },
+        children: [child],
+      }),
+    ).toThrow()
+    expect(() =>
+      lineageSchema.parse({
+        parent,
+        children: [
+          {
+            promptAssetId: child.promptAssetId,
+            promptVersionId: child.promptVersionId,
+            title: child.title,
+            derivationType: child.derivationType,
+          },
+        ],
+      }),
+    ).toThrow(/versionNumber/)
+    expect(() =>
+      lineageSchema.parse({
+        parent,
+        children: [{ ...child, derivationType: "templated_from" }],
+      }),
+    ).toThrow(/derivationType/)
+  })
+
+  it("defines exact source-less and source-version prompt template contracts", () => {
+    // Given: approved source-less create and source-version create payloads.
+    const templateSchema = registeredSchema(ipcContract, "promptTemplateSchema")
+    const createSchema = registeredSchema(ipcContract, "createPromptTemplateInputSchema")
+    const createFromVersionSchema = registeredSchema(
+      ipcContract,
+      "createPromptTemplateFromVersionInputSchema",
+    )
+    const template = {
+      id: validHarnessTemplateId,
+      name: "Feature Template",
+      description: null,
+      sourcePromptAssetId: validPromptAssetId,
+      sourcePromptVersionId: validPromptVersionId,
+      scenario: "feature",
+      targetAgent: "codex",
+      templateBody: "  # Objective\n{{objective}}  ",
+      createdAt: 1,
+      updatedAt: 2,
+    } as const
+    const createInput = {
+      name: "Feature Template",
+      description: null,
+      scenario: "feature",
+      targetAgent: "codex",
+      templateBody: template.templateBody,
+    } as const
+    const fromVersionInput = {
+      sourcePromptAssetId: validPromptAssetId,
+      sourcePromptVersionId: validPromptVersionId,
+      name: "Feature Template",
+      description: "Created from a saved prompt version.",
+      templateBody: template.templateBody,
+    } as const
+
+    // When: approved template records and create payloads are parsed.
+    const parsedTemplate = templateSchema.parse(template)
+
+    // Then: the exact ten-field record is preserved and source ownership stays main-process-only.
+    expect(parsedTemplate).toEqual(template)
+    expect(createSchema.parse(createInput)).toEqual(createInput)
+    expect(createFromVersionSchema.parse(fromVersionInput)).toEqual(fromVersionInput)
+    expect(() =>
+      createSchema.parse({ ...createInput, sourcePromptAssetId: validPromptAssetId }),
+    ).toThrow()
+    expect(() =>
+      createSchema.parse({ ...createInput, sourcePromptVersionId: validPromptVersionId }),
+    ).toThrow()
+    expect(() =>
+      createFromVersionSchema.parse({ ...fromVersionInput, scenario: "bugfix" }),
+    ).toThrow()
+    expect(() =>
+      createFromVersionSchema.parse({ ...fromVersionInput, targetAgent: "cursor" }),
+    ).toThrow()
+    expect(() => templateSchema.parse({ ...template, variables: ["objective"] })).toThrow()
+    expect(() => createSchema.parse({ ...createInput, name: "   " })).toThrow(/name/)
+    expect(() => createSchema.parse({ ...createInput, templateBody: "   " })).toThrow(
+      /templateBody/,
+    )
+  })
+
+  it("parses prompt template list, mutation, and delete request-response shapes", () => {
+    // Given: all approved prompt template registry schemas.
+    const listInputSchema = registeredSchema(ipcContract, "listPromptTemplatesInputSchema")
+    const updateInputSchema = registeredSchema(ipcContract, "updatePromptTemplateInputSchema")
+    const listResponseSchema = registeredSchema(ipcContract.responseSchemas, "listPromptTemplates")
+    const deleteResponseSchema = registeredSchema(
+      ipcContract.responseSchemas,
+      "deletePromptTemplate",
+    )
+    const template = {
+      id: validHarnessTemplateId,
+      name: "Feature Template",
+      description: null,
+      sourcePromptAssetId: null,
+      sourcePromptVersionId: null,
+      scenario: "feature",
+      targetAgent: "codex",
+      templateBody: "{{objective}}",
+      createdAt: 1,
+      updatedAt: 2,
+    } as const
+
+    // When: list filters, update fields, and result envelopes are parsed.
+    const listInput = listInputSchema.parse({
+      query: "  feature  ",
+      scenario: "feature",
+      targetAgent: "codex",
+      limit: 25,
+    })
+
+    // Then: list totals, immutable source IDs, and explicit deletion are enforced.
+    expect(listInput).toEqual({
+      query: "feature",
+      scenario: "feature",
+      targetAgent: "codex",
+      limit: 25,
+    })
+    expect(listInputSchema.parse({})).toEqual({ limit: 100 })
+    expect(updateInputSchema.parse({ description: null })).toEqual({ description: null })
+    expect(listResponseSchema.parse({ templates: [template], total: 1 })).toEqual({
+      templates: [template],
+      total: 1,
+    })
+    expect(deleteResponseSchema.parse({ id: validHarnessTemplateId, deleted: true })).toEqual({
+      id: validHarnessTemplateId,
+      deleted: true,
+    })
+    expect(() => updateInputSchema.parse({ sourcePromptAssetId: validPromptAssetId })).toThrow()
+    expect(() => updateInputSchema.parse({})).toThrow()
+    expect(() => deleteResponseSchema.parse({ id: validHarnessTemplateId })).toThrow(/deleted/)
+  })
+
+  it("routes every Phase 15 method through exact parsed bridge channels", async () => {
+    // Given: a fake main-process invoke that returns valid contract responses.
+    const calls: { readonly channel: string; readonly payload: unknown }[] = []
+    const bridge = createElectronBridge(async (channel, payload) => {
+      calls.push({ channel, payload })
+
+      if (
+        channel === PERSISTENCE_CHANNELS.createPromptWithInitialVersion ||
+        channel === PERSISTENCE_CHANNELS.duplicateAsset ||
+        channel === PERSISTENCE_CHANNELS.createDerivedAsset
+      ) {
+        return promptAssetVersionResponse
+      }
+      if (channel === PERSISTENCE_CHANNELS.getLineage) {
+        return promptLineageResponse
+      }
+      if (channel === PERSISTENCE_CHANNELS.listPromptTemplates) {
+        return { templates: [promptTemplateResponse], total: 1 }
+      }
+      if (channel === PERSISTENCE_CHANNELS.deletePromptTemplate) {
+        return { id: promptTemplateResponse.id, deleted: true }
+      }
+      if (channel.startsWith("prompter:prompt-templates:")) {
+        return promptTemplateResponse
+      }
+
+      throw new Error(`Unexpected channel ${channel}`)
+    })
+
+    // When: every approved renderer method crosses the bridge.
+    await bridge.prompts.createWithInitialVersion(createPromptWithInitialVersionInput)
+    await bridge.prompts.duplicateAsset({ sourcePromptAssetId: validPromptAssetId })
+    await bridge.prompts.createDerivedAsset(createDerivedPromptAssetInput)
+    await bridge.prompts.getLineage(validPromptAssetId)
+    await bridge.promptTemplates.create(createPromptTemplateInput)
+    await bridge.promptTemplates.list({})
+    await bridge.promptTemplates.get(promptTemplateResponse.id)
+    await bridge.promptTemplates.update(promptTemplateResponse.id, { name: "Updated Template" })
+    await bridge.promptTemplates.duplicate(promptTemplateResponse.id)
+    await bridge.promptTemplates.delete(promptTemplateResponse.id)
+    await bridge.promptTemplates.createFromVersion(createPromptTemplateFromVersionInput)
+
+    // Then: channel names and normalized payloads exactly match the Phase 15 contract.
+    expect(calls).toEqual([
+      {
+        channel: "prompter:prompt-assets:create-with-initial-version",
+        payload: createPromptWithInitialVersionInput,
+      },
+      {
+        channel: "prompter:prompt-assets:duplicate",
+        payload: { sourcePromptAssetId: validPromptAssetId, copyTags: true },
+      },
+      {
+        channel: "prompter:prompt-assets:create-derived",
+        payload: createDerivedPromptAssetInput,
+      },
+      {
+        channel: "prompter:prompt-assets:get-lineage",
+        payload: { promptAssetId: validPromptAssetId },
+      },
+      { channel: "prompter:prompt-templates:create", payload: createPromptTemplateInput },
+      { channel: "prompter:prompt-templates:list", payload: { limit: 100 } },
+      {
+        channel: "prompter:prompt-templates:get",
+        payload: { id: promptTemplateResponse.id },
+      },
+      {
+        channel: "prompter:prompt-templates:update",
+        payload: { id: promptTemplateResponse.id, input: { name: "Updated Template" } },
+      },
+      {
+        channel: "prompter:prompt-templates:duplicate",
+        payload: { id: promptTemplateResponse.id },
+      },
+      {
+        channel: "prompter:prompt-templates:delete",
+        payload: { id: promptTemplateResponse.id },
+      },
+      {
+        channel: "prompter:prompt-templates:create-from-version",
+        payload: createPromptTemplateFromVersionInput,
+      },
+    ])
+    expect(calls[4]?.payload).not.toHaveProperty("sourcePromptAssetId")
+    expect(calls[4]?.payload).not.toHaveProperty("sourcePromptVersionId")
+    expect(calls[10]?.payload).not.toHaveProperty("scenario")
+    expect(calls[10]?.payload).not.toHaveProperty("targetAgent")
+  })
+
+  it("rejects forbidden Phase 15 bridge payloads before invoking main", async () => {
+    // Given: a bridge whose invoke records any trust-boundary escape.
+    let invokeCount = 0
+    const bridge = createElectronBridge(async () => {
+      invokeCount += 1
+      return promptTemplateResponse
+    })
+
+    // When: renderer payloads include invalid IDs or main-owned source fields.
+    const attempts = [
+      Reflect.apply(bridge.prompts.getLineage, undefined, ["not-a-uuid"]),
+      Reflect.apply(bridge.promptTemplates.create, undefined, [
+        { ...createPromptTemplateInput, sourcePromptAssetId: validPromptAssetId },
+      ]),
+      Reflect.apply(bridge.promptTemplates.createFromVersion, undefined, [
+        { ...createPromptTemplateFromVersionInput, scenario: "bugfix" },
+      ]),
+      Reflect.apply(bridge.promptTemplates.createFromVersion, undefined, [
+        { ...createPromptTemplateFromVersionInput, targetAgent: "cursor" },
+      ]),
+    ]
+
+    // Then: Zod rejects every payload before ipcRenderer.invoke can run.
+    for (const attempt of attempts) {
+      await expect(attempt).rejects.toThrow()
+    }
+    expect(invokeCount).toBe(0)
+  })
+
+  it("parses every Phase 15 handler payload and service response", () => {
+    // Given: contract-shaped services that capture normalized handler arguments.
+    const calls: { readonly method: string; readonly payload: unknown }[] = []
+    const handlers = createPersistenceIpcHandlers({
+      ...createFailingServices(() => undefined),
+      createPromptWithInitialVersion: (input: CreatePromptWithInitialVersionInput) => {
+        calls.push({ method: "createPromptWithInitialVersion", payload: input })
+        return promptAssetVersionResponse
+      },
+      duplicatePromptAsset: (input: DuplicatePromptAssetInput) => {
+        calls.push({ method: "duplicatePromptAsset", payload: input })
+        return promptAssetVersionResponse
+      },
+      createDerivedPromptAsset: (input: CreateDerivedPromptAssetInput) => {
+        calls.push({ method: "createDerivedPromptAsset", payload: input })
+        return promptAssetVersionResponse
+      },
+      getLineage: (promptAssetId: string) => {
+        calls.push({ method: "getLineage", payload: promptAssetId })
+        return promptLineageResponse
+      },
+      createPromptTemplate: (input: CreatePromptTemplateInput) => {
+        calls.push({ method: "createPromptTemplate", payload: input })
+        return promptTemplateResponse
+      },
+      listPromptTemplates: (input?: ListPromptTemplatesInput) => {
+        calls.push({ method: "listPromptTemplates", payload: input })
+        return { templates: [promptTemplateResponse], total: 1 }
+      },
+      getPromptTemplate: (id: string) => {
+        calls.push({ method: "getPromptTemplate", payload: id })
+        return promptTemplateResponse
+      },
+      updatePromptTemplate: (id: string, input: UpdatePromptTemplateInput) => {
+        calls.push({ method: "updatePromptTemplate", payload: { id, input } })
+        return promptTemplateResponse
+      },
+      duplicatePromptTemplate: (id: string) => {
+        calls.push({ method: "duplicatePromptTemplate", payload: id })
+        return promptTemplateResponse
+      },
+      deletePromptTemplate: (id: string) => {
+        calls.push({ method: "deletePromptTemplate", payload: id })
+        return { id, deleted: true as const }
+      },
+      createPromptTemplateFromVersion: (input: CreatePromptTemplateFromVersionInput) => {
+        calls.push({ method: "createPromptTemplateFromVersion", payload: input })
+        return promptTemplateResponse
+      },
+    })
+
+    // When: each main-process handler receives an untrusted IPC payload.
+    expect(handlers.createPromptWithInitialVersion(createPromptWithInitialVersionInput)).toEqual(
+      promptAssetVersionResponse,
+    )
+    expect(handlers.duplicateAsset({ sourcePromptAssetId: validPromptAssetId })).toEqual(
+      promptAssetVersionResponse,
+    )
+    expect(handlers.createDerivedAsset(createDerivedPromptAssetInput)).toEqual(
+      promptAssetVersionResponse,
+    )
+    expect(handlers.getLineage({ promptAssetId: validPromptAssetId })).toEqual(
+      promptLineageResponse,
+    )
+    expect(handlers.createPromptTemplate(createPromptTemplateInput)).toEqual(promptTemplateResponse)
+    expect(handlers.listPromptTemplates({})).toEqual({
+      templates: [promptTemplateResponse],
+      total: 1,
+    })
+    expect(handlers.getPromptTemplate({ id: promptTemplateResponse.id })).toEqual(
+      promptTemplateResponse,
+    )
+    expect(
+      handlers.updatePromptTemplate({
+        id: promptTemplateResponse.id,
+        input: { name: "Updated Template" },
+      }),
+    ).toEqual(promptTemplateResponse)
+    expect(handlers.duplicatePromptTemplate({ id: promptTemplateResponse.id })).toEqual(
+      promptTemplateResponse,
+    )
+    expect(handlers.deletePromptTemplate({ id: promptTemplateResponse.id })).toEqual({
+      id: promptTemplateResponse.id,
+      deleted: true,
+    })
+    expect(handlers.createPromptTemplateFromVersion(createPromptTemplateFromVersionInput)).toEqual(
+      promptTemplateResponse,
+    )
+
+    // Then: defaults are applied once and service arguments contain only approved fields.
+    expect(calls).toEqual([
+      { method: "createPromptWithInitialVersion", payload: createPromptWithInitialVersionInput },
+      {
+        method: "duplicatePromptAsset",
+        payload: { sourcePromptAssetId: validPromptAssetId, copyTags: true },
+      },
+      { method: "createDerivedPromptAsset", payload: createDerivedPromptAssetInput },
+      { method: "getLineage", payload: validPromptAssetId },
+      { method: "createPromptTemplate", payload: createPromptTemplateInput },
+      { method: "listPromptTemplates", payload: { limit: 100 } },
+      { method: "getPromptTemplate", payload: promptTemplateResponse.id },
+      {
+        method: "updatePromptTemplate",
+        payload: { id: promptTemplateResponse.id, input: { name: "Updated Template" } },
+      },
+      { method: "duplicatePromptTemplate", payload: promptTemplateResponse.id },
+      { method: "deletePromptTemplate", payload: promptTemplateResponse.id },
+      {
+        method: "createPromptTemplateFromVersion",
+        payload: createPromptTemplateFromVersionInput,
+      },
+    ])
+  })
+
+  it("rejects every malformed Phase 15 handler payload before service calls", () => {
+    // Given: Phase 15 services that count any call made after payload parsing.
+    let serviceCallCount = 0
+    const serviceCalled = () => {
+      serviceCallCount += 1
+      return promptTemplateResponse
+    }
+    const handlers = createPersistenceIpcHandlers({
+      ...createFailingServices(() => undefined),
+      createPromptWithInitialVersion: () => {
+        serviceCallCount += 1
+        return promptAssetVersionResponse
+      },
+      duplicatePromptAsset: () => {
+        serviceCallCount += 1
+        return promptAssetVersionResponse
+      },
+      createDerivedPromptAsset: () => {
+        serviceCallCount += 1
+        return promptAssetVersionResponse
+      },
+      getLineage: () => {
+        serviceCallCount += 1
+        return promptLineageResponse
+      },
+      createPromptTemplate: serviceCalled,
+      listPromptTemplates: () => {
+        serviceCallCount += 1
+        return { templates: [promptTemplateResponse], total: 1 }
+      },
+      getPromptTemplate: serviceCalled,
+      updatePromptTemplate: serviceCalled,
+      duplicatePromptTemplate: serviceCalled,
+      deletePromptTemplate: () => {
+        serviceCallCount += 1
+        return { id: promptTemplateResponse.id, deleted: true as const }
+      },
+      createPromptTemplateFromVersion: serviceCalled,
+    })
+
+    // When: each handler receives an invalid or forbidden renderer payload.
+    const attempts = [
+      () =>
+        handlers.createPromptWithInitialVersion({
+          ...createPromptWithInitialVersionInput,
+          parentPromptId: validPromptAssetId,
+        }),
+      () => handlers.duplicateAsset({ sourcePromptAssetId: "not-a-uuid" }),
+      () =>
+        handlers.createDerivedAsset({
+          ...createDerivedPromptAssetInput,
+          projectId: validProjectId,
+        }),
+      () => handlers.getLineage({ promptAssetId: "not-a-uuid" }),
+      () =>
+        handlers.createPromptTemplate({
+          ...createPromptTemplateInput,
+          sourcePromptAssetId: validPromptAssetId,
+        }),
+      () => handlers.listPromptTemplates({ limit: 0 }),
+      () => handlers.getPromptTemplate({ id: "not-a-uuid" }),
+      () =>
+        handlers.updatePromptTemplate({
+          id: promptTemplateResponse.id,
+          input: { sourcePromptVersionId: validPromptVersionId },
+        }),
+      () => handlers.duplicatePromptTemplate({ id: "not-a-uuid" }),
+      () => handlers.deletePromptTemplate({ id: "not-a-uuid" }),
+      () =>
+        handlers.createPromptTemplateFromVersion({
+          ...createPromptTemplateFromVersionInput,
+          targetAgent: "cursor",
+        }),
+    ]
+
+    // Then: all payloads fail before a persistence service can run.
+    for (const attempt of attempts) {
+      expect(attempt).toThrow()
+    }
+    expect(serviceCallCount).toBe(0)
+  })
+
+  it("rejects malformed responses from every Phase 15 service", () => {
+    // Given: services whose return types are structurally valid but violate runtime constraints.
+    const malformedAssetVersion = {
+      asset: { ...promptAssetResponse, createdAt: -1 },
+      version: promptVersionResponse,
+    }
+    const malformedTemplate = { ...promptTemplateResponse, createdAt: -1 }
+    const handlers = createPersistenceIpcHandlers({
+      ...createFailingServices(() => undefined),
+      createPromptWithInitialVersion: () => malformedAssetVersion,
+      duplicatePromptAsset: () => malformedAssetVersion,
+      createDerivedPromptAsset: () => malformedAssetVersion,
+      getLineage: () => ({
+        parent: null,
+        children: [{ ...promptLineageChild, versionNumber: 0 }],
+      }),
+      createPromptTemplate: () => malformedTemplate,
+      listPromptTemplates: () => ({ templates: [malformedTemplate], total: -1 }),
+      getPromptTemplate: () => malformedTemplate,
+      updatePromptTemplate: () => malformedTemplate,
+      duplicatePromptTemplate: () => malformedTemplate,
+      deletePromptTemplate: () => ({ id: "not-a-uuid", deleted: true as const }),
+      createPromptTemplateFromVersion: () => malformedTemplate,
+    })
+
+    // When: each handler parses its service response before returning to Electron.
+    const attempts = [
+      () => handlers.createPromptWithInitialVersion(createPromptWithInitialVersionInput),
+      () => handlers.duplicateAsset({ sourcePromptAssetId: validPromptAssetId }),
+      () => handlers.createDerivedAsset(createDerivedPromptAssetInput),
+      () => handlers.getLineage({ promptAssetId: validPromptAssetId }),
+      () => handlers.createPromptTemplate(createPromptTemplateInput),
+      () => handlers.listPromptTemplates({}),
+      () => handlers.getPromptTemplate({ id: promptTemplateResponse.id }),
+      () =>
+        handlers.updatePromptTemplate({
+          id: promptTemplateResponse.id,
+          input: { name: "Updated Template" },
+        }),
+      () => handlers.duplicatePromptTemplate({ id: promptTemplateResponse.id }),
+      () => handlers.deletePromptTemplate({ id: promptTemplateResponse.id }),
+      () => handlers.createPromptTemplateFromVersion(createPromptTemplateFromVersionInput),
+    ]
+
+    // Then: malformed persistence data never crosses the main-process boundary.
+    for (const attempt of attempts) {
+      expect(attempt).toThrow()
+    }
+  })
+
+  it("rejects malformed responses from every Phase 15 bridge invocation", async () => {
+    // Given: a fake invoke returning malformed data for each Phase 15 response family.
+    const bridge = createElectronBridge(async (channel) => {
+      if (
+        channel === PERSISTENCE_CHANNELS.createPromptWithInitialVersion ||
+        channel === PERSISTENCE_CHANNELS.duplicateAsset ||
+        channel === PERSISTENCE_CHANNELS.createDerivedAsset
+      ) {
+        return { ...promptAssetVersionResponse, extra: true }
+      }
+      if (channel === PERSISTENCE_CHANNELS.getLineage) {
+        return {
+          parent: null,
+          children: [{ ...promptLineageChild, versionNumber: 0 }],
+        }
+      }
+      if (channel === PERSISTENCE_CHANNELS.listPromptTemplates) {
+        return { templates: [promptTemplateResponse], total: -1 }
+      }
+      if (channel === PERSISTENCE_CHANNELS.deletePromptTemplate) {
+        return { id: "not-a-uuid", deleted: true }
+      }
+      return { ...promptTemplateResponse, variables: ["objective"] }
+    })
+
+    // When: all approved renderer methods receive malformed main-process responses.
+    const attempts = [
+      bridge.prompts.createWithInitialVersion(createPromptWithInitialVersionInput),
+      bridge.prompts.duplicateAsset({ sourcePromptAssetId: validPromptAssetId }),
+      bridge.prompts.createDerivedAsset(createDerivedPromptAssetInput),
+      bridge.prompts.getLineage(validPromptAssetId),
+      bridge.promptTemplates.create(createPromptTemplateInput),
+      bridge.promptTemplates.list({}),
+      bridge.promptTemplates.get(promptTemplateResponse.id),
+      bridge.promptTemplates.update(promptTemplateResponse.id, { name: "Updated Template" }),
+      bridge.promptTemplates.duplicate(promptTemplateResponse.id),
+      bridge.promptTemplates.delete(promptTemplateResponse.id),
+      bridge.promptTemplates.createFromVersion(createPromptTemplateFromVersionInput),
+    ]
+
+    // Then: bridge response parsing rejects every malformed value.
+    for (const attempt of attempts) {
+      await expect(attempt).rejects.toThrow()
+    }
+  })
+
   it("exposes a typed menu action subscription without raw ipcRenderer", () => {
-    const subscriptions: ((action: "focusSearch") => void)[] = []
+    const subscriptions: ((action: MenuAction) => void)[] = []
     const bridge = createElectronBridge(
       async () => PING_RESPONSE,
       (callback) => {
@@ -713,11 +1569,11 @@ describe("Electron shell contract", () => {
     const receivedActions: string[] = []
     const unsubscribe = bridge.menu.onAction((action) => receivedActions.push(action))
 
-    subscriptions[0]?.("focusSearch")
+    subscriptions[0]?.("exportFullBackup")
     unsubscribe()
-    subscriptions[0]?.("focusSearch")
+    subscriptions[0]?.("importBackup")
 
-    expect(receivedActions).toEqual(["focusSearch"])
+    expect(receivedActions).toEqual(["exportFullBackup"])
   })
 
   it("routes Phase 6 prompt version methods through typed bridge channels", async () => {

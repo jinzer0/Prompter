@@ -3,32 +3,85 @@ import { z } from "zod"
 import type {
   applyPromptQualityScoreToVersionInputSchema,
   applyPromptQualityScoreToVersionResultSchema,
+  backupConflictSchema,
+  backupConsequenceSchema,
+  backupEnvelopeSchema,
+  backupExportResultSchema,
+  backupHarnessTemplateSchema,
+  backupImportResultSchema,
+  backupImportStrategySchema,
+  backupItemCountsSchema,
+  backupMetadataSchema,
+  backupProjectContextProfileSchema,
+  backupProjectSchema,
+  backupPromptAssetSchema,
+  backupPromptQualityReviewSchema,
+  backupPromptTagSchema,
+  backupPromptTemplateSchema,
+  backupPromptVersionSchema,
+  backupTagSchema,
+  backupTypeSchema,
+  backupValidationPreviewSchema,
+  backupValidationResultSchema,
+  backupWarningSchema,
+  cancelImportSessionInputSchema,
+  cancelImportSessionResultSchema,
+  cancelMaintenanceActionSessionInputSchema,
   clipboardReadTextResultSchema,
   comparePromptVersionsInputSchema,
   comparePromptVersionsResultSchema,
   copyTextInputSchema,
   copyTextResultSchema,
+  createDerivedPromptAssetInputSchema,
+  createDerivedPromptAssetResultSchema,
   createHarnessTemplateInputSchema,
   createNextPromptVersionInputSchema,
   createNextPromptVersionResultSchema,
   createProjectContextProfileInputSchema,
   createProjectInputSchema,
   createPromptAssetInputSchema,
+  createPromptTemplateFromVersionInputSchema,
+  createPromptTemplateInputSchema,
   createPromptVersionInputSchema,
+  createPromptWithInitialVersionInputSchema,
+  createPromptWithInitialVersionResultSchema,
   createTagInputSchema,
+  deletePromptTemplateResultSchema,
   deleteResultSchema,
+  duplicatePromptAssetInputSchema,
+  duplicatePromptAssetResultSchema,
+  executeMaintenanceActionInputSchema,
   exportFormatSchema,
+  exportFullBackupInputSchema,
+  exportHarnessTemplatesPackInputSchema,
+  exportProjectBackupInputSchema,
+  exportPromptAssetsBackupInputSchema,
   exportPromptInputSchema,
   exportPromptResultSchema,
+  exportPromptTemplatesPackInputSchema,
   formatPromptForExportInputSchema,
   getLatestPromptQualityReviewInputSchema,
   getPromptQualityReviewInputSchema,
   harnessTemplateSchema,
+  importBackupInputSchema,
   listHarnessTemplatesInputSchema,
   listPromptQualityReviewsForVersionInputSchema,
+  listPromptTemplatesInputSchema,
+  maintenanceActionPreviewSchema,
+  maintenanceActionResultSchema,
+  maintenanceActionStatusSchema,
+  maintenanceActionTypeSchema,
+  maintenanceCategorySchema,
+  maintenanceFindingSchema,
+  maintenanceScanInputSchema,
+  maintenanceScanResultSchema,
+  maintenanceScanSummarySchema,
+  maintenanceSeveritySchema,
   openAIKeyStatusSchema,
   PingResponse,
   payloadSchemas,
+  preparedMaintenanceActionSchema,
+  prepareMaintenanceActionInputSchema,
   projectContextCompilerBuildResultSchema,
   projectContextProfileSchema,
   projectSchema,
@@ -41,6 +94,9 @@ import type {
   promptCompilerCompileOutputSchema,
   promptCompilerCompileResultSchema,
   promptCompilerErrorSchema,
+  promptDerivationTypeSchema,
+  promptLineageSchema,
+  promptLineageSummarySchema,
   promptQualityGradeSchema,
   promptQualityLLMReviewResultSchema,
   promptQualityReviewModeSchema,
@@ -49,6 +105,8 @@ import type {
   promptSearchFilterSchema,
   promptSearchResultItemSchema,
   promptSearchResultSchema,
+  promptTemplateListResultSchema,
+  promptTemplateSchema,
   promptVersionSchema,
   reviewPromptQualityDraftInputSchema,
   reviewPromptQualityVersionInputSchema,
@@ -66,6 +124,7 @@ import type {
   updateProjectContextProfileInputSchema,
   updateProjectInputSchema,
   updatePromptAssetInputSchema,
+  updatePromptTemplateInputSchema,
   updateTagInputSchema,
 } from "./ipc-contract.js"
 
@@ -80,14 +139,18 @@ export const MENU_ACTIONS = [
   "savePrompt",
   "copyCompiledPrompt",
   "exportPrompt",
+  "exportFullBackup",
+  "importBackup",
   "openSettings",
+  "openLibraryMaintenance",
   "closeActivePanel",
 ] as const
 
 export const menuActionSchema = z.enum(MENU_ACTIONS)
-export type MenuAction = (typeof MENU_ACTIONS)[number]
+export type MenuAction = z.infer<typeof menuActionSchema>
 
 type Input<TSchema extends z.ZodType> = z.input<TSchema>
+type BackupOperation<TInput, TResult> = (input: TInput) => Promise<TResult>
 
 export type Project = z.infer<typeof projectSchema>
 export type ProjectContextProfile = z.infer<typeof projectContextProfileSchema>
@@ -96,6 +159,13 @@ export type ProjectContextCompilerBuildResult = z.infer<
 >
 export type PromptAsset = z.infer<typeof promptAssetSchema>
 export type PromptVersion = z.infer<typeof promptVersionSchema>
+export type PromptDerivationType = z.infer<typeof promptDerivationTypeSchema>
+export type PromptAssetVersionResult = z.infer<typeof createPromptWithInitialVersionResultSchema>
+export type CreatePromptWithInitialVersionResult = PromptAssetVersionResult
+export type DuplicatePromptAssetResult = z.infer<typeof duplicatePromptAssetResultSchema>
+export type CreateDerivedPromptAssetResult = z.infer<typeof createDerivedPromptAssetResultSchema>
+export type PromptLineageSummary = z.infer<typeof promptLineageSummarySchema>
+export type PromptLineage = z.infer<typeof promptLineageSchema>
 export type CreateNextPromptVersionResult = z.infer<typeof createNextPromptVersionResultSchema>
 export type ComparePromptVersionsResult = z.infer<typeof comparePromptVersionsResultSchema>
 export type PromptAssetFilter = z.output<typeof promptAssetFilterSchema>
@@ -116,6 +186,9 @@ export type PromptSearchResult = {
 }
 export type HarnessTemplate = z.infer<typeof harnessTemplateSchema>
 export type ListHarnessTemplatesInput = z.output<typeof listHarnessTemplatesInputSchema>
+export type PromptTemplate = z.infer<typeof promptTemplateSchema>
+export type PromptTemplateListResult = z.infer<typeof promptTemplateListResultSchema>
+export type DeletePromptTemplateResult = z.infer<typeof deletePromptTemplateResultSchema>
 export type Setting = z.infer<typeof settingSchema>
 export type SettingsDefaults = z.infer<typeof settingsDefaultsSchema>
 export type OpenAIKeyStatus = z.infer<typeof openAIKeyStatusSchema>
@@ -156,6 +229,59 @@ export type ApplyPromptQualityScoreToVersionInput = z.output<
 export type ApplyPromptQualityScoreToVersionResult = z.infer<
   typeof applyPromptQualityScoreToVersionResultSchema
 >
+export type MaintenanceSeverity = z.infer<typeof maintenanceSeveritySchema>
+export type MaintenanceCategory = z.infer<typeof maintenanceCategorySchema>
+export type MaintenanceFinding = z.infer<typeof maintenanceFindingSchema>
+export type MaintenanceActionType = z.infer<typeof maintenanceActionTypeSchema>
+export type MaintenanceActionStatus = z.infer<typeof maintenanceActionStatusSchema>
+export type MaintenanceActionPreview = z.infer<typeof maintenanceActionPreviewSchema>
+export type MaintenanceScanSummary = z.infer<typeof maintenanceScanSummarySchema>
+export type MaintenanceScanInput = z.input<typeof maintenanceScanInputSchema>
+export type MaintenanceScanResult = z.output<typeof maintenanceScanResultSchema>
+export type PrepareMaintenanceActionInput = z.input<typeof prepareMaintenanceActionInputSchema>
+export type PreparedMaintenanceAction = z.output<typeof preparedMaintenanceActionSchema>
+export type ExecuteMaintenanceActionInput = z.input<typeof executeMaintenanceActionInputSchema>
+export type CancelMaintenanceActionSessionInput = z.input<
+  typeof cancelMaintenanceActionSessionInputSchema
+>
+export type MaintenanceActionResult = z.output<typeof maintenanceActionResultSchema>
+export type MaintenanceBridge = {
+  readonly scanLibrary: (input: MaintenanceScanInput) => Promise<MaintenanceScanResult>
+  readonly prepareAction: (
+    input: PrepareMaintenanceActionInput,
+  ) => Promise<PreparedMaintenanceAction>
+  readonly executeAction: (input: ExecuteMaintenanceActionInput) => Promise<MaintenanceActionResult>
+  readonly cancelActionSession: (input: CancelMaintenanceActionSessionInput) => Promise<void>
+}
+export type BackupType = z.infer<typeof backupTypeSchema>
+export type BackupEnvelope = z.infer<typeof backupEnvelopeSchema>
+export type BackupMetadata = z.infer<typeof backupMetadataSchema>
+export type BackupItemCounts = z.infer<typeof backupItemCountsSchema>
+export type BackupProject = z.infer<typeof backupProjectSchema>
+export type BackupPromptAsset = z.infer<typeof backupPromptAssetSchema>
+export type BackupPromptVersion = z.infer<typeof backupPromptVersionSchema>
+export type BackupTag = z.infer<typeof backupTagSchema>
+export type BackupPromptTag = z.infer<typeof backupPromptTagSchema>
+export type BackupHarnessTemplate = z.infer<typeof backupHarnessTemplateSchema>
+export type BackupProjectContextProfile = z.infer<typeof backupProjectContextProfileSchema>
+export type BackupPromptTemplate = z.infer<typeof backupPromptTemplateSchema>
+export type BackupPromptQualityReview = z.infer<typeof backupPromptQualityReviewSchema>
+export type BackupWarning = z.infer<typeof backupWarningSchema>
+export type BackupConflict = z.infer<typeof backupConflictSchema>
+export type BackupConsequence = z.infer<typeof backupConsequenceSchema>
+export type BackupValidationPreview = z.infer<typeof backupValidationPreviewSchema>
+export type BackupExportResult = z.infer<typeof backupExportResultSchema>
+export type BackupValidationResult = z.infer<typeof backupValidationResultSchema>
+export type BackupImportStrategy = z.infer<typeof backupImportStrategySchema>
+export type BackupImportResult = z.infer<typeof backupImportResultSchema>
+export type CancelImportSessionResult = z.infer<typeof cancelImportSessionResultSchema>
+export type ExportFullBackupInput = z.output<typeof exportFullBackupInputSchema>
+export type ExportProjectBackupInput = z.output<typeof exportProjectBackupInputSchema>
+export type ExportPromptAssetsBackupInput = z.output<typeof exportPromptAssetsBackupInputSchema>
+export type ExportPromptTemplatesPackInput = z.output<typeof exportPromptTemplatesPackInputSchema>
+export type ExportHarnessTemplatesPackInput = z.output<typeof exportHarnessTemplatesPackInputSchema>
+export type ImportBackupInput = z.output<typeof importBackupInputSchema>
+export type CancelImportSessionInput = z.output<typeof cancelImportSessionInputSchema>
 export type DeleteResult = z.infer<typeof deleteResultSchema>
 export type CreateProjectInput = z.output<typeof createProjectInputSchema>
 export type UpdateProjectInput = z.output<typeof updateProjectInputSchema>
@@ -167,6 +293,11 @@ export type UpdateProjectContextProfileInput = z.output<
 >
 export type CreatePromptAssetInput = z.output<typeof createPromptAssetInputSchema>
 export type UpdatePromptAssetInput = z.output<typeof updatePromptAssetInputSchema>
+export type CreatePromptWithInitialVersionInput = z.output<
+  typeof createPromptWithInitialVersionInputSchema
+>
+export type DuplicatePromptAssetInput = z.output<typeof duplicatePromptAssetInputSchema>
+export type CreateDerivedPromptAssetInput = z.output<typeof createDerivedPromptAssetInputSchema>
 export type CreatePromptVersionInput = z.output<typeof createPromptVersionInputSchema>
 export type CreateNextPromptVersionInput = z.output<typeof createNextPromptVersionInputSchema>
 export type ComparePromptVersionsInput = z.output<typeof comparePromptVersionsInputSchema>
@@ -174,6 +305,12 @@ export type CreateTagInput = z.output<typeof createTagInputSchema>
 export type UpdateTagInput = z.output<typeof updateTagInputSchema>
 export type CreateHarnessTemplateInput = z.output<typeof createHarnessTemplateInputSchema>
 export type UpdateHarnessTemplateInput = z.output<typeof updateHarnessTemplateInputSchema>
+export type CreatePromptTemplateInput = z.output<typeof createPromptTemplateInputSchema>
+export type ListPromptTemplatesInput = z.output<typeof listPromptTemplatesInputSchema>
+export type UpdatePromptTemplateInput = z.output<typeof updatePromptTemplateInputSchema>
+export type CreatePromptTemplateFromVersionInput = z.output<
+  typeof createPromptTemplateFromVersionInputSchema
+>
 export type SaveOpenAIKeyInput = z.output<typeof saveOpenAIKeyInputSchema>
 export type UpdateDefaultsInput = z.output<typeof updateDefaultsInputSchema>
 
@@ -227,6 +364,31 @@ export type ElectronBridge = {
       baseVersionId: string,
       compareVersionId: string,
     ) => Promise<ComparePromptVersionsResult>
+    readonly createWithInitialVersion: (
+      input: Input<typeof payloadSchemas.createPromptWithInitialVersion>,
+    ) => Promise<CreatePromptWithInitialVersionResult>
+    readonly duplicateAsset: (
+      input: Input<typeof payloadSchemas.duplicateAsset>,
+    ) => Promise<DuplicatePromptAssetResult>
+    readonly createDerivedAsset: (
+      input: Input<typeof payloadSchemas.createDerivedAsset>,
+    ) => Promise<CreateDerivedPromptAssetResult>
+    readonly getLineage: (promptAssetId: string) => Promise<PromptLineage>
+  }
+  readonly promptTemplates: {
+    readonly create: (
+      input: Input<typeof payloadSchemas.createPromptTemplate>,
+    ) => Promise<PromptTemplate>
+    readonly list: (
+      filter?: Input<typeof payloadSchemas.listPromptTemplates>,
+    ) => Promise<PromptTemplateListResult>
+    readonly get: (id: string) => Promise<PromptTemplate>
+    readonly update: (id: string, input: UpdatePromptTemplateInput) => Promise<PromptTemplate>
+    readonly duplicate: (id: string) => Promise<PromptTemplate>
+    readonly delete: (id: string) => Promise<DeletePromptTemplateResult>
+    readonly createFromVersion: (
+      input: Input<typeof payloadSchemas.createPromptTemplateFromVersion>,
+    ) => Promise<PromptTemplate>
   }
   readonly search: {
     readonly searchPrompts: (
@@ -234,6 +396,7 @@ export type ElectronBridge = {
     ) => Promise<SearchPromptsResponse>
     readonly rebuildIndex: () => Promise<{ readonly rebuilt: true }>
   }
+  readonly maintenance: MaintenanceBridge
   readonly tags: {
     readonly create: (input: CreateTagInput) => Promise<Tag>
     readonly list: () => Promise<readonly Tag[]>
@@ -304,5 +467,27 @@ export type ElectronBridge = {
   readonly clipboard: {
     readonly copyText: (input: CopyTextInput) => Promise<CopyTextResult>
     readonly readText: () => Promise<ClipboardReadTextResult>
+  }
+  readonly backup: {
+    readonly exportFullBackup: BackupOperation<ExportFullBackupInput, BackupExportResult>
+    readonly exportProjectBackup: BackupOperation<ExportProjectBackupInput, BackupExportResult>
+    readonly exportPromptAssetsBackup: BackupOperation<
+      ExportPromptAssetsBackupInput,
+      BackupExportResult
+    >
+    readonly exportPromptTemplatesPack: BackupOperation<
+      ExportPromptTemplatesPackInput,
+      BackupExportResult
+    >
+    readonly exportHarnessTemplatesPack: BackupOperation<
+      ExportHarnessTemplatesPackInput,
+      BackupExportResult
+    >
+    readonly validateBackupFile: () => Promise<BackupValidationResult>
+    readonly importBackup: BackupOperation<ImportBackupInput, BackupImportResult>
+    readonly cancelImportSession: BackupOperation<
+      CancelImportSessionInput,
+      CancelImportSessionResult
+    >
   }
 }

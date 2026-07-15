@@ -8,7 +8,8 @@ import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
 import type { ExportPromptInput, ExportPromptResult } from "../electron/ipc-types"
 import { createPromptExportNativeService } from "../electron/prompt-export-native"
-import { createFailingServices, listFiles, validPromptAssetId } from "./electron-contract-helpers"
+import { listFiles, validPromptAssetId } from "./electron-contract-helpers"
+import { createFailingServices } from "./electron-contract-service-fixture"
 
 const validPromptVersionId = "22222222-2222-4222-8222-222222222222"
 const validExportInput: ExportPromptInput = {

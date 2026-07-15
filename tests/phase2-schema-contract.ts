@@ -6,6 +6,7 @@ export const expectedTables = [
   "prompt_assets",
   "prompt_versions",
   "prompt_quality_reviews",
+  "prompt_templates",
   "tags",
   "prompt_tags",
   "harness_templates",
@@ -13,6 +14,7 @@ export const expectedTables = [
 ] as const
 
 export const forbiddenTables = [
+  "prompt_asset_lineage",
   "prompt_runs",
   "agent_runs",
   "execution_results",
@@ -25,6 +27,13 @@ export const forbiddenTables = [
 ] as const
 
 export const forbiddenHarnessTemplateColumns = ["description", "is_builtin", "is_archived"] as const
+
+export const forbiddenPromptTemplateColumns = [
+  "variables",
+  "tags",
+  "templated_from",
+  "improved_from_review",
+] as const
 
 export const expectedColumns = {
   projects: [
@@ -66,6 +75,8 @@ export const expectedColumns = {
     "target_agent",
     "current_version_id",
     "parent_prompt_id",
+    "parent_prompt_version_id",
+    "derivation_type",
     "created_at",
     "updated_at",
   ],
@@ -101,6 +112,18 @@ export const expectedColumns = {
     "snapshot",
     "improved_prompt_draft",
     "created_at",
+  ],
+  prompt_templates: [
+    "id",
+    "name",
+    "description",
+    "source_prompt_asset_id",
+    "source_prompt_version_id",
+    "scenario",
+    "target_agent",
+    "template_body",
+    "created_at",
+    "updated_at",
   ],
   tags: ["id", "name", "created_at"],
   prompt_tags: ["prompt_asset_id", "tag_id"],

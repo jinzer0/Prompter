@@ -190,6 +190,72 @@ export function createElectronBridge(
           response.comparePromptVersions,
           { baseVersionId, compareVersionId },
         ),
+      createWithInitialVersion: (input) =>
+        request(
+          ch.createPromptWithInitialVersion,
+          payload.createPromptWithInitialVersion,
+          response.createPromptWithInitialVersion,
+          input,
+        ),
+      duplicateAsset: (input) =>
+        request(ch.duplicateAsset, payload.duplicateAsset, response.duplicateAsset, input),
+      createDerivedAsset: (input) =>
+        request(
+          ch.createDerivedAsset,
+          payload.createDerivedAsset,
+          response.createDerivedAsset,
+          input,
+        ),
+      getLineage: (promptAssetId) =>
+        request(ch.getLineage, payload.getLineage, response.getLineage, { promptAssetId }),
+    },
+    promptTemplates: {
+      create: (input) =>
+        request(
+          ch.createPromptTemplate,
+          payload.createPromptTemplate,
+          response.createPromptTemplate,
+          input,
+        ),
+      list: (filter) =>
+        request(
+          ch.listPromptTemplates,
+          payload.listPromptTemplates,
+          response.listPromptTemplates,
+          filter,
+        ),
+      get: (id) =>
+        request(ch.getPromptTemplate, payload.getPromptTemplate, response.getPromptTemplate, {
+          id,
+        }),
+      update: (id, input) =>
+        request(
+          ch.updatePromptTemplate,
+          payload.updatePromptTemplate,
+          response.updatePromptTemplate,
+          { id, input },
+        ),
+      duplicate: (id) =>
+        request(
+          ch.duplicatePromptTemplate,
+          payload.duplicatePromptTemplate,
+          response.duplicatePromptTemplate,
+          { id },
+        ),
+      delete: (id) =>
+        request(
+          ch.deletePromptTemplate,
+          payload.deletePromptTemplate,
+          response.deletePromptTemplate,
+          { id },
+        ),
+      createFromVersion: (input) =>
+        request(
+          ch.createPromptTemplateFromVersion,
+          payload.createPromptTemplateFromVersion,
+          response.createPromptTemplateFromVersion,
+          input,
+        ),
     },
     search: {
       searchPrompts: (input) =>
@@ -200,6 +266,36 @@ export function createElectronBridge(
           payload.rebuildSearchIndex,
           response.rebuildSearchIndex,
           undefined,
+        ),
+    },
+    maintenance: {
+      scanLibrary: (input) =>
+        request(
+          ch.scanMaintenanceLibrary,
+          payload.scanMaintenanceLibrary,
+          response.scanMaintenanceLibrary,
+          input,
+        ),
+      prepareAction: (input) =>
+        request(
+          ch.prepareMaintenanceAction,
+          payload.prepareMaintenanceAction,
+          response.prepareMaintenanceAction,
+          input,
+        ),
+      executeAction: (input) =>
+        request(
+          ch.executeMaintenanceAction,
+          payload.executeMaintenanceAction,
+          response.executeMaintenanceAction,
+          input,
+        ),
+      cancelActionSession: (input) =>
+        request(
+          ch.cancelMaintenanceActionSession,
+          payload.cancelMaintenanceActionSession,
+          response.cancelMaintenanceActionSession,
+          input,
         ),
     },
     tags: {
@@ -404,6 +500,54 @@ export function createElectronBridge(
     clipboard: {
       copyText: (input) => request(ch.copyText, payload.copyText, response.copyText, input),
       readText: () => request(ch.readText, payload.readText, response.readText, undefined),
+    },
+    backup: {
+      exportFullBackup: (input) =>
+        request(ch.exportFullBackup, payload.exportFullBackup, response.exportFullBackup, input),
+      exportProjectBackup: (input) =>
+        request(
+          ch.exportProjectBackup,
+          payload.exportProjectBackup,
+          response.exportProjectBackup,
+          input,
+        ),
+      exportPromptAssetsBackup: (input) =>
+        request(
+          ch.exportPromptAssetsBackup,
+          payload.exportPromptAssetsBackup,
+          response.exportPromptAssetsBackup,
+          input,
+        ),
+      exportPromptTemplatesPack: (input) =>
+        request(
+          ch.exportPromptTemplatesPack,
+          payload.exportPromptTemplatesPack,
+          response.exportPromptTemplatesPack,
+          input,
+        ),
+      exportHarnessTemplatesPack: (input) =>
+        request(
+          ch.exportHarnessTemplatesPack,
+          payload.exportHarnessTemplatesPack,
+          response.exportHarnessTemplatesPack,
+          input,
+        ),
+      validateBackupFile: () =>
+        request(
+          ch.validateBackupFile,
+          payload.validateBackupFile,
+          response.validateBackupFile,
+          undefined,
+        ),
+      importBackup: (input) =>
+        request(ch.importBackup, payload.importBackup, response.importBackup, input),
+      cancelImportSession: (input) =>
+        request(
+          ch.cancelImportSession,
+          payload.cancelImportSession,
+          response.cancelImportSession,
+          input,
+        ),
     },
   }
 }

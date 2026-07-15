@@ -1,4 +1,5 @@
 import "./prompt-quality-migration.test.ts"
+import "./phase15-schema-migration.test.ts"
 
 import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"

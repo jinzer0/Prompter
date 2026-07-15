@@ -29,6 +29,13 @@
       "when": 1783787813360,
       "tag": "0003_lame_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1783930696397,
+      "tag": "0004_tough_warlock",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,7 @@
 import "./prompt-quality-persistence.test.ts"
+import "./phase15-atomic-persistence.test.ts"
+import "./phase15-prompt-derivation-persistence.test.ts"
+import "./phase15-prompt-template-persistence.test.ts"
 
 import { randomUUID } from "node:crypto"
 import { mkdtemp, rm } from "node:fs/promises"
@@ -425,18 +428,11 @@ describe("Electron persistence", () => {
 
     try {
       const project = database.services.createProject({ name: "Prompts" })
-      const parent = database.services.createPromptAsset({
-        projectId: project.id,
-        title: "Parent Prompt",
-        scenario: "feature",
-        targetAgent: "codex",
-      })
       const asset = database.services.createPromptAsset({
         projectId: project.id,
         title: "Summarizer",
         scenario: "research",
         targetAgent: "generic_agent",
-        parentPromptId: parent.id,
       })
       const version = database.services.createPromptVersion({
         promptAssetId: asset.id,
@@ -452,8 +448,7 @@ describe("Electron persistence", () => {
 
       const filteredAssets = database.services.listPromptAssets({ projectId: project.id })
 
-      expect(filteredAssets).toHaveLength(2)
-      expect(filteredAssets).toEqual(expect.arrayContaining([asset, parent]))
+      expect(filteredAssets).toEqual([asset])
       expect(database.services.getPromptAsset(asset.id)).toEqual(asset)
       expect(database.services.listPromptVersions(asset.id)).toEqual([version])
       expect(database.services.getPromptVersion(version.id)).toEqual(version)

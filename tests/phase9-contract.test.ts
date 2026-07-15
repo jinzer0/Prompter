@@ -66,7 +66,19 @@ const promptCompilerCompileFixture: PromptCompilerCompileResult = {
 }
 
 function createPhase9Services(onServiceCall: () => void) {
+  const phase15Failure = (): never => {
+    onServiceCall()
+    throw new Error("unused service")
+  }
   const promptQualityFailure = (): never => {
+    onServiceCall()
+    throw new Error("unused service")
+  }
+  const backupFailure = async (): Promise<never> => {
+    onServiceCall()
+    throw new Error("unused service")
+  }
+  const maintenanceFailure = (): never => {
     onServiceCall()
     throw new Error("unused service")
   }
@@ -84,6 +96,10 @@ function createPhase9Services(onServiceCall: () => void) {
     createPromptAsset: () => {
       throw new Error("unused service")
     },
+    createPromptWithInitialVersion: phase15Failure,
+    duplicatePromptAsset: phase15Failure,
+    createDerivedPromptAsset: phase15Failure,
+    getLineage: phase15Failure,
     listPromptAssets: () => [],
     getPromptAsset: () => null,
     updatePromptAsset: () => {
@@ -122,6 +138,10 @@ function createPhase9Services(onServiceCall: () => void) {
     },
     rebuildSearchIndex: () => undefined,
     searchPrompts: () => [],
+    scanLibrary: maintenanceFailure,
+    prepareAction: maintenanceFailure,
+    executeAction: async () => maintenanceFailure(),
+    cancelActionSession: maintenanceFailure,
     createHarnessTemplate: () => {
       throw new Error("unused service")
     },
@@ -131,6 +151,13 @@ function createPhase9Services(onServiceCall: () => void) {
       throw new Error("unused service")
     },
     deleteHarnessTemplate: (id: string) => ({ id }),
+    createPromptTemplate: phase15Failure,
+    listPromptTemplates: phase15Failure,
+    getPromptTemplate: phase15Failure,
+    updatePromptTemplate: phase15Failure,
+    duplicatePromptTemplate: phase15Failure,
+    deletePromptTemplate: phase15Failure,
+    createPromptTemplateFromVersion: phase15Failure,
     createProjectContextProfile: () => {
       throw new Error("unused service")
     },
@@ -212,6 +239,14 @@ function createPhase9Services(onServiceCall: () => void) {
     async readText() {
       return { text: "", isEmpty: true, length: 0 }
     },
+    exportFullBackup: backupFailure,
+    exportProjectBackup: backupFailure,
+    exportPromptAssetsBackup: backupFailure,
+    exportPromptTemplatesPack: backupFailure,
+    exportHarnessTemplatesPack: backupFailure,
+    validateBackupFile: backupFailure,
+    importBackup: backupFailure,
+    cancelImportSession: backupFailure,
   }
 }
 
@@ -243,6 +278,23 @@ describe("Phase 9 settings and secrets contract", () => {
       "deleteOpenAIKey",
     ])
     expect(Object.keys(bridge.secrets)).not.toContain("getOpenAIKey")
+    expect(Object.keys(bridge.promptTemplates)).toEqual([
+      "create",
+      "list",
+      "get",
+      "update",
+      "duplicate",
+      "delete",
+      "createFromVersion",
+    ])
+    expect(Object.keys(bridge.promptTemplates)).not.toContain("preview")
+    expect(Object.keys(bridge.promptTemplates)).not.toContain("extractVariables")
+    expect(Object.keys(bridge.prompts)).not.toContain("listChildren")
+    expect(bridge).not.toHaveProperty("ipcRenderer")
+    expect(bridge).not.toHaveProperty("database")
+    expect(bridge).not.toHaveProperty("fs")
+    expect(bridge).not.toHaveProperty("process")
+    expect(bridge).not.toHaveProperty("getOpenAIKeyForMainProcessOnly")
     await expect(bridge.settings.getDefaults()).resolves.toEqual(phase9Defaults)
     await expect(bridge.secrets.getOpenAIKeyStatus()).resolves.toEqual(phase9SecretStatus)
   })

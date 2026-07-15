@@ -21,6 +21,11 @@ export type TagRepository = {
   readonly listTagsForPrompt: (promptAssetId: string) => readonly Tag[]
   readonly listTagsWithCounts: () => readonly TagCount[]
   readonly createAndAttachTagToPrompt: (promptAssetId: string, input: CreateTagInput) => TagLink
+  readonly attachTagsToPrompt: (input: {
+    readonly promptAssetId: string
+    readonly tagIds: readonly string[]
+    readonly tagNames: readonly string[]
+  }) => void
 }
 
 function findTagByName(db: AppDatabase, name: string): Tag | undefined {
@@ -116,6 +121,34 @@ export function createTagRepository(db: AppDatabase): TagRepository {
 
       db.insert(schema.promptTags).values(link).onConflictDoNothing().run()
       return link
+    },
+    attachTagsToPrompt(input) {
+      for (const tagId of input.tagIds) {
+        db.insert(schema.promptTags)
+          .values({ promptAssetId: input.promptAssetId, tagId })
+          .onConflictDoNothing()
+          .run()
+      }
+
+      for (const tagName of input.tagNames) {
+        const existing = findTagByName(db, tagName)
+        const tag =
+          existing ??
+          requireRow(
+            db
+              .insert(schema.tags)
+              .values({ id: createId(), name: tagName, createdAt: createTimestamp() })
+              .returning()
+              .get(),
+            "tag",
+            tagName,
+          )
+
+        db.insert(schema.promptTags)
+          .values({ promptAssetId: input.promptAssetId, tagId: tag.id })
+          .onConflictDoNothing()
+          .run()
+      }
     },
   }
 }

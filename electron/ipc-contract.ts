@@ -13,6 +13,7 @@ export const SCENARIOS = [
   "research",
 ] as const
 export const TARGET_AGENTS = ["codex", "claude_code", "cursor", "generic_agent"] as const
+export const PROMPT_DERIVATION_TYPES = ["duplicate", "derived"] as const
 export const APP_THEMES = ["system", "light", "dark"] as const
 export const RISK_LEVELS = ["low", "medium", "high"] as const
 export const SEARCH_SORTS = ["relevance", "updated_at", "title"] as const
@@ -52,6 +53,44 @@ export const EXPORT_FORMATS = [
   "agents_md",
   "skill_md",
 ] as const
+export const BACKUP_TYPES = [
+  "full",
+  "project",
+  "prompt_assets",
+  "prompt_templates",
+  "harness_templates",
+] as const
+export const MAINTENANCE_SEVERITIES = ["low", "medium", "high"] as const
+export const MAINTENANCE_CATEGORIES = [
+  "duplicate_prompts",
+  "duplicate_tags",
+  "unused_tags",
+  "empty_prompt_assets",
+  "current_version_issues",
+  "search_index_health",
+  "prompt_template_issues",
+  "harness_template_issues",
+  "quality_review_findings",
+] as const
+export const MAINTENANCE_ACTION_TYPES = [
+  "rebuild_search_index",
+  "repair_current_versions",
+  "merge_duplicate_tags",
+  "delete_unused_tags",
+  "delete_empty_prompt_assets",
+] as const
+export const MAINTENANCE_ACTION_STATUSES = [
+  "succeeded",
+  "stale",
+  "failed",
+  "confirmation_cancelled",
+] as const
+export const BACKUP_FILE_MAX_BYTES = 50 * 1024 * 1024
+export const BACKUP_NAME_MAX_LENGTH = 200
+export const BACKUP_LABEL_MAX_LENGTH = 1_000
+export const BACKUP_BODY_MAX_LENGTH = 5 * 1024 * 1024
+export const BACKUP_ROW_MAX_ITEMS = 10_000
+export const BACKUP_PREVIEW_MAX_ITEMS = 1_000
 export const PROJECT_CONTEXT_PROFILE_DB_FIELD_NAMES = [
   "id",
   "project_id",
@@ -104,6 +143,10 @@ export const PERSISTENCE_CHANNELS = {
   updateProject: "prompter:projects:update",
   deleteProject: "prompter:projects:delete",
   createPromptAsset: "prompter:prompt-assets:create",
+  createPromptWithInitialVersion: "prompter:prompt-assets:create-with-initial-version",
+  duplicateAsset: "prompter:prompt-assets:duplicate",
+  createDerivedAsset: "prompter:prompt-assets:create-derived",
+  getLineage: "prompter:prompt-assets:get-lineage",
   listPromptAssets: "prompter:prompt-assets:list",
   getPromptAsset: "prompter:prompt-assets:get",
   updatePromptAsset: "prompter:prompt-assets:update",
@@ -126,12 +169,23 @@ export const PERSISTENCE_CHANNELS = {
   createAndAttachTagToPrompt: "prompter:tags:create-and-attach",
   searchPrompts: "prompter:search:prompts",
   rebuildSearchIndex: "prompter:search:rebuild-index",
+  scanMaintenanceLibrary: "prompter:maintenance:scan-library",
+  prepareMaintenanceAction: "prompter:maintenance:prepare-action",
+  executeMaintenanceAction: "prompter:maintenance:execute-action",
+  cancelMaintenanceActionSession: "prompter:maintenance:cancel-action-session",
   createHarnessTemplate: "prompter:harness-templates:create",
   listHarnessTemplates: "prompter:harness-templates:list",
   getHarnessTemplate: "prompter:harness-templates:get",
   updateHarnessTemplate: "prompter:harness-templates:update",
   deleteHarnessTemplate: "prompter:harness-templates:delete",
   duplicateHarnessTemplate: "prompter:harness-templates:duplicate",
+  createPromptTemplate: "prompter:prompt-templates:create",
+  listPromptTemplates: "prompter:prompt-templates:list",
+  getPromptTemplate: "prompter:prompt-templates:get",
+  updatePromptTemplate: "prompter:prompt-templates:update",
+  duplicatePromptTemplate: "prompter:prompt-templates:duplicate",
+  deletePromptTemplate: "prompter:prompt-templates:delete",
+  createPromptTemplateFromVersion: "prompter:prompt-templates:create-from-version",
   createProjectContextProfile: "prompter:project-context-profiles:create",
   listProjectContextProfiles: "prompter:project-context-profiles:list",
   getProjectContextProfile: "prompter:project-context-profiles:get",
@@ -164,6 +218,14 @@ export const PERSISTENCE_CHANNELS = {
   getLatestPromptQualityReview: "prompter:prompt-quality:get-latest",
   getPromptQualityReview: "prompter:prompt-quality:get",
   applyPromptQualityScoreToVersion: "prompter:prompt-quality:apply-score-to-version",
+  exportFullBackup: "prompter:backup:export-full",
+  exportProjectBackup: "prompter:backup:export-project",
+  exportPromptAssetsBackup: "prompter:backup:export-prompt-assets",
+  exportPromptTemplatesPack: "prompter:backup:export-prompt-templates",
+  exportHarnessTemplatesPack: "prompter:backup:export-harness-templates",
+  validateBackupFile: "prompter:backup:validate-file",
+  importBackup: "prompter:backup:import",
+  cancelImportSession: "prompter:backup:cancel-import-session",
 } as const
 
 export type PingResponse = typeof PING_RESPONSE
@@ -185,6 +247,7 @@ const requiredPreservedTextSchema = z
 const noPayloadSchema = z.undefined()
 const scenarioSchema = z.enum(SCENARIOS)
 const targetAgentSchema = z.enum(TARGET_AGENTS)
+export const promptDerivationTypeSchema = z.enum(PROMPT_DERIVATION_TYPES)
 const appThemeSchema = z.enum(APP_THEMES)
 const riskLevelSchema = z.enum(RISK_LEVELS)
 const searchSortSchema = z.enum(SEARCH_SORTS)
@@ -197,6 +260,11 @@ export const promptQualityReviewSourceSchema = z.enum(PROMPT_QUALITY_REVIEW_SOUR
 export const promptQualityLLMReviewCodeSchema = z.enum(PROMPT_QUALITY_LLM_REVIEW_CODES)
 const promptCompilerErrorCodeSchema = z.enum(PROMPT_COMPILER_ERROR_CODES)
 export const exportFormatSchema = z.enum(EXPORT_FORMATS)
+export const backupTypeSchema = z.enum(BACKUP_TYPES)
+export const maintenanceSeveritySchema = z.enum(MAINTENANCE_SEVERITIES)
+export const maintenanceCategorySchema = z.enum(MAINTENANCE_CATEGORIES)
+export const maintenanceActionTypeSchema = z.enum(MAINTENANCE_ACTION_TYPES)
+export const maintenanceActionStatusSchema = z.enum(MAINTENANCE_ACTION_STATUSES)
 
 export const exportFormatLabels = {
   markdown: "Markdown Prompt",
@@ -337,17 +405,21 @@ export const projectContextProfileSchema = z
   })
   .extend(projectContextProfileTextFieldsSchema.shape)
 
-export const promptAssetSchema = z.object({
-  id: idSchema,
-  projectId: idSchema.nullable(),
-  title: nameSchema,
-  scenario: scenarioSchema,
-  targetAgent: targetAgentSchema,
-  currentVersionId: idSchema.nullable(),
-  parentPromptId: idSchema.nullable(),
-  createdAt: timestampSchema,
-  updatedAt: timestampSchema,
-})
+export const promptAssetSchema = z
+  .object({
+    id: idSchema,
+    projectId: idSchema.nullable(),
+    title: nameSchema,
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    currentVersionId: idSchema.nullable(),
+    parentPromptId: idSchema.nullable(),
+    parentPromptVersionId: idSchema.nullable(),
+    derivationType: promptDerivationTypeSchema.nullable(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
 
 export const promptVersionSchema = z.object({
   id: idSchema,
@@ -367,6 +439,30 @@ export const createNextPromptVersionResultSchema = z.object({
   asset: promptAssetSchema,
   version: promptVersionSchema,
 })
+export const promptAssetVersionResultSchema = z
+  .object({
+    asset: promptAssetSchema,
+    version: promptVersionSchema,
+  })
+  .strict()
+export const createPromptWithInitialVersionResultSchema = promptAssetVersionResultSchema
+export const duplicatePromptAssetResultSchema = promptAssetVersionResultSchema
+export const createDerivedPromptAssetResultSchema = promptAssetVersionResultSchema
+export const promptLineageSummarySchema = z
+  .object({
+    promptAssetId: idSchema,
+    promptVersionId: idSchema,
+    title: nameSchema,
+    versionNumber: z.number().int().positive(),
+    derivationType: promptDerivationTypeSchema,
+  })
+  .strict()
+export const promptLineageSchema = z
+  .object({
+    parent: promptLineageSummarySchema.nullable(),
+    children: z.array(promptLineageSummarySchema),
+  })
+  .strict()
 export const comparePromptVersionsResultSchema = z.object({
   baseVersion: promptVersionSchema,
   compareVersion: promptVersionSchema,
@@ -469,6 +565,558 @@ export const harnessTemplateSchema = z.object({
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 })
+export const promptTemplateSchema = z
+  .object({
+    id: idSchema,
+    name: nameSchema,
+    description: nullableTextSchema,
+    sourcePromptAssetId: idSchema.nullable(),
+    sourcePromptVersionId: idSchema.nullable(),
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    templateBody: requiredPreservedTextSchema,
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
+export const promptTemplateListResultSchema = z
+  .object({
+    templates: z.array(promptTemplateSchema),
+    total: z.number().int().nonnegative(),
+  })
+  .strict()
+export const deletePromptTemplateResultSchema = z
+  .object({ id: idSchema, deleted: z.literal(true) })
+  .strict()
+
+export const maintenanceScanInputSchema = z
+  .object({
+    projectId: idSchema.optional(),
+    includePromptDuplicates: z.boolean(),
+    includeTagDuplicates: z.boolean(),
+    includeUnusedTags: z.boolean(),
+    includeCurrentVersionIssues: z.boolean(),
+    includeEmptyAssets: z.boolean(),
+    includeSearchIndexHealth: z.boolean(),
+    includePromptTemplateIssues: z.boolean(),
+    includeHarnessTemplateIssues: z.boolean(),
+    includeQualityFindings: z.boolean(),
+  })
+  .strict()
+
+export const maintenanceFindingSchema = z
+  .object({
+    id: idSchema,
+    severity: maintenanceSeveritySchema,
+    category: maintenanceCategorySchema,
+    title: nameSchema,
+    description: requiredTextSchema,
+    affectedEntityType: nameSchema,
+    affectedEntityIds: z.array(idSchema),
+    suggestedActionType: maintenanceActionTypeSchema.optional(),
+    safeAutoFixAvailable: z.boolean(),
+  })
+  .strict()
+
+export const maintenanceActionPreviewSchema = z
+  .object({
+    actionType: maintenanceActionTypeSchema,
+    title: nameSchema,
+    description: requiredTextSchema,
+    severity: maintenanceSeveritySchema,
+    affectedEntityType: nameSchema,
+    affectedEntityIds: z.array(idSchema),
+    destructive: z.boolean(),
+    relationshipChanging: z.boolean(),
+    estimatedChangeCount: z.number().int().nonnegative(),
+    backupRecommendation: requiredTextSchema.nullable(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if ((value.destructive || value.relationshipChanging) && value.backupRecommendation === null) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["backupRecommendation"],
+        message:
+          "Backup recommendation is required for destructive or relationship-changing actions",
+      })
+    }
+  })
+
+const maintenanceCountSchema = z.number().int().nonnegative()
+export const maintenanceScanSummarySchema = z
+  .object({
+    totalFindings: maintenanceCountSchema,
+    severityCounts: z
+      .object({
+        low: maintenanceCountSchema,
+        medium: maintenanceCountSchema,
+        high: maintenanceCountSchema,
+      })
+      .strict(),
+    categoryCounts: z
+      .object({
+        duplicate_prompts: maintenanceCountSchema,
+        duplicate_tags: maintenanceCountSchema,
+        unused_tags: maintenanceCountSchema,
+        empty_prompt_assets: maintenanceCountSchema,
+        current_version_issues: maintenanceCountSchema,
+        search_index_health: maintenanceCountSchema,
+        prompt_template_issues: maintenanceCountSchema,
+        harness_template_issues: maintenanceCountSchema,
+        quality_review_findings: maintenanceCountSchema,
+      })
+      .partial()
+      .strict(),
+    truncated: z.boolean(),
+  })
+  .strict()
+
+export const maintenanceScanResultSchema = z
+  .object({
+    summary: maintenanceScanSummarySchema,
+    findings: z.array(maintenanceFindingSchema),
+    recommendedActions: z.array(maintenanceActionPreviewSchema),
+  })
+  .strict()
+
+const mergeDuplicateTagsInputSchema = z
+  .object({
+    actionType: z.literal("merge_duplicate_tags"),
+    canonicalTagId: idSchema,
+    duplicateTagIds: z.array(idSchema).min(1),
+  })
+  .strict()
+const deleteUnusedTagsInputSchema = z
+  .object({
+    actionType: z.literal("delete_unused_tags"),
+    tagIds: z.array(idSchema).min(1),
+  })
+  .strict()
+const repairCurrentVersionsInputSchema = z
+  .object({
+    actionType: z.literal("repair_current_versions"),
+    promptAssetIds: z.array(idSchema).min(1),
+  })
+  .strict()
+const deleteEmptyPromptAssetsInputSchema = z
+  .object({
+    actionType: z.literal("delete_empty_prompt_assets"),
+    promptAssetIds: z.array(idSchema).min(1),
+  })
+  .strict()
+const rebuildSearchIndexInputSchema = z
+  .object({ actionType: z.literal("rebuild_search_index") })
+  .strict()
+
+export const prepareMaintenanceActionInputSchema = z
+  .discriminatedUnion("actionType", [
+    rebuildSearchIndexInputSchema,
+    repairCurrentVersionsInputSchema,
+    mergeDuplicateTagsInputSchema,
+    deleteUnusedTagsInputSchema,
+    deleteEmptyPromptAssetsInputSchema,
+  ])
+  .superRefine((value, ctx) => {
+    if (
+      value.actionType === "merge_duplicate_tags" &&
+      value.duplicateTagIds.includes(value.canonicalTagId)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["duplicateTagIds"],
+        message: "Canonical tag id must not appear in duplicate tag ids",
+      })
+    }
+  })
+
+export const preparedMaintenanceActionSchema = z
+  .object({
+    actionSessionId: idSchema,
+    actionType: maintenanceActionTypeSchema,
+    preview: maintenanceActionPreviewSchema,
+    affectedDisplayNames: z.array(nameSchema),
+    warnings: z.array(requiredTextSchema),
+    requiresConfirmation: z.boolean(),
+    expiresAt: timestampSchema,
+  })
+  .strict()
+  .refine((value) => value.actionType === value.preview.actionType, {
+    path: ["preview", "actionType"],
+    message: "Prepared action type must match its preview",
+  })
+
+export const executeMaintenanceActionInputSchema = z
+  .object({
+    actionSessionId: idSchema,
+    actionType: maintenanceActionTypeSchema,
+  })
+  .strict()
+
+export const cancelMaintenanceActionSessionInputSchema = z
+  .object({ actionSessionId: idSchema })
+  .strict()
+
+export const maintenanceActionResultSchema = z
+  .object({
+    actionSessionId: idSchema,
+    actionType: maintenanceActionTypeSchema,
+    status: maintenanceActionStatusSchema,
+    changedCount: maintenanceCountSchema,
+    skippedCount: maintenanceCountSchema,
+    message: requiredTextSchema,
+    warnings: z.array(requiredTextSchema),
+  })
+  .strict()
+
+const backupNameSchema = z.string().trim().min(1).max(BACKUP_NAME_MAX_LENGTH)
+const backupLabelSchema = z.string().trim().min(1).max(BACKUP_LABEL_MAX_LENGTH)
+const backupBodySchema = z.string().max(BACKUP_BODY_MAX_LENGTH)
+const nullableBackupBodySchema = backupBodySchema.nullable()
+const backupRowArray = <TSchema extends z.ZodType>(schema: TSchema) =>
+  z.array(schema).max(BACKUP_ROW_MAX_ITEMS)
+
+function isJsonString(value: string): boolean {
+  try {
+    JSON.parse(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const backupJsonStringSchema = backupBodySchema.refine(isJsonString, "Expected a JSON string")
+const nullableBackupJsonStringSchema = backupJsonStringSchema.nullable()
+
+export const backupProjectSchema = z
+  .object({
+    id: idSchema,
+    name: backupNameSchema,
+    description: nullableBackupBodySchema,
+    techStack: nullableBackupBodySchema,
+    defaultAgent: targetAgentSchema.nullable(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
+
+export const backupPromptAssetSchema = z
+  .object({
+    id: idSchema,
+    projectId: idSchema.nullable(),
+    title: backupNameSchema,
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    currentVersionId: idSchema.nullable(),
+    parentPromptId: idSchema.nullable(),
+    parentPromptVersionId: idSchema.nullable(),
+    derivationType: promptDerivationTypeSchema.nullable(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
+
+export const backupPromptVersionSchema = z
+  .object({
+    id: idSchema,
+    promptAssetId: idSchema,
+    versionNumber: z.number().int().positive(),
+    originalInput: backupBodySchema,
+    compiledPrompt: backupBodySchema,
+    assumptions: nullableBackupBodySchema,
+    questions: nullableBackupBodySchema,
+    answers: nullableBackupBodySchema,
+    acceptanceCriteria: nullableBackupBodySchema,
+    validationCommands: nullableBackupBodySchema,
+    qualityScore: promptQualityScoreSchema.nullable(),
+    createdAt: timestampSchema,
+  })
+  .strict()
+
+export const backupTagSchema = z
+  .object({ id: idSchema, name: backupNameSchema, createdAt: timestampSchema })
+  .strict()
+
+export const backupPromptTagSchema = z.object({ promptAssetId: idSchema, tagId: idSchema }).strict()
+
+export const backupHarnessTemplateSchema = z
+  .object({
+    id: idSchema,
+    name: backupNameSchema,
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    templateBody: backupBodySchema,
+    requiredFields: nullableBackupJsonStringSchema,
+    clarificationPolicy: nullableBackupJsonStringSchema,
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
+
+export const backupProjectContextProfileSchema = z
+  .object({
+    id: idSchema,
+    projectId: idSchema,
+    name: backupNameSchema,
+    summary: nullableBackupBodySchema,
+    techStack: nullableBackupBodySchema,
+    architectureNotes: nullableBackupBodySchema,
+    codingConventions: nullableBackupBodySchema,
+    constraints: nullableBackupBodySchema,
+    forbiddenActions: nullableBackupBodySchema,
+    acceptanceDefaults: nullableBackupBodySchema,
+    validationCommands: nullableBackupBodySchema,
+    securityNotes: nullableBackupBodySchema,
+    additionalContext: nullableBackupBodySchema,
+    testingNotes: nullableBackupBodySchema,
+    packageManager: nullableBackupBodySchema,
+    defaultBranch: nullableBackupBodySchema,
+    repoPath: nullableBackupBodySchema,
+    isDefault: z.boolean(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
+
+export const backupPromptTemplateSchema = z
+  .object({
+    id: idSchema,
+    name: backupNameSchema,
+    description: nullableBackupBodySchema,
+    sourcePromptAssetId: idSchema.nullable(),
+    sourcePromptVersionId: idSchema.nullable(),
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    templateBody: backupBodySchema,
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
+
+export const backupPromptQualityReviewSchema = z
+  .object({
+    id: idSchema,
+    promptVersionId: idSchema,
+    source: promptQualityReviewSourceSchema,
+    reviewMode: promptQualityReviewModeSchema,
+    overallScore: promptQualityScoreSchema,
+    grade: promptQualityGradeSchema,
+    dimensionScores: backupJsonStringSchema,
+    strengths: backupJsonStringSchema,
+    issues: backupJsonStringSchema,
+    suggestions: backupJsonStringSchema,
+    missingSections: backupJsonStringSchema,
+    warnings: backupJsonStringSchema,
+    recommendedClarifyingQuestions: backupJsonStringSchema,
+    scoreExplanation: backupBodySchema,
+    snapshot: backupJsonStringSchema,
+    improvedPromptDraft: nullableBackupBodySchema,
+    createdAt: timestampSchema,
+  })
+  .strict()
+
+export const backupItemCountsSchema = z
+  .object({
+    projects: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    promptAssets: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    promptVersions: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    tags: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    promptTags: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    harnessTemplates: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    projectContextProfiles: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    promptTemplates: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+    promptQualityReviews: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+  })
+  .strict()
+
+export const backupMetadataSchema = z
+  .object({
+    itemCounts: backupItemCountsSchema,
+    sourceSummary: backupLabelSchema,
+    excludesSecrets: z.literal(true),
+    excludesSecretStatus: z.literal(true),
+    includesSettings: z.literal(false),
+    plaintext: z.literal(true),
+    schemaVersion: z.literal(1),
+  })
+  .strict()
+
+export const fullBackupDataSchema = z
+  .object({
+    projects: backupRowArray(backupProjectSchema),
+    promptAssets: backupRowArray(backupPromptAssetSchema),
+    promptVersions: backupRowArray(backupPromptVersionSchema),
+    tags: backupRowArray(backupTagSchema),
+    promptTags: backupRowArray(backupPromptTagSchema),
+    harnessTemplates: backupRowArray(backupHarnessTemplateSchema),
+    projectContextProfiles: backupRowArray(backupProjectContextProfileSchema),
+    promptTemplates: backupRowArray(backupPromptTemplateSchema),
+    promptQualityReviews: backupRowArray(backupPromptQualityReviewSchema),
+  })
+  .strict()
+
+export const projectBackupDataSchema = z
+  .object({
+    projects: z.array(backupProjectSchema).length(1),
+    promptAssets: backupRowArray(backupPromptAssetSchema),
+    promptVersions: backupRowArray(backupPromptVersionSchema),
+    tags: backupRowArray(backupTagSchema),
+    promptTags: backupRowArray(backupPromptTagSchema),
+    projectContextProfiles: backupRowArray(backupProjectContextProfileSchema),
+    promptTemplates: backupRowArray(backupPromptTemplateSchema),
+    promptQualityReviews: backupRowArray(backupPromptQualityReviewSchema),
+  })
+  .strict()
+
+export const promptAssetsBackupDataSchema = z
+  .object({
+    promptAssets: backupRowArray(backupPromptAssetSchema).min(1),
+    promptVersions: backupRowArray(backupPromptVersionSchema),
+    tags: backupRowArray(backupTagSchema),
+    promptTags: backupRowArray(backupPromptTagSchema),
+    promptQualityReviews: backupRowArray(backupPromptQualityReviewSchema),
+  })
+  .strict()
+
+export const promptTemplatesBackupDataSchema = z
+  .object({ promptTemplates: backupRowArray(backupPromptTemplateSchema).min(1) })
+  .strict()
+
+export const harnessTemplatesBackupDataSchema = z
+  .object({ harnessTemplates: backupRowArray(backupHarnessTemplateSchema).min(1) })
+  .strict()
+
+export const backupDataSchema = z.union([
+  fullBackupDataSchema,
+  projectBackupDataSchema,
+  promptAssetsBackupDataSchema,
+  promptTemplatesBackupDataSchema,
+  harnessTemplatesBackupDataSchema,
+])
+
+const backupEnvelopeShape = {
+  schemaVersion: z.literal(1),
+  appName: z.literal("Prompter"),
+  exportedAt: timestampSchema,
+  exportedByAppVersion: backupNameSchema.optional(),
+  metadata: backupMetadataSchema,
+} as const
+
+export const backupEnvelopeSchema = z.discriminatedUnion("backupType", [
+  z
+    .object({
+      ...backupEnvelopeShape,
+      backupType: z.literal("full"),
+      data: fullBackupDataSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...backupEnvelopeShape,
+      backupType: z.literal("project"),
+      data: projectBackupDataSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...backupEnvelopeShape,
+      backupType: z.literal("prompt_assets"),
+      data: promptAssetsBackupDataSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...backupEnvelopeShape,
+      backupType: z.literal("prompt_templates"),
+      data: promptTemplatesBackupDataSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...backupEnvelopeShape,
+      backupType: z.literal("harness_templates"),
+      data: harnessTemplatesBackupDataSchema,
+    })
+    .strict(),
+])
+
+export const backupWarningSchema = z
+  .object({
+    code: backupNameSchema,
+    message: backupLabelSchema,
+    entityType: backupNameSchema.optional(),
+    sourceId: idSchema.optional(),
+  })
+  .strict()
+
+export const backupConflictSchema = z
+  .object({
+    code: backupNameSchema,
+    message: backupLabelSchema,
+    resolution: backupLabelSchema,
+    entityType: backupNameSchema.optional(),
+    sourceId: idSchema.optional(),
+  })
+  .strict()
+
+export const backupConsequenceSchema = z
+  .object({
+    code: backupNameSchema,
+    message: backupLabelSchema,
+    count: z.number().int().nonnegative().max(BACKUP_ROW_MAX_ITEMS),
+  })
+  .strict()
+
+export const backupValidationPreviewSchema = z
+  .object({
+    importSessionId: idSchema,
+    previewFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    previewRevision: z.number().int().positive(),
+    backupType: backupTypeSchema,
+    schemaVersion: z.literal(1),
+    exportedAt: timestampSchema,
+    itemCounts: backupItemCountsSchema,
+    conflicts: z.array(backupConflictSchema).max(BACKUP_PREVIEW_MAX_ITEMS),
+    warnings: z.array(backupWarningSchema).max(BACKUP_PREVIEW_MAX_ITEMS),
+    consequences: z.array(backupConsequenceSchema).max(BACKUP_PREVIEW_MAX_ITEMS),
+    requiresDestinationProject: z.boolean(),
+    excludesSecrets: z.literal(true),
+    excludesSecretStatus: z.literal(true),
+    includesSettings: z.literal(false),
+    plaintext: z.literal(true),
+    expiresAt: timestampSchema,
+  })
+  .strict()
+
+export const backupExportResultSchema = z
+  .object({
+    cancelled: z.boolean(),
+    backupType: backupTypeSchema,
+    itemCounts: backupItemCountsSchema,
+    message: backupLabelSchema,
+  })
+  .strict()
+
+export const backupValidationResultSchema = z.discriminatedUnion("cancelled", [
+  z.object({ cancelled: z.literal(true) }).strict(),
+  z.object({ cancelled: z.literal(false), preview: backupValidationPreviewSchema }).strict(),
+])
+
+export const backupImportResultSchema = z
+  .object({
+    backupType: backupTypeSchema,
+    importedCounts: backupItemCountsSchema,
+    createdProjectIds: backupRowArray(idSchema),
+    createdPromptAssetIds: backupRowArray(idSchema),
+    createdPromptTemplateIds: backupRowArray(idSchema),
+    createdHarnessTemplateIds: backupRowArray(idSchema),
+    warnings: z.array(backupWarningSchema).max(BACKUP_PREVIEW_MAX_ITEMS),
+    searchIndexStatus: z.enum(["updated", "not_required"]),
+    message: backupLabelSchema,
+  })
+  .strict()
+
+export const cancelImportSessionResultSchema = z.object({ cancelled: z.literal(true) }).strict()
 export const settingSchema = z.object({
   key: keySchema,
   value: z.string(),
@@ -652,16 +1300,18 @@ export const promptAssetFilterSchema = z
     targetAgent: targetAgentSchema.optional(),
   })
   .optional()
-export const createPromptAssetInputSchema = z.object({
-  projectId: idSchema.nullable().optional(),
-  title: nameSchema,
-  scenario: scenarioSchema,
-  targetAgent: targetAgentSchema,
-  parentPromptId: idSchema.nullable().optional(),
-})
+export const createPromptAssetInputSchema = z
+  .object({
+    projectId: idSchema.nullable().optional(),
+    title: nameSchema,
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+  })
+  .strict()
 export const updatePromptAssetInputSchema = createPromptAssetInputSchema
   .partial()
   .extend({ currentVersionId: idSchema.nullable().optional() })
+  .strict()
   .refine((value) => Object.keys(value).length > 0, "At least one prompt asset field is required")
 
 export const createPromptVersionInputSchema = z.object({
@@ -675,6 +1325,40 @@ export const createPromptVersionInputSchema = z.object({
   validationCommands: optionalTextSchema,
   qualityScore: z.number().int().nullable().optional(),
 })
+const initialPromptVersionFieldsSchema = createPromptVersionInputSchema.omit({
+  promptAssetId: true,
+})
+const optionalPromptTagsSchema = z.object({
+  tagIds: z.array(idSchema).optional(),
+  tagNames: z.array(nameSchema).optional(),
+})
+export const createPromptWithInitialVersionInputSchema = z
+  .object({
+    projectId: idSchema.nullable(),
+    title: nameSchema,
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+  })
+  .extend(initialPromptVersionFieldsSchema.shape)
+  .extend(optionalPromptTagsSchema.shape)
+  .strict()
+export const duplicatePromptAssetInputSchema = z
+  .object({
+    sourcePromptAssetId: idSchema,
+    sourcePromptVersionId: idSchema.optional(),
+    copyTags: z.boolean().default(true),
+  })
+  .strict()
+export const createDerivedPromptAssetInputSchema = z
+  .object({
+    sourcePromptAssetId: idSchema,
+    sourcePromptVersionId: idSchema,
+    title: nameSchema,
+  })
+  .extend(initialPromptVersionFieldsSchema.shape)
+  .extend(optionalPromptTagsSchema.shape)
+  .strict()
+export const getPromptLineageInputSchema = z.object({ promptAssetId: idSchema }).strict()
 export const listPromptVersionsInputSchema = idPayloadSchema
 export const getPromptVersionInputSchema = idPayloadSchema
 export const createNextPromptVersionInputSchema = createPromptVersionInputSchema.extend({
@@ -728,6 +1412,55 @@ export const updateHarnessTemplateInputSchema = z
     (value) => Object.keys(value).length > 0,
     "At least one harness template field is required",
   )
+export const createPromptTemplateInputSchema = z
+  .object({
+    name: nameSchema,
+    description: optionalTextSchema,
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    templateBody: requiredPreservedTextSchema,
+  })
+  .strict()
+export const listPromptTemplatesInputSchema = z
+  .object({
+    query: z.string().trim().optional(),
+    scenario: scenarioSchema.optional(),
+    targetAgent: targetAgentSchema.optional(),
+    limit: z.number().int().min(1).max(100).default(100),
+  })
+  .strict()
+  .optional()
+export const getPromptTemplateInputSchema = z.object({ id: idSchema }).strict()
+export const duplicatePromptTemplateInputSchema = getPromptTemplateInputSchema
+export const deletePromptTemplateInputSchema = getPromptTemplateInputSchema
+export const updatePromptTemplateInputSchema = z
+  .object({
+    name: nameSchema.optional(),
+    description: optionalTextSchema,
+    scenario: scenarioSchema.optional(),
+    targetAgent: targetAgentSchema.optional(),
+    templateBody: requiredPreservedTextSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    "At least one prompt template field is required",
+  )
+export const updatePromptTemplatePayloadSchema = z
+  .object({
+    id: idSchema,
+    input: updatePromptTemplateInputSchema,
+  })
+  .strict()
+export const createPromptTemplateFromVersionInputSchema = z
+  .object({
+    sourcePromptAssetId: idSchema,
+    sourcePromptVersionId: idSchema,
+    name: nameSchema,
+    description: optionalTextSchema,
+    templateBody: requiredPreservedTextSchema,
+  })
+  .strict()
 export const saveOpenAIKeyInputSchema = z.object({
   apiKey: z.string().trim().min(1, "API key is required").min(16, "API key is too short"),
 })
@@ -847,6 +1580,48 @@ export const applyPromptQualityScoreToVersionResultSchema = z.object({
 })
 export const keyPayloadSchema = z.object({ key: keySchema })
 
+export const exportFullBackupInputSchema = z.object({}).strict()
+export const exportProjectBackupInputSchema = z.object({ projectId: idSchema }).strict()
+export const exportPromptAssetsBackupInputSchema = z
+  .object({ promptAssetIds: z.array(idSchema).min(1).max(BACKUP_ROW_MAX_ITEMS) })
+  .strict()
+export const exportPromptTemplatesPackInputSchema = z
+  .object({
+    promptTemplateIds: z.array(idSchema).min(1).max(BACKUP_ROW_MAX_ITEMS).optional(),
+    includeAll: z.literal(true).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => (value.promptTemplateIds === undefined) !== (value.includeAll === undefined),
+    "Choose promptTemplateIds or includeAll",
+  )
+export const exportHarnessTemplatesPackInputSchema = z
+  .object({
+    harnessTemplateIds: z.array(idSchema).min(1).max(BACKUP_ROW_MAX_ITEMS).optional(),
+    includeAllUserTemplates: z.literal(true).optional(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      (value.harnessTemplateIds === undefined) !== (value.includeAllUserTemplates === undefined),
+    "Choose harnessTemplateIds or includeAllUserTemplates",
+  )
+export const validateBackupFileInputSchema = noPayloadSchema
+export const backupImportStrategySchema = z.literal("safe_duplicate")
+export const importBackupInputSchema = z
+  .object({
+    importSessionId: idSchema,
+    previewFingerprint: z.string().regex(/^[a-f0-9]{64}$/),
+    previewRevision: z.number().int().positive(),
+    strategy: backupImportStrategySchema,
+    destinationProjectId: idSchema.optional(),
+  })
+  .strict()
+export const promptAssetsImportBackupInputSchema = importBackupInputSchema.extend({
+  destinationProjectId: idSchema,
+})
+export const cancelImportSessionInputSchema = z.object({ importSessionId: idSchema }).strict()
+
 export const payloadSchemas = {
   createProject: createProjectInputSchema,
   listProjects: noPayloadSchema,
@@ -854,6 +1629,10 @@ export const payloadSchemas = {
   updateProject: updateProjectPayloadSchema,
   deleteProject: idPayloadSchema,
   createPromptAsset: createPromptAssetInputSchema,
+  createPromptWithInitialVersion: createPromptWithInitialVersionInputSchema,
+  duplicateAsset: duplicatePromptAssetInputSchema,
+  createDerivedAsset: createDerivedPromptAssetInputSchema,
+  getLineage: getPromptLineageInputSchema,
   listPromptAssets: promptAssetFilterSchema,
   getPromptAsset: idPayloadSchema,
   updatePromptAsset: updatePromptAssetPayloadSchema,
@@ -876,12 +1655,23 @@ export const payloadSchemas = {
   createAndAttachTagToPrompt: createAndAttachTagPayloadSchema,
   searchPrompts: promptSearchFilterSchema,
   rebuildSearchIndex: noPayloadSchema,
+  scanMaintenanceLibrary: maintenanceScanInputSchema,
+  prepareMaintenanceAction: prepareMaintenanceActionInputSchema,
+  executeMaintenanceAction: executeMaintenanceActionInputSchema,
+  cancelMaintenanceActionSession: cancelMaintenanceActionSessionInputSchema,
   createHarnessTemplate: createHarnessTemplateInputSchema,
   listHarnessTemplates: listHarnessTemplatesInputSchema,
   getHarnessTemplate: idPayloadSchema,
   updateHarnessTemplate: updateHarnessTemplatePayloadSchema,
   deleteHarnessTemplate: idPayloadSchema,
   duplicateHarnessTemplate: duplicateHarnessTemplateInputSchema,
+  createPromptTemplate: createPromptTemplateInputSchema,
+  listPromptTemplates: listPromptTemplatesInputSchema,
+  getPromptTemplate: getPromptTemplateInputSchema,
+  updatePromptTemplate: updatePromptTemplatePayloadSchema,
+  duplicatePromptTemplate: duplicatePromptTemplateInputSchema,
+  deletePromptTemplate: deletePromptTemplateInputSchema,
+  createPromptTemplateFromVersion: createPromptTemplateFromVersionInputSchema,
   createProjectContextProfile: createProjectContextProfileInputSchema,
   listProjectContextProfiles: listProjectContextProfilesInputSchema,
   getProjectContextProfile: getProjectContextProfileInputSchema,
@@ -914,6 +1704,14 @@ export const payloadSchemas = {
   getLatestPromptQualityReview: getLatestPromptQualityReviewInputSchema,
   getPromptQualityReview: getPromptQualityReviewInputSchema,
   applyPromptQualityScoreToVersion: applyPromptQualityScoreToVersionInputSchema,
+  exportFullBackup: exportFullBackupInputSchema,
+  exportProjectBackup: exportProjectBackupInputSchema,
+  exportPromptAssetsBackup: exportPromptAssetsBackupInputSchema,
+  exportPromptTemplatesPack: exportPromptTemplatesPackInputSchema,
+  exportHarnessTemplatesPack: exportHarnessTemplatesPackInputSchema,
+  validateBackupFile: validateBackupFileInputSchema,
+  importBackup: importBackupInputSchema,
+  cancelImportSession: cancelImportSessionInputSchema,
 } as const
 
 export const responseSchemas = {
@@ -923,6 +1721,10 @@ export const responseSchemas = {
   updateProject: projectSchema,
   deleteProject: deleteResultSchema,
   createPromptAsset: promptAssetSchema,
+  createPromptWithInitialVersion: createPromptWithInitialVersionResultSchema,
+  duplicateAsset: duplicatePromptAssetResultSchema,
+  createDerivedAsset: createDerivedPromptAssetResultSchema,
+  getLineage: promptLineageSchema,
   listPromptAssets: z.array(promptAssetSchema),
   getPromptAsset: promptAssetSchema.nullable(),
   updatePromptAsset: promptAssetSchema,
@@ -945,12 +1747,23 @@ export const responseSchemas = {
   createAndAttachTagToPrompt: tagLinkSchema,
   searchPrompts: promptSearchResultSchema,
   rebuildSearchIndex: z.object({ rebuilt: z.literal(true) }),
+  scanMaintenanceLibrary: maintenanceScanResultSchema,
+  prepareMaintenanceAction: preparedMaintenanceActionSchema,
+  executeMaintenanceAction: maintenanceActionResultSchema,
+  cancelMaintenanceActionSession: noPayloadSchema,
   createHarnessTemplate: harnessTemplateSchema,
   listHarnessTemplates: z.array(harnessTemplateSchema),
   getHarnessTemplate: harnessTemplateSchema.nullable(),
   updateHarnessTemplate: harnessTemplateSchema,
   deleteHarnessTemplate: deleteResultSchema,
   duplicateHarnessTemplate: harnessTemplateSchema,
+  createPromptTemplate: promptTemplateSchema,
+  listPromptTemplates: promptTemplateListResultSchema,
+  getPromptTemplate: promptTemplateSchema,
+  updatePromptTemplate: promptTemplateSchema,
+  duplicatePromptTemplate: promptTemplateSchema,
+  deletePromptTemplate: deletePromptTemplateResultSchema,
+  createPromptTemplateFromVersion: promptTemplateSchema,
   createProjectContextProfile: projectContextProfileSchema,
   listProjectContextProfiles: z.array(projectContextProfileSchema),
   getProjectContextProfile: projectContextProfileSchema.nullable(),
@@ -983,6 +1796,14 @@ export const responseSchemas = {
   getLatestPromptQualityReview: promptQualityReviewResultSchema.nullable(),
   getPromptQualityReview: promptQualityReviewResultSchema.nullable(),
   applyPromptQualityScoreToVersion: applyPromptQualityScoreToVersionResultSchema,
+  exportFullBackup: backupExportResultSchema,
+  exportProjectBackup: backupExportResultSchema,
+  exportPromptAssetsBackup: backupExportResultSchema,
+  exportPromptTemplatesPack: backupExportResultSchema,
+  exportHarnessTemplatesPack: backupExportResultSchema,
+  validateBackupFile: backupValidationResultSchema,
+  importBackup: backupImportResultSchema,
+  cancelImportSession: cancelImportSessionResultSchema,
 } as const
 
 export type ProjectContextProfile = z.infer<typeof projectContextProfileSchema>

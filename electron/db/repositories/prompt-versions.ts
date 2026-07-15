@@ -8,11 +8,13 @@ import type {
   PromptAsset,
   PromptVersion,
 } from "../../ipc-types.js"
+import { PromptInitialVersionError } from "../errors.js"
 import * as schema from "../schema.js"
 import { type AppDatabase, createId, createTimestamp, optionalText, requireRow } from "./common.js"
 
 export type PromptVersionRepository = {
   readonly createPromptVersion: (input: CreatePromptVersionInput) => PromptVersion
+  readonly createInitialPromptVersion: (input: CreatePromptVersionInput) => PromptVersion
   readonly createNextPromptVersion: (
     input: CreateNextPromptVersionInput,
   ) => CreateNextPromptVersionResult
@@ -72,6 +74,24 @@ export function createPromptVersionRepository(db: AppDatabase): PromptVersionRep
           .values(promptVersionValues(input, nextVersionNumber(db, input.promptAssetId)))
           .returning()
           .get(),
+        "prompt version",
+        input.promptAssetId,
+      )
+    },
+    createInitialPromptVersion(input) {
+      const existing = db
+        .select({ id: schema.promptVersions.id })
+        .from(schema.promptVersions)
+        .where(eq(schema.promptVersions.promptAssetId, input.promptAssetId))
+        .limit(1)
+        .get()
+
+      if (existing !== undefined) {
+        throw new PromptInitialVersionError(input.promptAssetId)
+      }
+
+      return requireRow(
+        db.insert(schema.promptVersions).values(promptVersionValues(input, 1)).returning().get(),
         "prompt version",
         input.promptAssetId,
       )

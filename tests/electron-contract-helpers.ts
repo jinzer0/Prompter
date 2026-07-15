@@ -2,13 +2,11 @@ import { readdir } from "node:fs/promises"
 import { join } from "node:path"
 
 import type {
-  ExportPromptResult,
   ProjectContextCompilerBuildResult,
   ProjectContextProfile,
   PromptCompilerAnalyzeResult,
   PromptCompilerCompileResult,
 } from "../electron/ipc-types"
-import { createUnavailableOpenAIKeyStore } from "../electron/secrets/open-ai-key-store"
 
 export async function listFiles(directory: string): Promise<readonly string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
@@ -107,143 +105,4 @@ export const projectContextCompilerBuildFixture: ProjectContextCompilerBuildResu
   context: "## Project Context Profile\n\n### Summary\n\nA safe project summary.",
   sectionNames: ["Summary"],
   warnings: [],
-}
-const exportPromptResultFixture: ExportPromptResult = {
-  format: "markdown",
-  filename: "prompt-export.md",
-  content: "# Prompt Export",
-  mimeType: "text/markdown",
-}
-
-export function createFailingServices(onServiceCall: () => void) {
-  const promptQualityFailure = (): never => {
-    onServiceCall()
-    throw new Error("prompt quality service should not be called")
-  }
-
-  return {
-    createProject: () => {
-      onServiceCall()
-      throw new Error("repository should not be called")
-    },
-    listProjects: () => [],
-    getProject: () => null,
-    updateProject: () => {
-      throw new Error("unused service")
-    },
-    deleteProject: (id: string) => ({ id }),
-    createPromptAsset: () => {
-      throw new Error("unused service")
-    },
-    listPromptAssets: () => [],
-    getPromptAsset: () => null,
-    updatePromptAsset: () => {
-      throw new Error("unused service")
-    },
-    deletePromptAsset: (id: string) => ({ id }),
-    createPromptVersion: () => {
-      onServiceCall()
-      throw new Error("repository should not be called")
-    },
-    createNextPromptVersion: () => {
-      onServiceCall()
-      throw new Error("repository should not be called")
-    },
-    listPromptVersions: () => [],
-    getPromptVersion: () => null,
-    getCurrentPromptVersion: () => null,
-    setCurrentPromptVersion: () => {
-      throw new Error("unused service")
-    },
-    comparePromptVersions: () => {
-      throw new Error("unused service")
-    },
-    createTag: () => {
-      throw new Error("unused service")
-    },
-    listTags: () => [],
-    updateTag: () => {
-      throw new Error("unused service")
-    },
-    deleteTag: (id: string) => ({ id }),
-    attachTagToPrompt: (promptAssetId: string, tagId: string) => ({ promptAssetId, tagId }),
-    detachTagFromPrompt: (promptAssetId: string, tagId: string) => ({ promptAssetId, tagId }),
-    listTagsForPrompt: () => [],
-    listTagsWithCounts: () => [],
-    createAndAttachTagToPrompt: (promptAssetId: string, input: { readonly name: string }) => ({
-      promptAssetId,
-      tagId: input.name,
-    }),
-    rebuildSearchIndex: () => {
-      onServiceCall()
-    },
-    searchPrompts: () => {
-      onServiceCall()
-      return []
-    },
-    createHarnessTemplate: () => {
-      throw new Error("unused service")
-    },
-    listHarnessTemplates: () => [],
-    getHarnessTemplate: () => null,
-    updateHarnessTemplate: () => {
-      throw new Error("unused service")
-    },
-    deleteHarnessTemplate: (id: string) => ({ id }),
-    createProjectContextProfile: () => {
-      onServiceCall()
-      throw new Error("repository should not be called")
-    },
-    listProjectContextProfiles: () => [],
-    getProjectContextProfile: () => null,
-    getDefaultProjectContextProfile: () => null,
-    updateProjectContextProfile: () => {
-      onServiceCall()
-      throw new Error("repository should not be called")
-    },
-    deleteProjectContextProfile: (input: { readonly profileId: string }) => ({
-      id: input.profileId,
-    }),
-    duplicateProjectContextProfile: () => projectContextProfileFixture,
-    setDefaultProjectContextProfile: () => projectContextProfileFixture,
-    buildCompilerContext: () => projectContextCompilerBuildFixture,
-    getSetting: () => null,
-    setSetting: (key: string, value: string) => ({ key, value, updatedAt: 1 }),
-    listSettings: () => [],
-    getDefaults: () => settingsDefaultsFixture,
-    updateDefaults: () => settingsDefaultsFixture,
-    ...createUnavailableOpenAIKeyStore(),
-    async promptCompilerAnalyze() {
-      onServiceCall()
-      return promptCompilerAnalyzeFixture
-    },
-    async promptCompilerCompile() {
-      onServiceCall()
-      return promptCompilerCompileFixture
-    },
-    reviewPromptQualityDraft: promptQualityFailure,
-    reviewPromptQualityWithLLM: async () => promptQualityFailure(),
-    reviewPromptQualityVersion: promptQualityFailure,
-    savePromptQualityReview: promptQualityFailure,
-    listPromptQualityReviewsForVersion: promptQualityFailure,
-    getLatestPromptQualityReview: promptQualityFailure,
-    getPromptQualityReview: promptQualityFailure,
-    applyPromptQualityScoreToVersion: promptQualityFailure,
-    formatPromptForExport: () => {
-      onServiceCall()
-      return exportPromptResultFixture
-    },
-    async savePromptToFile() {
-      onServiceCall()
-      return { cancelled: true as const }
-    },
-    async copyText() {
-      onServiceCall()
-      return { copied: true as const }
-    },
-    async readText() {
-      onServiceCall()
-      return { text: "", isEmpty: true, length: 0 }
-    },
-  }
 }

@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { openPrompterDatabase } from "../electron/db/connection"
+import { openPrompterDatabase, type PrompterDatabaseConfig } from "../electron/db/connection"
 
 export type TestDatabase = ReturnType<typeof openPrompterDatabase>
 
@@ -34,13 +34,21 @@ function callPlannedService(
   return Reflect.apply(service, database.services, args)
 }
 
-export async function createSearchTestDatabase(): Promise<TestDatabase> {
+type SearchTestDatabaseConfig = Pick<
+  PrompterDatabaseConfig,
+  "openAIKeyStore" | "promptCompilerClientFactory"
+>
+
+export async function createSearchTestDatabase(
+  config: SearchTestDatabaseConfig = {},
+): Promise<TestDatabase> {
   const directory = await mkdtemp(join(tmpdir(), "prompter-search-db-"))
   searchTestDirectories.push(directory)
 
   return openPrompterDatabase({
     databasePath: join(directory, "prompter.sqlite"),
     migrationsFolder: join(process.cwd(), "drizzle"),
+    ...config,
   })
 }
 

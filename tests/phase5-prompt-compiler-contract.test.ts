@@ -17,11 +17,11 @@ import {
   promptCompilerSystemPrompt,
 } from "../electron/prompt-compiler/prompts"
 import {
-  createFailingServices,
   listFiles,
   promptCompilerAnalyzeFixture,
   promptCompilerCompileFixture,
 } from "./electron-contract-helpers"
+import { createFailingServices } from "./electron-contract-service-fixture"
 import { readProductionSource } from "./source-guardrail-helpers"
 
 // allow: SIZE_OK - central prompt compiler contract covers schemas, prompt safety, and source guardrails.

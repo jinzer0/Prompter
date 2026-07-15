@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import { createElectronBridge } from "../electron/bridge"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
-import { createFailingServices, validPromptAssetId } from "./electron-contract-helpers"
+import { validPromptAssetId } from "./electron-contract-helpers"
+import { createFailingServices } from "./electron-contract-service-fixture"
 
 const validPromptVersionId = "22222222-2222-4222-8222-222222222222"
 const validTagId = "44444444-4444-4444-8444-444444444444"

@@ -9,11 +9,19 @@ import {
   responseSchemas,
 } from "./ipc-contract.js"
 import type {
+  CancelImportSessionInput,
+  ExportFullBackupInput,
+  ExportHarnessTemplatesPackInput,
+  ExportProjectBackupInput,
+  ExportPromptAssetsBackupInput,
+  ExportPromptTemplatesPackInput,
   HarnessTemplate,
+  ImportBackupInput,
   ListHarnessTemplatesInput,
   PromptSearchResultItem,
   SearchPromptsResponse,
 } from "./ipc-types.js"
+import type { MaintenanceServices } from "./maintenance/maintenance-services.js"
 import type { PromptExportNativeService } from "./prompt-export-native.js"
 
 // allow: SIZE_OK - central IPC handler registry mirrors the typed channel contract.
@@ -22,6 +30,16 @@ type HarnessTemplateContractServices = {
   readonly listHarnessTemplates: (filter?: ListHarnessTemplatesInput) => readonly HarnessTemplate[]
   readonly duplicateHarnessTemplate?: (id: string) => HarnessTemplate
 }
+type BackupContractServices = {
+  readonly exportFullBackup: (input: ExportFullBackupInput) => Promise<unknown>
+  readonly exportProjectBackup: (input: ExportProjectBackupInput) => Promise<unknown>
+  readonly exportPromptAssetsBackup: (input: ExportPromptAssetsBackupInput) => Promise<unknown>
+  readonly exportPromptTemplatesPack: (input: ExportPromptTemplatesPackInput) => Promise<unknown>
+  readonly exportHarnessTemplatesPack: (input: ExportHarnessTemplatesPackInput) => Promise<unknown>
+  readonly validateBackupFile: () => Promise<unknown>
+  readonly importBackup: (input: ImportBackupInput) => Promise<unknown>
+  readonly cancelImportSession: (input: CancelImportSessionInput) => Promise<unknown>
+}
 type IpcServices = Omit<
   PersistenceServices,
   | "listHarnessTemplates"
@@ -29,9 +47,17 @@ type IpcServices = Omit<
   | "seedDefaultHarnessTemplates"
   | "analyze"
   | "compile"
+  | "scanLibrary"
+  | "mergeDuplicateTags"
+  | "deleteUnusedTags"
+  | "repairCurrentVersions"
+  | "deleteEmptyPromptAssets"
+  | "rebuildMaintenanceSearchIndex"
 > &
   HarnessTemplateContractServices &
-  PromptExportNativeService
+  MaintenanceServices &
+  PromptExportNativeService &
+  BackupContractServices
 
 function textPreview(value: string): string {
   const firstLine =
@@ -91,6 +117,24 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
       services.deleteProject(payloadSchemas.deleteProject.parse(payload).id),
     createPromptAsset: (payload: unknown) =>
       services.createPromptAsset(payloadSchemas.createPromptAsset.parse(payload)),
+    createPromptWithInitialVersion: (payload: unknown) =>
+      responseSchemas.createPromptWithInitialVersion.parse(
+        services.createPromptWithInitialVersion(
+          payloadSchemas.createPromptWithInitialVersion.parse(payload),
+        ),
+      ),
+    duplicateAsset: (payload: unknown) =>
+      responseSchemas.duplicateAsset.parse(
+        services.duplicatePromptAsset(payloadSchemas.duplicateAsset.parse(payload)),
+      ),
+    createDerivedAsset: (payload: unknown) =>
+      responseSchemas.createDerivedAsset.parse(
+        services.createDerivedPromptAsset(payloadSchemas.createDerivedAsset.parse(payload)),
+      ),
+    getLineage: (payload: unknown) =>
+      responseSchemas.getLineage.parse(
+        services.getLineage(payloadSchemas.getLineage.parse(payload).promptAssetId),
+      ),
     listPromptAssets: (payload: unknown) =>
       services.listPromptAssets(payloadSchemas.listPromptAssets.parse(payload)),
     getPromptAsset: (payload: unknown) =>
@@ -156,6 +200,22 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
       services.rebuildSearchIndex()
       return { rebuilt: true as const }
     },
+    scanMaintenanceLibrary: (payload: unknown) =>
+      responseSchemas.scanMaintenanceLibrary.parse(
+        services.scanLibrary(payloadSchemas.scanMaintenanceLibrary.parse(payload)),
+      ),
+    prepareMaintenanceAction: (payload: unknown) =>
+      responseSchemas.prepareMaintenanceAction.parse(
+        services.prepareAction(payloadSchemas.prepareMaintenanceAction.parse(payload)),
+      ),
+    async executeMaintenanceAction(payload: unknown) {
+      const parsed = payloadSchemas.executeMaintenanceAction.parse(payload)
+      return responseSchemas.executeMaintenanceAction.parse(await services.executeAction(parsed))
+    },
+    cancelMaintenanceActionSession: (payload: unknown) =>
+      responseSchemas.cancelMaintenanceActionSession.parse(
+        services.cancelActionSession(payloadSchemas.cancelMaintenanceActionSession.parse(payload)),
+      ),
     createHarnessTemplate: (payload: unknown) =>
       services.createHarnessTemplate(payloadSchemas.createHarnessTemplate.parse(payload)),
     listHarnessTemplates: (payload: unknown) => {
@@ -179,6 +239,38 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
 
       return services.duplicateHarnessTemplate(parsed.id)
     },
+    createPromptTemplate: (payload: unknown) =>
+      responseSchemas.createPromptTemplate.parse(
+        services.createPromptTemplate(payloadSchemas.createPromptTemplate.parse(payload)),
+      ),
+    listPromptTemplates: (payload: unknown) =>
+      responseSchemas.listPromptTemplates.parse(
+        services.listPromptTemplates(payloadSchemas.listPromptTemplates.parse(payload)),
+      ),
+    getPromptTemplate: (payload: unknown) =>
+      responseSchemas.getPromptTemplate.parse(
+        services.getPromptTemplate(payloadSchemas.getPromptTemplate.parse(payload).id),
+      ),
+    updatePromptTemplate: (payload: unknown) => {
+      const parsed = payloadSchemas.updatePromptTemplate.parse(payload)
+      return responseSchemas.updatePromptTemplate.parse(
+        services.updatePromptTemplate(parsed.id, parsed.input),
+      )
+    },
+    duplicatePromptTemplate: (payload: unknown) =>
+      responseSchemas.duplicatePromptTemplate.parse(
+        services.duplicatePromptTemplate(payloadSchemas.duplicatePromptTemplate.parse(payload).id),
+      ),
+    deletePromptTemplate: (payload: unknown) =>
+      responseSchemas.deletePromptTemplate.parse(
+        services.deletePromptTemplate(payloadSchemas.deletePromptTemplate.parse(payload).id),
+      ),
+    createPromptTemplateFromVersion: (payload: unknown) =>
+      responseSchemas.createPromptTemplateFromVersion.parse(
+        services.createPromptTemplateFromVersion(
+          payloadSchemas.createPromptTemplateFromVersion.parse(payload),
+        ),
+      ),
     createProjectContextProfile: (payload: unknown) =>
       services.createProjectContextProfile(
         payloadSchemas.createProjectContextProfile.parse(payload),
@@ -297,6 +389,54 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
           payloadSchemas.applyPromptQualityScoreToVersion.parse(payload),
         ),
       ),
+    exportFullBackup: (payload: unknown) => {
+      const parsed = payloadSchemas.exportFullBackup.parse(payload)
+      return services
+        .exportFullBackup(parsed)
+        .then((result) => responseSchemas.exportFullBackup.parse(result))
+    },
+    exportProjectBackup: (payload: unknown) => {
+      const parsed = payloadSchemas.exportProjectBackup.parse(payload)
+      return services
+        .exportProjectBackup(parsed)
+        .then((result) => responseSchemas.exportProjectBackup.parse(result))
+    },
+    exportPromptAssetsBackup: (payload: unknown) => {
+      const parsed = payloadSchemas.exportPromptAssetsBackup.parse(payload)
+      return services
+        .exportPromptAssetsBackup(parsed)
+        .then((result) => responseSchemas.exportPromptAssetsBackup.parse(result))
+    },
+    exportPromptTemplatesPack: (payload: unknown) => {
+      const parsed = payloadSchemas.exportPromptTemplatesPack.parse(payload)
+      return services
+        .exportPromptTemplatesPack(parsed)
+        .then((result) => responseSchemas.exportPromptTemplatesPack.parse(result))
+    },
+    exportHarnessTemplatesPack: (payload: unknown) => {
+      const parsed = payloadSchemas.exportHarnessTemplatesPack.parse(payload)
+      return services
+        .exportHarnessTemplatesPack(parsed)
+        .then((result) => responseSchemas.exportHarnessTemplatesPack.parse(result))
+    },
+    validateBackupFile: (payload: unknown) => {
+      payloadSchemas.validateBackupFile.parse(payload)
+      return services
+        .validateBackupFile()
+        .then((result) => responseSchemas.validateBackupFile.parse(result))
+    },
+    importBackup: (payload: unknown) => {
+      const parsed = payloadSchemas.importBackup.parse(payload)
+      return services
+        .importBackup(parsed)
+        .then((result) => responseSchemas.importBackup.parse(result))
+    },
+    cancelImportSession: (payload: unknown) => {
+      const parsed = payloadSchemas.cancelImportSession.parse(payload)
+      return services
+        .cancelImportSession(parsed)
+        .then((result) => responseSchemas.cancelImportSession.parse(result))
+    },
   }
 }
 
@@ -320,6 +460,16 @@ export function registerIpcHandlers(services: IpcServices): void {
   ipcMain.handle(PERSISTENCE_CHANNELS.createPromptAsset, (_event, payload) =>
     handlers.createPromptAsset(payload),
   )
+  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptWithInitialVersion, (_event, payload) =>
+    handlers.createPromptWithInitialVersion(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.duplicateAsset, (_event, payload) =>
+    handlers.duplicateAsset(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.createDerivedAsset, (_event, payload) =>
+    handlers.createDerivedAsset(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getLineage, (_event, payload) => handlers.getLineage(payload))
   ipcMain.handle(PERSISTENCE_CHANNELS.listPromptAssets, (_event, payload) =>
     handlers.listPromptAssets(payload),
   )
@@ -378,6 +528,18 @@ export function registerIpcHandlers(services: IpcServices): void {
   ipcMain.handle(PERSISTENCE_CHANNELS.rebuildSearchIndex, (_event, payload) =>
     handlers.rebuildSearchIndex(payload),
   )
+  ipcMain.handle(PERSISTENCE_CHANNELS.scanMaintenanceLibrary, (_event, payload) =>
+    handlers.scanMaintenanceLibrary(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.prepareMaintenanceAction, (_event, payload) =>
+    handlers.prepareMaintenanceAction(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.executeMaintenanceAction, (_event, payload) =>
+    handlers.executeMaintenanceAction(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.cancelMaintenanceActionSession, (_event, payload) =>
+    handlers.cancelMaintenanceActionSession(payload),
+  )
   ipcMain.handle(PERSISTENCE_CHANNELS.createHarnessTemplate, (_event, payload) =>
     handlers.createHarnessTemplate(payload),
   )
@@ -395,6 +557,27 @@ export function registerIpcHandlers(services: IpcServices): void {
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.duplicateHarnessTemplate, (_event, payload) =>
     handlers.duplicateHarnessTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptTemplate, (_event, payload) =>
+    handlers.createPromptTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.listPromptTemplates, (_event, payload) =>
+    handlers.listPromptTemplates(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getPromptTemplate, (_event, payload) =>
+    handlers.getPromptTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.updatePromptTemplate, (_event, payload) =>
+    handlers.updatePromptTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.duplicatePromptTemplate, (_event, payload) =>
+    handlers.duplicatePromptTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.deletePromptTemplate, (_event, payload) =>
+    handlers.deletePromptTemplate(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptTemplateFromVersion, (_event, payload) =>
+    handlers.createPromptTemplateFromVersion(payload),
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.createProjectContextProfile, (_event, payload) =>
     handlers.createProjectContextProfile(payload),
@@ -483,5 +666,29 @@ export function registerIpcHandlers(services: IpcServices): void {
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.applyPromptQualityScoreToVersion, (_event, payload) =>
     handlers.applyPromptQualityScoreToVersion(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.exportFullBackup, (_event, payload) =>
+    handlers.exportFullBackup(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.exportProjectBackup, (_event, payload) =>
+    handlers.exportProjectBackup(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.exportPromptAssetsBackup, (_event, payload) =>
+    handlers.exportPromptAssetsBackup(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.exportPromptTemplatesPack, (_event, payload) =>
+    handlers.exportPromptTemplatesPack(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.exportHarnessTemplatesPack, (_event, payload) =>
+    handlers.exportHarnessTemplatesPack(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.validateBackupFile, (_event, payload) =>
+    handlers.validateBackupFile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.importBackup, (_event, payload) =>
+    handlers.importBackup(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.cancelImportSession, (_event, payload) =>
+    handlers.cancelImportSession(payload),
   )
 }

@@ -17,6 +17,8 @@ import {
   TARGET_AGENTS,
 } from "../ipc-contract.js"
 
+export const PROMPT_DERIVATION_TYPES = ["duplicate", "derived"] as const
+
 export const projects = sqliteTable("projects", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -73,12 +75,19 @@ export const promptAssets = sqliteTable(
     parentPromptId: text("parent_prompt_id").references((): AnySQLiteColumn => promptAssets.id, {
       onDelete: "set null",
     }),
+    parentPromptVersionId: text("parent_prompt_version_id").references(
+      (): AnySQLiteColumn => promptVersions.id,
+      { onDelete: "set null" },
+    ),
+    derivationType: text("derivation_type", { enum: PROMPT_DERIVATION_TYPES }),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
     index("prompt_assets_project_id_idx").on(table.projectId),
     index("prompt_assets_parent_prompt_id_idx").on(table.parentPromptId),
+    index("prompt_assets_parent_prompt_version_id_idx").on(table.parentPromptVersionId),
+    index("prompt_assets_derivation_type_idx").on(table.derivationType),
   ],
 )
 
@@ -137,6 +146,33 @@ export const promptQualityReviews = sqliteTable(
       table.promptVersionId,
       table.createdAt,
     ),
+  ],
+)
+
+export const promptTemplates = sqliteTable(
+  "prompt_templates",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    sourcePromptAssetId: text("source_prompt_asset_id").references(() => promptAssets.id, {
+      onDelete: "set null",
+    }),
+    sourcePromptVersionId: text("source_prompt_version_id").references(() => promptVersions.id, {
+      onDelete: "set null",
+    }),
+    scenario: text("scenario", { enum: SCENARIOS }).notNull(),
+    targetAgent: text("target_agent", { enum: TARGET_AGENTS }).notNull(),
+    templateBody: text("template_body").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    index("prompt_templates_source_prompt_asset_id_idx").on(table.sourcePromptAssetId),
+    index("prompt_templates_source_prompt_version_id_idx").on(table.sourcePromptVersionId),
+    index("prompt_templates_scenario_idx").on(table.scenario),
+    index("prompt_templates_target_agent_idx").on(table.targetAgent),
+    index("prompt_templates_updated_at_idx").on(table.updatedAt),
   ],
 )
 

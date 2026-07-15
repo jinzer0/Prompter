@@ -7217,15 +7217,3280 @@ Phase 13에서 이 결정을 깨뜨리지 마세요.
 14. 앱 실행 및 타입 검사 명령어를 제공합니다.
 15. 수동 테스트 절차를 제공합니다.
 16. 아직 구현하지 않은 기능을 명확히 구분해서 설명합니다.
-
 ```
 
 # Phase 14
 
 ```
+당신은 Prompter라는 Electron 데스크톱 앱을 개발하고 있습니다.
+
+Prompter는 로컬 우선(local-first) 프롬프트 컴파일러이자 프롬프트 라이브러리입니다. 이 앱의 목적은 모호한 인간의 요청을 에이전트가 실행 가능한 프롬프트로 변환하고, 이를 버전 관리되는 프롬프트 자산으로 저장하며, Codex, Claude Code, Cursor 및 일반 LLM 에이전트에 사용할 수 있도록 내보내는 것입니다.
+
+현재까지 완료되었다고 가정하는 단계:
+
+Phase 0:
+
+* Electron, React, TypeScript, Vite 기반 앱 골격
+* main, preload, renderer 분리
+* 안전한 Electron 기본 설정
+* typed preload bridge
+* IPC ping/pong 테스트
+
+Phase 1:
+
+* Tailwind CSS 기반 기본 UI
+* 3단 레이아웃
+* 재사용 가능한 기본 UI 컴포넌트
+
+Phase 2:
+
+* SQLite + Drizzle ORM + better-sqlite3 기반 로컬 DB
+* DB는 Electron main process에서만 접근
+* renderer는 typed IPC를 통해서만 DB 기능 호출
+* Zod 기반 IPC 입력값 검증
+
+Phase 3:
+
+* 프로젝트 생성 및 프로젝트별 프롬프트 목록 표시
+* PromptAsset + PromptVersion 저장
+* 프롬프트 선택 및 상세 표시
+
+Phase 4:
+
+* 정적 템플릿 기반 프롬프트 컴파일러 UI
+* 생성 프롬프트 저장 가능
+
+Phase 9:
+
+* Settings UI
+* OpenAI API Key 안전 저장
+* 기본 모델, 대상 에이전트, 시나리오 설정
+
+Phase 5:
+
+* LLM 기반 analyze / compile
+* clarification question 생성
+* 최종 compiledPrompt 생성
+* LLM 호출은 Electron main process에서만 수행
+
+Phase 6:
+
+* 프롬프트 버전 관리
+* current version 지정
+* 새 버전 저장
+* diff view
+
+Phase 7:
+
+* SQLite FTS 검색
+* 태그 생성, 연결, 제거
+* 프로젝트, 태그, 시나리오, 대상 에이전트 필터
+
+Phase 8:
+
+* Markdown, Codex, Claude Code, Cursor, Generic Agent export
+* AGENTS.md snippet export
+* SKILL.md draft export
+* 클립보드 복사 및 파일 저장
+
+Phase 10:
+
+* 테스트, polish, macOS 패키징
+* 키보드 단축키
+* 앱 메뉴
+* 보안 점검
+* README 및 QA 체크리스트
+* narrow menu action channel 구현
+
+Phase 11:
+
+* 빠른 캡처는 버튼 + File 메뉴 + 앱 포커스 상태의 CmdOrCtrl+Shift+V accelerator로 한정
+* window.prompter.clipboard.readText() 최소 API 구현
+* 기존 menu.onAction / MENU_ACTION_CHANNEL 재사용
+* OS 전역 단축키 없음
+* quick_capture_* settings 없음
+* 클립보드 텍스트 원문 보존
+* 자동 trim/cleanup 없음
+* append 옵션 없음
+* 자동 LLM 호출 없음
+* 자동 저장 없음
+* 클립보드 내용 로그 없음
+* 클립보드 내용 자동 persistence 없음
+
+Phase 12:
+
+* 기본 하네스 템플릿 seed
+* 하네스 템플릿 목록, 상세, 생성, 수정, 복제, 삭제 UI
+* PromptCompilerPanel에서 하네스 템플릿 선택 가능
+* 선택된 하네스 템플릿이 정적 컴파일러와 LLM PromptCompilerService에 반영됨
+* 하네스 선택은 originalInput, scenario, targetAgent를 자동 덮어쓰지 않음
+* 하네스 선택은 자동 analyze, 자동 compile, 자동 저장을 실행하지 않음
+* 하네스 선택 시 stale compiler state 초기화
+* template_body는 코드로 실행되지 않음
+
+Phase 13:
+
+* 프로젝트별 context profile CRUD
+* 프로젝트마다 default context profile 지정 가능
+* PromptCompilerPanel에서 project context profile 선택 및 include 가능
+* 정적 컴파일러와 LLM PromptCompilerService에 project context profile 반영
+* project context는 originalInput, manual context, scenario, targetAgent를 자동 덮어쓰지 않음
+* context 선택은 자동 analyze, 자동 compile, 자동 저장을 실행하지 않음
+* repo_path가 있어도 파일 시스템 자동 접근 없음
+
+이 작업은 Phase 14: 프롬프트 품질 점수 / 리뷰어입니다.
+
+목표:
+저장된 PromptVersion 또는 현재 컴파일러 draft의 compiledPrompt를 평가하여 품질 점수, 세부 점수, 문제점, 개선 제안, 누락된 섹션, 위험 신호를 보여주는 Prompt Quality Reviewer를 구현합니다.
+
+이 기능은 프롬프트를 실행하지 않습니다.
+이 기능은 Codex, Claude Code, Cursor 같은 외부 에이전트를 실행하지 않습니다.
+이 기능은 프롬프트 실행 결과를 저장하지 않습니다.
+이 기능은 “프롬프트 자체가 얼마나 실행 가능한 작업 명세인지”만 평가합니다.
+
+중요:
+프롬프트 실행 기능을 추가하지 마세요.
+Codex CLI를 호출하지 마세요.
+Claude Code CLI를 호출하지 마세요.
+Cursor를 자동 실행하지 마세요.
+외부 앱을 자동 제어하지 마세요.
+외부 repo를 자동 스캔하지 마세요.
+repo_path 기반 파일 읽기를 하지 마세요.
+프롬프트 실행 결과 저장 기능을 추가하지 마세요.
+prompt_runs, agent_runs, execution_results, validation_results, run_logs를 만들거나 사용하지 마세요.
+OS 전역 단축키를 추가하지 마세요.
+window.prompter.appEvents.*를 추가하지 마세요.
+window.prompter.shortcuts.*를 추가하지 마세요.
+quick_capture_* settings key를 추가하지 마세요.
+이번 단계는 프롬프트 품질 평가와 리뷰 UI에만 집중합니다.
+
+Phase 11 / Phase 12 / Phase 13 guardrail:
+
+* quick capture 동작을 변경하지 마세요.
+* 클립보드 텍스트를 자동 정리하지 마세요.
+* 하네스 템플릿 선택 로직을 변경하지 마세요.
+* 프로젝트 컨텍스트 프로파일 선택 로직을 변경하지 마세요.
+* 품질 리뷰는 자동 LLM 호출을 실행하면 안 됩니다.
+* 품질 리뷰는 자동 저장을 실행하면 안 됩니다.
+* 품질 리뷰는 originalInput, scenario, targetAgent, harnessTemplateId, projectContextProfileId를 자동 변경하면 안 됩니다.
+* 품질 리뷰 결과를 바탕으로 compiledPrompt를 자동 수정하지 마세요.
+* 개선안 적용은 사용자가 명시적으로 선택할 때만 수행합니다.
+
+품질 리뷰의 범위:
+리뷰 대상은 다음 중 하나입니다.
+
+1. 저장된 PromptVersion
+
+* prompt_version_id 기준
+* compiled_prompt 중심으로 평가
+* original_input, assumptions, questions, answers, acceptance_criteria, validation_commands도 참고 가능
+
+2. 현재 PromptCompilerPanel draft
+
+* 아직 저장되지 않은 compiledPrompt
+* originalInput과 선택된 scenario, targetAgent, harnessTemplate, project context를 참고 가능
+* 리뷰 결과는 자동 저장하지 않음
+
+품질 리뷰 방식:
+두 가지 리뷰 모드를 지원합니다.
+
+1. Local heuristic review
+
+* API Key 없이 동작
+* 문자열/구조 기반 검사
+* 필수 섹션 존재 여부
+* 목표 명확성
+* 제약 조건 존재 여부
+* 성공 기준 존재 여부
+* 검증 명령어 존재 여부
+* out of scope 존재 여부
+* 너무 짧거나 너무 긴 프롬프트 경고
+* 모호한 표현 탐지
+
+2. LLM review
+
+* 사용자가 명시적으로 버튼을 눌렀을 때만 실행
+* OpenAI SDK는 Electron main process에서만 사용
+* API Key가 없으면 명확한 에러 표시
+* LLM은 프롬프트를 실행하지 않고 리뷰만 수행
+* LLM 출력은 JSON schema로 받고 Zod로 검증
+* LLM review 결과는 사용자가 저장을 선택할 때만 저장
+
+MVP 요구사항:
+
+* Local heuristic review는 필수
+* LLM review는 가능하면 구현
+* LLM review가 범위를 키우면 Local review를 먼저 완성하고 LLM review는 main service skeleton + UI placeholder 정도로 분리해도 됩니다.
+* 단, Phase 5에서 이미 OpenAI SDK와 PromptCompilerService가 있으므로, LLM review를 main process service로 추가하는 것을 권장합니다.
+
+점수 체계:
+전체 점수는 0에서 100 사이 number로 표현합니다.
+
+세부 점수:
+
+* objectiveClarity: 0-100
+* contextCompleteness: 0-100
+* taskSpecificity: 0-100
+* scopeControl: 0-100
+* constraintsQuality: 0-100
+* acceptanceCriteriaQuality: 0-100
+* validationStrength: 0-100
+* agentReadiness: 0-100
+* ambiguityRisk: 0-100, 낮을수록 좋지만 표시에서는 risk로 표현
+* safetyAndBoundaryControl: 0-100
+
+전체 점수 계산:
+
+* Local heuristic에서는 weighted average로 계산합니다.
+* LLM review에서는 LLM이 전체 점수를 반환하되, Zod 검증 후 0-100 범위로 clamp합니다.
+* ambiguityRisk는 위험 점수이므로 전체 점수 계산 시 inverse로 반영하거나 별도 표시합니다.
+* 계산 방식은 shared utility에 분리합니다.
+
+등급:
+
+* 90-100: Excellent
+* 75-89: Good
+* 60-74: Usable
+* 40-59: Needs work
+* 0-39: Weak
+
+UI 라벨은 한국어로 표시해도 됩니다.
+예:
+
+* Excellent: 매우 좋음
+* Good: 좋음
+* Usable: 사용 가능
+* Needs work: 개선 필요
+* Weak: 약함
+
+리뷰 결과 구조:
+PromptQualityReviewResult:
+
+* id?: string
+* promptVersionId?: string | null
+* source: "draft" | "prompt_version"
+* reviewMode: "local" | "llm"
+* overallScore: number
+* grade: "excellent" | "good" | "usable" | "needs_work" | "weak"
+* dimensionScores: object
+* strengths: string[]
+* issues: PromptQualityIssue[]
+* suggestions: PromptQualitySuggestion[]
+* missingSections: string[]
+* warnings: string[]
+* recommendedClarifyingQuestions: string[]
+* improvedPromptDraft?: string | null
+* createdAt: number
+
+PromptQualityIssue:
+
+* id: string
+* severity: "low" | "medium" | "high"
+* category: string
+* message: string
+* evidence?: string
+* recommendation?: string
+
+PromptQualitySuggestion:
+
+* id: string
+* type: "add" | "revise" | "remove" | "clarify" | "restructure"
+* title: string
+* description: string
+* suggestedText?: string
+
+중요:
+
+* improvedPromptDraft는 자동으로 기존 compiledPrompt를 덮어쓰지 않습니다.
+* 사용자가 명시적으로 “개선안을 새 버전으로 저장”을 누를 때만 새 PromptVersion으로 저장합니다.
+* 기존 PromptVersion의 compiled_prompt를 자동 수정하지 마세요.
+
+DB 저장 정책:
+MVP에서는 두 가지 중 하나를 선택합니다.
+
+권장 방식 A:
+prompt_quality_reviews 테이블을 추가합니다.
+
+필드:
+
+* id: text, primary key
+* prompt_version_id: text, nullable, references prompt_versions.id
+* source: text, required
+* review_mode: text, required
+* overall_score: integer, required
+* grade: text, required
+* dimension_scores: text, required, JSON string
+* strengths: text, nullable, JSON string
+* issues: text, nullable, JSON string
+* suggestions: text, nullable, JSON string
+* missing_sections: text, nullable, JSON string
+* warnings: text, nullable, JSON string
+* recommended_clarifying_questions: text, nullable, JSON string
+* improved_prompt_draft: text, nullable
+* created_at: integer, required
+
+장점:
+
+* 같은 PromptVersion에 여러 번 리뷰 가능
+* local review와 LLM review를 비교 가능
+* 리뷰 이력을 볼 수 있음
+
+권장 방식 B:
+prompt_versions에 quality_score만 업데이트하고 상세 리뷰는 저장하지 않음.
+
+장점:
+
+* 단순함
+* migration 최소화
+
+선택 기준:
+
+* 구현 부담이 괜찮다면 방식 A를 선택하세요.
+* 단, prompt_quality_reviews는 프롬프트 실행 결과가 아닙니다.
+* 테이블명에 run, execution, result 같은 실행 뉘앙스를 넣지 마세요.
+* prompt_runs 또는 execution_results를 만들면 안 됩니다.
+
+이번 Phase에서는 방식 A를 권장합니다.
+
+추가로 prompt_versions.quality_score는 최신 리뷰 overallScore로 업데이트할 수 있습니다.
+단, 업데이트는 사용자가 “리뷰 저장” 또는 “점수 반영”을 명시적으로 누른 경우에만 수행합니다.
+자동 업데이트하지 마세요.
+
+이번 단계에서 구현할 주요 기능:
+
+1. Local heuristic quality reviewer
+
+shared 또는 main-safe utility로 local reviewer를 구현합니다.
+
+권장 위치:
+
+* src/shared/quality/qualityTypes.ts
+* src/shared/quality/qualitySchemas.ts
+* src/shared/quality/localPromptQualityReviewer.ts
+* src/shared/quality/scorePromptQuality.ts
+* src/shared/quality/detectPromptSections.ts
+* src/shared/quality/detectAmbiguity.ts
+
+검사 항목:
+
+* 필수 섹션 존재 여부
+
+  * # Objective
+  * # Context
+  * # Task
+  * # Scope
+  * # Constraints
+  * # Acceptance Criteria
+  * # Validation
+  * # Working Instructions
+  * # Final Response Format
+* Objective가 너무 짧거나 비어 있는지
+* Task가 구체적인 액션을 포함하는지
+* Scope에 out of scope가 있는지
+* Constraints가 존재하는지
+* Acceptance Criteria가 체크 가능한 형태인지
+* Validation 명령어 또는 검증 지침이 있는지
+* Final Response Format이 있는지
+* “잘”, “적절히”, “필요하면”, “가능하면”, “깔끔하게”, “최적화” 같은 모호한 표현이 과하게 많은지
+* “전부 고쳐”, “알아서 해”, “완벽하게 해” 같은 과도하게 넓은 지시가 있는지
+* 금지 사항이나 경계가 없는지
+* targetAgent별 지침이 반영되어 있는지
+* scenario별 필요한 지침이 반영되어 있는지
+
+주의:
+
+* heuristic은 완벽할 필요 없습니다.
+* 하지만 결과가 일관적이어야 합니다.
+* 사람이 이해할 수 있는 issues와 suggestions를 반환해야 합니다.
+* originalInput, compiledPrompt whitespace를 변경하지 마세요.
+
+2. LLM quality reviewer service
+
+main process에 LLM 기반 품질 리뷰 서비스를 추가합니다.
+
+권장 위치:
+
+* src/main/services/promptQuality/PromptQualityReviewService.ts
+* src/main/services/promptQuality/prompts.ts
+* src/main/ipc/promptQuality.ts
+
+입력:
+
+* source: "draft" | "prompt_version"
+* promptVersionId?: string
+* originalInput?: string
+* compiledPrompt: string
+* scenario?: PromptScenario
+* targetAgent?: TargetAgent
+* harnessTemplateId?: string | null
+* projectContextProfileId?: string | null
+* includeProjectContextProfile?: boolean
+* reviewMode: "local" | "llm"
+
+LLM review 요구사항:
+
+* OpenAI SDK는 main process에서만 사용합니다.
+* API Key는 Phase 9 secret store에서 main process 내부로만 읽습니다.
+* renderer에 API Key를 반환하지 않습니다.
+* LLM에게 프롬프트를 실행하지 말고 리뷰만 하라고 명시합니다.
+* LLM 출력은 JSON schema로 받고 Zod로 검증합니다.
+* schema 검증 실패 시 recoverable error를 반환합니다.
+* API Key가 없으면 local review를 제안하는 메시지를 반환합니다.
+* LLM review 버튼을 누른 경우에만 호출합니다.
+* 자동 호출 금지
+
+LLM reviewer system prompt 요지:
+
+* 너는 agent prompt quality reviewer다.
+* 사용자의 프롬프트를 실행하지 않는다.
+* 외부 도구를 호출하지 않는다.
+* 코드를 작성하거나 수정하지 않는다.
+* 프롬프트가 코딩 에이전트에게 충분히 실행 가능한지 평가한다.
+* objective, context, task, scope, constraints, acceptance criteria, validation, response format을 기준으로 평가한다.
+* 모호성, 범위 과다, 검증 부족, 성공 기준 부족, 안전 경계 부족을 찾아낸다.
+* 개선 제안을 제공하되 자동 수정하지 않는다.
+* 출력은 반드시 JSON schema를 따른다.
+
+3. prompt_quality_reviews repository / service
+
+방식 A를 선택한 경우 repository/service를 구현합니다.
+
+권장 함수:
+
+* createPromptQualityReview(input)
+* listPromptQualityReviewsForVersion(promptVersionId)
+* getLatestPromptQualityReview(promptVersionId)
+* getPromptQualityReview(id)
+* deletePromptQualityReview(id)
+* applyQualityScoreToPromptVersion(promptVersionId, reviewId)
+* saveImprovedPromptAsNewVersion(input), 선택
+
+주의:
+
+* delete는 필수 아님
+* applyQualityScoreToPromptVersion은 사용자가 명시적으로 눌렀을 때만 실행
+* saveImprovedPromptAsNewVersion은 improvedPromptDraft가 있을 때만 가능
+* saveImprovedPromptAsNewVersion은 기존 Phase 6의 createNextVersion 흐름을 사용해야 합니다.
+* version_number는 main process에서 계산해야 합니다.
+
+4. PromptVersion 상세 UI에 품질 패널 추가
+
+선택된 PromptVersion 상세 영역에 Quality Review 패널을 추가합니다.
+
+표시 항목:
+
+* 현재 quality_score
+* latest review overallScore
+* grade badge
+* dimension scores
+* strengths
+* issues
+* suggestions
+* missing sections
+* warnings
+* recommended clarifying questions
+* review createdAt
+* review mode
+
+액션:
+
+* Local review 실행
+* LLM review 실행
+* 리뷰 저장, draft 리뷰인 경우
+* 최신 리뷰를 quality_score에 반영
+* improvedPromptDraft가 있으면 “새 버전으로 저장” 버튼 표시
+* 리뷰 이력 보기, 가능하면 구현
+
+UI 상태:
+
+* no review empty state
+* reviewing loading state
+* API Key 없음
+* LLM review 실패
+* schema 검증 실패
+* local review 성공
+* review saved
+* score applied
+
+5. PromptCompilerPanel draft review
+
+저장 전 draft 상태에서도 품질 리뷰를 실행할 수 있어야 합니다.
+
+동작:
+
+* 현재 compiledPrompt가 있으면 리뷰 가능
+* compiledPrompt가 없으면 “먼저 프롬프트를 생성하세요” 메시지 표시
+* draft local review는 바로 가능
+* draft LLM review는 사용자가 명시적으로 클릭해야 함
+* draft review 결과는 자동 저장하지 않음
+* 사용자가 프롬프트 저장 시 review score를 함께 반영할지 선택 가능하면 좋음
+* 범위가 커지면 저장된 PromptVersion 리뷰만 우선 구현하고 draft review는 local만 구현해도 됩니다.
+
+중요:
+
+* draft review는 originalInput을 변경하지 않습니다.
+* draft review는 scenario, targetAgent를 변경하지 않습니다.
+* draft review는 harnessTemplateId, projectContextProfileId를 변경하지 않습니다.
+* draft review는 자동 compile을 실행하지 않습니다.
+
+6. 개선안 적용 흐름
+
+LLM review가 improvedPromptDraft를 제공할 수 있습니다.
+
+요구사항:
+
+* improvedPromptDraft를 preview로 보여줍니다.
+* 기존 compiledPrompt와 improvedPromptDraft diff를 볼 수 있으면 좋습니다.
+* “현재 프롬프트 덮어쓰기”는 기본적으로 제공하지 마세요.
+* 저장된 PromptVersion의 경우:
+
+  * “개선안을 새 버전으로 저장” 버튼 제공
+  * 기존 PromptAsset에 새 PromptVersion으로 저장
+  * version_number는 main process에서 계산
+  * 저장 후 새 버전을 current version으로 지정할지 선택 또는 기본 true
+* draft의 경우:
+
+  * “draft에 개선안 적용” 버튼을 제공할 수 있습니다.
+  * 이 경우 사용자의 명시적 클릭이 필요합니다.
+  * 적용 시 stale review state는 초기화하거나 “적용 전 리뷰”로 표시합니다.
+
+권장:
+
+* 저장된 PromptVersion에는 새 버전 저장만 허용
+* draft에는 명시적 적용 허용
+* 자동 적용 금지
+
+7. search / list UI에 품질 점수 표시
+
+Phase 7 검색 결과와 프롬프트 카드에 quality_score를 표시합니다.
+
+요구사항:
+
+* PromptAsset 카드에 current version quality_score 표시
+* 점수 없으면 “미평가” 표시
+* grade badge 표시, 가능하면 구현
+* 검색 결과 sortBy에 quality_score 추가 가능, 선택
+* 필터에 quality score 범위 추가는 이번 단계에서 필수 아님
+
+주의:
+
+* quality_score 표시를 위해 검색 성능을 크게 망치지 마세요.
+* current version 기준으로만 표시하면 충분합니다.
+
+8. export와의 관계
+
+Phase 8 export content에 quality review를 자동 포함하지 마세요.
+
+선택 구현:
+
+* Markdown export에 “Include quality review” checkbox를 추가할 수 있습니다.
+* 기본값은 false
+* Codex/Claude/Cursor agent prompt export에는 quality review를 기본 포함하지 마세요.
+* 에이전트에게 전달할 작업 프롬프트에 리뷰 메타데이터를 과하게 넣으면 오히려 지시가 흐려집니다. 인간 문서도 그렇습니다.
+
+이번 단계에서는 export 변경은 선택사항입니다.
+
+9. IPC API 요구사항
+
+preload bridge에 다음 API를 추가합니다.
+
+권장 API:
+
+* window.prompter.promptQuality.reviewDraft(input)
+* window.prompter.promptQuality.reviewVersion(input)
+* window.prompter.promptQuality.saveReview(input)
+* window.prompter.promptQuality.listReviewsForVersion(promptVersionId)
+* window.prompter.promptQuality.getLatestReview(promptVersionId)
+* window.prompter.promptQuality.applyScoreToVersion(input)
+* window.prompter.promptQuality.saveImprovedPromptAsNewVersion(input), 선택
+
+reviewDraft input:
+
+* reviewMode: "local" | "llm"
+* originalInput?: string
+* compiledPrompt: string
+* scenario?: PromptScenario
+* targetAgent?: TargetAgent
+* harnessTemplateId?: string | null
+* projectContextProfileId?: string | null
+* includeProjectContextProfile?: boolean
+
+reviewVersion input:
+
+* reviewMode: "local" | "llm"
+* promptVersionId: string
+
+applyScoreToVersion input:
+
+* promptVersionId: string
+* reviewId: string
+
+saveImprovedPromptAsNewVersion input:
+
+* promptAssetId: string
+* sourcePromptVersionId: string
+* reviewId: string
+* makeCurrent?: boolean
+
+금지:
+
+* promptRuns 관련 API 추가 금지
+* executionResults 관련 API 추가 금지
+* Codex 실행 API 추가 금지
+* shortcuts/appEvents/globalShortcut API 추가 금지
+
+10. Zod schema 요구사항
+
+다음 schema를 정의합니다.
+
+* PromptQualityReviewModeSchema
+* PromptQualityGradeSchema
+* PromptQualityDimensionScoresSchema
+* PromptQualityIssueSchema
+* PromptQualitySuggestionSchema
+* PromptQualityReviewResultSchema
+* ReviewDraftInputSchema
+* ReviewVersionInputSchema
+* SavePromptQualityReviewInputSchema
+* ApplyQualityScoreToVersionInputSchema
+* SaveImprovedPromptAsNewVersionInputSchema
+* ListPromptQualityReviewsInputSchema
+
+검증 규칙:
+
+* compiledPrompt는 빈 문자열 불가
+* promptVersionId는 빈 문자열 불가
+* reviewMode는 local 또는 llm
+* score는 0 이상 100 이하
+* severity는 low / medium / high
+* grade는 허용 enum
+* arrays는 누락 시 빈 배열로 normalize 가능
+* improvedPromptDraft는 optional string
+* LLM 출력 score는 0-100 범위로 clamp하거나 검증 실패 처리
+
+추가하지 말아야 할 schema:
+
+* PromptRunSchema
+* AgentRunSchema
+* ExecutionResultSchema
+* ValidationResultSchema
+* QuickCaptureSettingsSchema
+* RegisterGlobalShortcutInputSchema
+
+11. UI 구조 권장
+
+Renderer:
+
+* src/renderer/components/quality/PromptQualityPanel.tsx
+* src/renderer/components/quality/QualityScoreBadge.tsx
+* src/renderer/components/quality/QualityDimensionScores.tsx
+* src/renderer/components/quality/QualityIssuesList.tsx
+* src/renderer/components/quality/QualitySuggestionsList.tsx
+* src/renderer/components/quality/QualityReviewHistory.tsx
+* src/renderer/components/quality/ImprovedPromptPreview.tsx
+* src/renderer/hooks/usePromptQuality.ts
+
+Shared:
+
+* src/shared/quality/qualityTypes.ts
+* src/shared/quality/qualitySchemas.ts
+* src/shared/quality/localPromptQualityReviewer.ts
+* src/shared/quality/scorePromptQuality.ts
+* src/shared/quality/detectPromptSections.ts
+* src/shared/quality/detectAmbiguity.ts
+* src/shared/quality/qualityGrade.ts
+
+Main:
+
+* src/main/repositories/promptQualityReviewRepository.ts
+* src/main/services/promptQuality/PromptQualityReviewService.ts
+* src/main/services/promptQuality/prompts.ts
+* src/main/ipc/promptQuality.ts
+
+Compiler / prompt integration:
+
+* 기존 PromptCompilerPanel
+* 기존 PromptVersion detail panel
+* 기존 prompt repository/service
+* 기존 createNextVersion 흐름
+
+12. stale state 규칙
+
+품질 리뷰 결과도 stale 상태가 될 수 있습니다.
+
+다음 변경이 발생하면 draft quality review 결과는 stale 처리하거나 초기화해야 합니다.
+
+* originalInput 변경
+* compiledPrompt 변경
+* scenario 변경
+* targetAgent 변경
+* harnessTemplateId 변경
+* projectContextProfileId 변경
+* includeProjectContextProfile 변경
+* manual projectContext 변경
+* constraints 변경
+* acceptanceCriteria 변경
+* validationCommands 변경
+
+중요:
+
+* stale quality review 처리 때문에 originalInput이나 compiledPrompt를 자동 변경하지 마세요.
+* stale review를 자동 재실행하지 마세요.
+* 자동 LLM review 금지
+
+13. 보안 요구사항
+
+* LLM review는 main process에서만 수행합니다.
+* API Key는 renderer로 반환하지 않습니다.
+* API Key를 로그에 남기지 않습니다.
+* reviewed prompt content를 불필요하게 console.log하지 않습니다.
+* 사용자가 prompt에 secret을 넣었을 수 있으므로 prompt body 전체를 로그로 남기지 마세요.
+* prompt review는 prompt execution이 아닙니다.
+* 외부 에이전트를 실행하지 않습니다.
+* repo_path가 있어도 파일 시스템을 읽지 않습니다.
+* renderer에서 DB, fs, path, process, safeStorage, ipcRenderer에 직접 접근하지 않습니다.
+* prompt_quality_reviews는 실행 결과 저장소가 아닙니다.
+* prompt_runs, execution_results 등 실행 결과 테이블을 만들지 않습니다.
+
+14. TDD 구현 순서
+
+가능하면 다음 순서로 구현하세요.
+
+1. quality schema 테스트 작성
+
+* valid review result
+* invalid score
+* invalid grade
+* invalid severity
+* empty compiledPrompt 거부
+* arrays default 처리
+
+2. local reviewer 테스트 작성
+
+* 필수 섹션이 모두 있으면 높은 점수
+* Objective 누락 시 issue 생성
+* Validation 누락 시 issue 생성
+* Acceptance Criteria 누락 시 issue 생성
+* Scope/Out of scope 누락 시 issue 생성
+* 모호한 표현이 많으면 ambiguity issue 생성
+* 너무 짧은 prompt는 낮은 점수
+* code block과 Markdown을 훼손하지 않음
+
+3. grade utility 테스트 작성
+
+* 95 => excellent
+* 80 => good
+* 65 => usable
+* 50 => needs_work
+* 20 => weak
+
+4. repository/service 테스트, 가능하면
+
+* create review
+* list reviews for version
+* get latest review
+* apply score to prompt version
+* save improved prompt as new version
+
+5. LLM service schema 테스트, 가능하면
+
+* LLM output schema valid
+* malformed output recoverable error
+* API Key 없음 error
+* review does not execute prompt
+
+6. UI behavior 테스트, 가능하면
+
+* Local review button works
+* LLM review button requires explicit click
+* no compiledPrompt disables review
+* review result displayed
+* apply improved prompt requires explicit action
+
+15. 파일별 예상 변경
+
+예상 변경 파일:
+
+* DB schema / migration 파일, prompt_quality_reviews 선택 시
+* shared quality schema/type 파일 추가
+* local reviewer utility 추가
+* quality score / grade utility 추가
+* promptQualityReviewRepository 추가
+* PromptQualityReviewService 추가
+* promptQuality IPC handler 추가
+* preload bridge 타입 추가
+* PromptVersion detail panel에 Quality panel 추가
+* PromptCompilerPanel에 draft review entry 추가
+* PromptAsset card / search result card에 quality_score 표시
+* createNextVersion flow와 improvedPromptDraft 저장 연결, 선택
+* 관련 테스트 파일 추가
+
+건드리지 말아야 할 것:
+
+* quick capture trim/cleanup 추가 금지
+* quick_capture settings 추가 금지
+* globalShortcut 추가 금지
+* appEvents bridge 추가 금지
+* shortcuts bridge 추가 금지
+* prompt_runs 관련 schema 추가 금지
+* 실행 결과 저장 관련 코드 추가 금지
+* 외부 repo 자동 스캔 추가 금지
+* prompt execution service 추가 금지
+
+16. 의존성 그래프
+
+권장 의존성 방향:
+
+shared/quality schemas
+→ shared/local quality reviewer
+→ main promptQuality repository/service
+→ main IPC promptQuality
+→ preload typed bridge
+→ renderer quality hooks
+→ renderer quality components
+→ PromptVersion detail / PromptCompilerPanel integration
+
+금지 방향:
+
+* renderer → OpenAI SDK 직접 접근
+* renderer → DB 직접 접근
+* renderer → Electron ipcRenderer 직접 접근
+* renderer → fs/path/process 직접 접근
+* quality reviewer → external coding agent execution
+* quality review → prompt run history
+* review result → automatic prompt mutation
+
+17. 자동 테스트 목록
+
+가능한 경우 다음 테스트를 추가하세요.
+
+Schema:
+
+* PromptQualityReviewResultSchema accepts valid result
+* rejects score below 0
+* rejects score above 100
+* rejects invalid severity
+* rejects invalid reviewMode
+* ReviewDraftInput rejects empty compiledPrompt
+* ReviewVersionInput rejects empty promptVersionId
+
+Local reviewer:
+
+* detects missing Objective
+* detects missing Context
+* detects missing Acceptance Criteria
+* detects missing Validation
+* detects missing Final Response Format
+* detects vague language
+* detects overly broad instruction
+* returns grade based on score
+* preserves prompt text
+* does not mutate input
+
+Repository/service:
+
+* creates quality review
+* lists quality reviews by promptVersionId
+* gets latest review
+* applies overallScore to prompt_versions.quality_score
+* saves improvedPromptDraft as next version, if implemented
+* does not create prompt_runs or execution_results
+
+LLM review:
+
+* requires API Key
+* validates JSON output
+* handles malformed model output
+* does not call external agents
+* does not execute prompt
+
+UI behavior:
+
+* no compiledPrompt shows empty state
+* local review works without API Key
+* LLM review requires explicit click
+* review result displays score and issues
+* apply score requires explicit user action
+* improvedPromptDraft does not overwrite automatically
+
+18. 수동 QA 체크리스트
+
+| 항목                               | 기대 결과                                    |
+| -------------------------------- | ---------------------------------------- |
+| 저장된 PromptVersion 선택             | 품질 패널 표시                                 |
+| 리뷰 없음                            | “아직 리뷰 없음” empty state                   |
+| Local review 실행                  | API Key 없이 점수와 issues 생성                 |
+| LLM review 실행                    | 명시적 클릭 후 main process에서만 호출              |
+| API Key 없음                       | LLM review error, local review 가능        |
+| 필수 섹션 없는 prompt                  | missing section issue 표시                 |
+| Validation 없는 prompt             | validationStrength 낮게 표시                 |
+| Acceptance Criteria 없는 prompt    | 개선 제안 표시                                 |
+| 리뷰 저장                            | prompt_quality_reviews에 저장, 실행 결과 테이블 아님 |
+| 점수 반영                            | prompt_versions.quality_score 업데이트       |
+| 프롬프트 카드                          | current version quality_score 표시         |
+| improvedPromptDraft              | 자동 덮어쓰기 없음                               |
+| 개선안 새 버전 저장                      | 기존 PromptAsset에 새 PromptVersion 생성       |
+| draft review                     | 자동 저장 없음                                 |
+| draft review                     | originalInput 변경 없음                      |
+| quick capture 후 review           | 클립보드 원문 보존                               |
+| harness 적용 prompt review         | 하네스 선택값 유지                               |
+| project context 적용 prompt review | context 선택값 유지                           |
+| 앱 재시작                            | 저장된 리뷰 이력 유지                             |
+| prompt_runs 확인                   | 실행 결과 관련 데이터 생성 없음                       |
+
+19. Attribution
+
+이 Phase 14 명세는 Phase 11, Phase 12, Phase 13의 최종 guardrail을 반영합니다.
+
+반영된 Phase 11 결정:
+
+* 빠른 캡처는 버튼 + File 메뉴 + 앱 포커스 상태의 CmdOrCtrl+Shift+V accelerator로 한정
+* 기존 menu.onAction / MENU_ACTION_CHANNEL 재사용
+* window.prompter.appEvents.* 추가 없음
+* window.prompter.shortcuts.* 추가 없음
+* OS globalShortcut 없음
+* quick_capture_* settings 없음
+* 클립보드 텍스트 원문 보존
+* 자동 trim/cleanup 없음
+* append 옵션 없음
+* no-auto-LLM, no-auto-save, no-log, no-persistence guardrail 유지
+
+반영된 Phase 12 결정:
+
+* 하네스 템플릿은 프롬프트 구조와 컴파일 규칙을 담당
+* 하네스 선택은 originalInput/scenario/targetAgent를 자동 덮어쓰지 않음
+* 하네스 선택은 자동 analyze/compile/save를 실행하지 않음
+* 하네스 선택은 stale compiler state를 초기화
+* template_body는 코드로 실행하지 않음
+* 하네스 템플릿은 LLM 시스템 프롬프트 전체를 덮어쓰지 않고 추가 지침으로만 반영
+
+반영된 Phase 13 결정:
+
+* 프로젝트 컨텍스트는 사용자 제공 프로젝트 맥락으로만 반영
+* project context 선택은 originalInput/manual context/scenario/targetAgent를 자동 덮어쓰지 않음
+* project context 선택은 자동 analyze/compile/save를 실행하지 않음
+* repo_path는 저장할 수 있어도 파일 시스템 자동 접근 없음
+* 하네스 템플릿과 project context profile은 동시에 적용 가능
+
+Phase 14에서 이 결정을 깨뜨리지 마세요.
+
+20. 이번 단계에서 구현하지 말 것
+
+다음은 절대 구현하지 마세요.
+
+* 프롬프트 실행 기능
+* Codex CLI 실행
+* Codex OAuth
+* Claude Code 실행
+* Cursor 실행
+* 외부 앱 자동 제어
+* 외부 repo 자동 스캔
+* repo_path 기반 파일 읽기
+* git 명령 실행
+* OS 전역 단축키
+* window.prompter.appEvents.*
+* window.prompter.shortcuts.*
+* quick_capture_* settings
+* QuickCaptureSettingsSchema
+* RegisterGlobalShortcutInputSchema
+* clipboard history
+* background clipboard watch
+* external selected text 읽기
+* prompt_runs
+* agent_runs
+* execution_results
+* validation_results
+* run_logs
+* 실행 결과 저장
+* 클라우드 동기화
+* 팀 협업
+* quality marketplace
+* 원격 reviewer 다운로드
+* review result 기반 자동 prompt overwrite
+* 자동 LLM review
+* 자동 prompt 개선 적용
+
+완료 기준:
+
+* Local heuristic Prompt Quality Reviewer가 구현되어 있습니다.
+* 저장된 PromptVersion을 품질 리뷰할 수 있습니다.
+* 현재 draft compiledPrompt를 품질 리뷰할 수 있습니다.
+* API Key 없이 local review가 동작합니다.
+* LLM review는 사용자가 명시적으로 클릭한 경우에만 main process에서 실행됩니다.
+* LLM review 출력은 Zod schema로 검증됩니다.
+* 리뷰 결과는 overallScore, grade, dimensionScores, issues, suggestions, warnings를 포함합니다.
+* 리뷰 결과는 자동으로 prompt를 수정하지 않습니다.
+* 리뷰 결과는 자동으로 quality_score를 업데이트하지 않습니다.
+* 사용자가 명시적으로 선택하면 quality_score를 PromptVersion에 반영할 수 있습니다.
+* improvedPromptDraft가 있는 경우 자동 덮어쓰기 없이 새 PromptVersion으로 저장할 수 있습니다.
+* 프롬프트 카드와 검색 결과에 current version quality_score가 표시됩니다.
+* prompt_quality_reviews 테이블을 추가한 경우, 이는 실행 결과 저장소가 아니며 prompt_runs와 분리되어 있습니다.
+* 모든 IPC 입력값은 Zod로 검증됩니다.
+* renderer는 DB, OpenAI SDK, fs, path, process, safeStorage, ipcRenderer에 직접 접근하지 않습니다.
+* Phase 11 quick capture guardrail, Phase 12 harness guardrail, Phase 13 project context guardrail이 유지됩니다.
+* TypeScript 타입 검사가 통과합니다.
+* 앱이 개발 모드에서 정상 실행됩니다.
+* 프롬프트 실행이나 실행 결과 저장 기능은 추가되지 않았습니다.
+
+작업 전:
+
+1. 현재 Phase 0부터 Phase 13까지의 코드 구조를 확인합니다.
+2. prompt_versions schema와 quality_score 필드 사용 현황을 확인합니다.
+3. PromptVersion detail panel 구조를 확인합니다.
+4. PromptCompilerPanel draft state 구조를 확인합니다.
+5. Phase 11 quick capture stale state 초기화 로직을 확인합니다.
+6. Phase 12 harnessTemplateId draft state와 stale state 초기화 방식을 확인합니다.
+7. Phase 13 projectContextProfileId/includeProjectContextProfile draft state와 stale state 초기화 방식을 확인합니다.
+8. OpenAI SDK 호출이 main process에서만 이루어지는 기존 PromptCompilerService 구조를 확인합니다.
+9. prompt_quality_reviews 테이블을 추가할지, quality_score만 사용할지 결정합니다.
+10. TDD 순서에 따라 schema와 local reviewer 테스트를 먼저 작성합니다.
+11. 간결한 구현 계획을 세운 뒤 Phase 14만 구현합니다.
+
+작업 후:
+
+1. 변경된 내용을 요약합니다.
+2. 생성되거나 수정된 파일 목록을 제공합니다.
+3. schema 또는 migration 변경을 설명합니다.
+4. Local heuristic reviewer의 평가 기준을 설명합니다.
+5. LLM reviewer를 구현했다면 main process 데이터 흐름을 설명합니다.
+6. API Key가 renderer로 노출되지 않는 방식을 설명합니다.
+7. 리뷰 결과 저장 정책을 설명합니다.
+8. quality_score 반영이 자동이 아니라 명시적 액션인 방식을 설명합니다.
+9. improvedPromptDraft가 자동 덮어쓰기 되지 않는 방식을 설명합니다.
+10. PromptVersion detail과 PromptCompilerPanel의 UI 연결 방식을 설명합니다.
+11. Phase 11 quick capture guardrail, Phase 12 harness guardrail, Phase 13 project context guardrail을 유지한 방식을 설명합니다.
+12. 추가한 테스트와 테스트 결과를 설명합니다.
+13. 앱 실행 및 타입 검사 명령어를 제공합니다.
+14. 수동 테스트 절차를 제공합니다.
+15. 아직 구현하지 않은 기능을 명확히 구분해서 설명합니다.
+```
+
+# Phase 15
+
+```
+당신은 Prompter라는 Electron 데스크톱 앱을 개발하고 있습니다.
+
+Prompter는 로컬 우선(local-first) 프롬프트 컴파일러이자 프롬프트 라이브러리입니다. 이 앱의 목적은 모호한 인간의 요청을 에이전트가 실행 가능한 프롬프트로 변환하고, 이를 버전 관리되는 프롬프트 자산으로 저장하며, Codex, Claude Code, Cursor 및 일반 LLM 에이전트에 사용할 수 있도록 내보내는 것입니다.
+
+현재까지 완료되었다고 가정하는 단계:
+
+Phase 0:
+
+* Electron, React, TypeScript, Vite 기반 앱 골격
+* main, preload, renderer 분리
+* 안전한 Electron 기본 설정
+* typed preload bridge
+* IPC ping/pong 테스트
+
+Phase 1:
+
+* Tailwind CSS 기반 기본 UI
+* 3단 레이아웃
+* 재사용 가능한 기본 UI 컴포넌트
+
+Phase 2:
+
+* SQLite + Drizzle ORM + better-sqlite3 기반 로컬 DB
+* DB는 Electron main process에서만 접근
+* renderer는 typed IPC를 통해서만 DB 기능 호출
+* Zod 기반 IPC 입력값 검증
+* prompt_assets.parent_prompt_id 필드 존재 가능
+
+Phase 3:
+
+* 프로젝트 생성 및 프로젝트별 프롬프트 목록 표시
+* PromptAsset + PromptVersion 저장
+* 프롬프트 선택 및 상세 표시
+
+Phase 4:
+
+* 정적 템플릿 기반 프롬프트 컴파일러 UI
+* 생성 프롬프트 저장 가능
+
+Phase 9:
+
+* Settings UI
+* OpenAI API Key 안전 저장
+* 기본 모델, 대상 에이전트, 시나리오 설정
+
+Phase 5:
+
+* LLM 기반 analyze / compile
+* clarification question 생성
+* 최종 compiledPrompt 생성
+* LLM 호출은 Electron main process에서만 수행
+
+Phase 6:
+
+* 프롬프트 버전 관리
+* current version 지정
+* 새 버전 저장
+* diff view
+
+Phase 7:
+
+* SQLite FTS 검색
+* 태그 생성, 연결, 제거
+* 프로젝트, 태그, 시나리오, 대상 에이전트 필터
+
+Phase 8:
+
+* Markdown, Codex, Claude Code, Cursor, Generic Agent export
+* AGENTS.md snippet export
+* SKILL.md draft export
+* 클립보드 복사 및 파일 저장
+
+Phase 10:
+
+* 테스트, polish, macOS 패키징
+* 키보드 단축키
+* 앱 메뉴
+* 보안 점검
+* README 및 QA 체크리스트
+* narrow menu action channel 구현
+
+Phase 11:
+
+* 빠른 캡처는 버튼 + File 메뉴 + 앱 포커스 상태의 CmdOrCtrl+Shift+V accelerator로 한정
+* window.prompter.clipboard.readText() 최소 API 구현
+* 기존 menu.onAction / MENU_ACTION_CHANNEL 재사용
+* OS 전역 단축키 없음
+* quick_capture_* settings 없음
+* 클립보드 텍스트 원문 보존
+* 자동 trim/cleanup 없음
+* append 옵션 없음
+* 자동 LLM 호출 없음
+* 자동 저장 없음
+* 클립보드 내용 로그 없음
+* 클립보드 내용 자동 persistence 없음
+
+Phase 12:
+
+* 기본 하네스 템플릿 seed
+* 하네스 템플릿 목록, 상세, 생성, 수정, 복제, 삭제 UI
+* PromptCompilerPanel에서 하네스 템플릿 선택 가능
+* 선택된 하네스 템플릿이 정적 컴파일러와 LLM PromptCompilerService에 반영됨
+* 하네스 선택은 originalInput, scenario, targetAgent를 자동 덮어쓰지 않음
+* 하네스 선택은 자동 analyze, 자동 compile, 자동 저장을 실행하지 않음
+* 하네스 선택 시 stale compiler state 초기화
+* template_body는 코드로 실행되지 않음
+
+Phase 13:
+
+* 프로젝트별 context profile CRUD
+* 프로젝트마다 default context profile 지정 가능
+* PromptCompilerPanel에서 project context profile 선택 및 include 가능
+* 정적 컴파일러와 LLM PromptCompilerService에 project context profile 반영
+* project context는 originalInput, manual context, scenario, targetAgent를 자동 덮어쓰지 않음
+* context 선택은 자동 analyze, 자동 compile, 자동 저장을 실행하지 않음
+* repo_path가 있어도 파일 시스템 자동 접근 없음
+
+Phase 14:
+
+* Local heuristic Prompt Quality Reviewer
+* 저장된 PromptVersion과 현재 draft compiledPrompt 품질 리뷰 가능
+* API Key 없이 local review 동작
+* LLM review는 사용자가 명시적으로 클릭한 경우에만 main process에서 실행
+* 리뷰 결과는 자동으로 prompt를 수정하지 않음
+* 리뷰 결과는 자동으로 quality_score를 업데이트하지 않음
+* improvedPromptDraft는 자동 덮어쓰기 없이 새 PromptVersion으로 저장 가능
+* prompt_quality_reviews 테이블을 추가한 경우에도 prompt_runs와 분리됨
+
+이 작업은 Phase 15: 프롬프트 파생 / 복제 / 템플릿화 워크플로입니다.
+
+목표:
+좋은 프롬프트를 기반으로 새 프롬프트를 빠르게 만들 수 있도록 “복제”, “파생”, “템플릿화”, “계보 보기” 기능을 구현합니다. 사용자는 기존 PromptVersion을 기반으로 새 PromptAsset을 만들거나, 기존 PromptAsset의 구조를 재사용 가능한 Prompt Template으로 저장하고, 이후 새로운 요구사항을 입력할 때 해당 템플릿을 출발점으로 사용할 수 있어야 합니다.
+
+이 단계의 핵심:
+
+* 기존 프롬프트를 새 프롬프트의 출발점으로 사용
+* parent_prompt_id 또는 별도 lineage metadata로 파생 관계 기록
+* 좋은 PromptVersion을 재사용 가능한 Prompt Template으로 전환
+* PromptCompilerPanel에서 템플릿을 선택해 draft를 시작
+* 파생 관계와 원본을 추적
+* 자동 LLM 호출, 자동 저장, 자동 실행은 하지 않음
+
+중요:
+프롬프트 실행 기능을 추가하지 마세요.
+Codex CLI를 호출하지 마세요.
+Claude Code CLI를 호출하지 마세요.
+Cursor를 자동 실행하지 마세요.
+외부 앱을 자동 제어하지 마세요.
+외부 repo를 자동 스캔하지 마세요.
+repo_path 기반 파일 읽기를 하지 마세요.
+프롬프트 실행 결과 저장 기능을 추가하지 마세요.
+prompt_runs, agent_runs, execution_results, validation_results, run_logs를 만들거나 사용하지 마세요.
+OS 전역 단축키를 추가하지 마세요.
+window.prompter.appEvents.*를 추가하지 마세요.
+window.prompter.shortcuts.*를 추가하지 마세요.
+quick_capture_* settings key를 추가하지 마세요.
+이번 단계는 프롬프트 재사용, 파생 관계, 템플릿화에만 집중합니다.
+
+Phase 11 / 12 / 13 / 14 guardrail:
+
+* quick capture 동작을 변경하지 마세요.
+* 클립보드 텍스트를 자동 정리하지 마세요.
+* 하네스 템플릿 선택 로직을 변경하지 마세요.
+* 프로젝트 컨텍스트 프로파일 선택 로직을 변경하지 마세요.
+* 품질 리뷰어 동작을 자동화하지 마세요.
+* 템플릿 선택은 자동 LLM analyze를 실행하면 안 됩니다.
+* 템플릿 선택은 자동 compile을 실행하면 안 됩니다.
+* 템플릿 선택은 자동 저장을 실행하면 안 됩니다.
+* 템플릿 선택은 originalInput, scenario, targetAgent, harnessTemplateId, projectContextProfileId를 임의로 덮어쓰면 안 됩니다.
+* 템플릿 적용은 사용자가 명시적으로 선택한 경우에만 draft를 변경해야 합니다.
+* 템플릿 적용 후 기존 analyze / compile / quality review 결과는 stale이므로 초기화해야 합니다.
+
+용어 정의:
+
+1. PromptAsset
+
+* 프롬프트의 논리적 자산 단위
+* 여러 PromptVersion을 가질 수 있음
+* parent_prompt_id를 통해 다른 PromptAsset에서 파생될 수 있음
+
+2. PromptVersion
+
+* 실제 original_input, compiled_prompt, assumptions, questions, answers 등을 가진 버전 단위
+
+3. Derived Prompt
+
+* 기존 PromptAsset 또는 PromptVersion을 기반으로 새로 만든 PromptAsset
+* 원본과 파생 관계를 기록해야 함
+
+4. Prompt Template
+
+* 특정 PromptVersion의 구조를 재사용 가능한 출발점으로 만든 것
+* 하네스 템플릿과 다름
+* 하네스 템플릿은 “어떻게 컴파일할지”를 정의
+* Prompt Template은 “어떤 작업 프롬프트 구조를 재사용할지”를 정의
+
+아키텍처 요구사항:
+
+* renderer는 DB에 직접 접근하면 안 됩니다.
+* renderer는 preload bridge에 노출된 typed API만 사용해야 합니다.
+* 복제, 파생, 템플릿 생성은 Electron main process repository/service를 통해 처리합니다.
+* 모든 IPC 입력값은 Zod로 검증합니다.
+* 템플릿 placeholder 치환은 단순 문자열 처리만 사용합니다.
+* template content는 코드로 실행하지 않습니다.
+* eval, new Function, 동적 import를 사용하지 마세요.
+* Prompt Template 선택만으로 LLM 호출, 저장, 실행을 하지 않습니다.
+* 템플릿 적용은 local draft state 변경일 뿐이며, 사용자가 저장하기 전까지 DB에 새 PromptAsset이 생기면 안 됩니다.
+
+데이터 모델:
+
+기존 prompt_assets.parent_prompt_id가 있다면 이를 활용합니다.
+
+추가 권장 테이블 1: prompt_asset_lineage, 선택
+
+기존 parent_prompt_id만으로 충분하면 새 테이블을 만들지 않아도 됩니다.
+다만 어떤 version에서 파생되었는지 추적하려면 별도 lineage 테이블을 권장합니다.
+
+prompt_asset_lineage 필드:
+
+* id: text, primary key
+* child_prompt_asset_id: text, required, references prompt_assets.id
+* parent_prompt_asset_id: text, required, references prompt_assets.id
+* parent_prompt_version_id: text, nullable, references prompt_versions.id
+* relationship_type: text, required
+
+  * duplicate
+  * derived
+  * templated_from
+  * improved_from_review
+* note: text, nullable
+* created_at: integer, required
+
+주의:
+
+* 이미 parent_prompt_id를 사용하고 있다면 중복 책임을 피하세요.
+* MVP에서는 parent_prompt_id + optional parent_version_id 필드 추가 정도로도 충분합니다.
+* 더 명확한 추적이 필요하면 prompt_asset_lineage를 추가하세요.
+* 선택한 방식을 작업 후 설명하세요.
+
+추가 권장 테이블 2: prompt_templates
+
+prompt_templates 필드:
+
+* id: text, primary key
+* name: text, required
+* description: text, nullable
+* source_prompt_asset_id: text, nullable, references prompt_assets.id
+* source_prompt_version_id: text, nullable, references prompt_versions.id
+* scenario: text, required
+* target_agent: text, required
+* template_body: text, required
+* variables: text, nullable, JSON string
+* tags: text, nullable, JSON string
+* created_at: integer, required
+* updated_at: integer, required
+
+Prompt Template은 하네스 템플릿과 분리합니다.
+하네스 템플릿은 compiler structure이고, prompt_templates는 reusable prompt content입니다.
+
+절대 추가하지 말아야 할 테이블:
+
+* prompt_runs
+* agent_runs
+* execution_results
+* validation_results
+* run_logs
+* clipboard_history
+* quick_capture_settings
+
+이번 단계에서 구현할 주요 기능:
+
+1. PromptAsset 복제
+
+선택한 PromptAsset을 복제할 수 있어야 합니다.
+
+동작:
+
+* 원본 PromptAsset의 metadata를 복사
+* current version 또는 사용자가 선택한 PromptVersion을 기반으로 새 PromptAsset 생성
+* 새 PromptAsset의 title은 “{원본 제목} 복사본” 또는 “Copy of {원본 제목}”
+* 새 PromptVersion version_number는 1
+* original_input과 compiled_prompt는 원본 version에서 복사
+* assumptions, questions, answers, acceptance_criteria, validation_commands, quality_score는 복사하되, quality_score는 정책에 따라 null로 초기화 가능
+* parent_prompt_id 또는 lineage record로 원본 관계 기록
+* tags는 복사할지 사용자 선택 가능
+* project_id는 기본적으로 원본과 동일하게 하되, 다른 프로젝트로 복제할 수 있으면 좋음
+
+MVP 정책:
+
+* tags는 기본 복사
+* quality_score는 복사하지 않고 null로 시작하는 것을 권장
+* parent_prompt_id는 원본 PromptAsset id로 설정
+* 복제 후 새 PromptAsset을 선택
+
+2. PromptVersion에서 새 PromptAsset 파생
+
+선택한 PromptVersion을 기반으로 새 PromptAsset을 만들 수 있어야 합니다.
+
+UI 액션:
+
+* “이 버전에서 새 프롬프트 만들기”
+* “파생 프롬프트 생성”
+
+동작:
+
+* 선택된 PromptVersion의 original_input과 compiled_prompt를 기반으로 새 draft를 만들거나
+* 즉시 새 PromptAsset + PromptVersion을 생성할 수 있음
+
+권장 흐름:
+
+* 즉시 저장하지 말고 PromptCompilerPanel draft로 보냅니다.
+* originalInput은 원본 original_input 또는 사용자가 선택한 방식으로 채움
+* compiledPrompt는 원본 compiled_prompt를 초안으로 채움
+* scenario, targetAgent는 원본 PromptAsset metadata를 사용
+* parent source info를 draft metadata로 보관
+* 사용자가 수정 후 명시적으로 저장하면 새 PromptAsset 생성
+* 저장 시 parent_prompt_id 또는 lineage record 생성
+
+이유:
+
+* 파생은 “새 작업”이므로 사용자가 수정할 시간을 줘야 합니다.
+* 자동 저장은 불필요한 쓰레기 프롬프트를 양산합니다. 인간은 이미 충분히 많은 쓰레기 파일을 만들었습니다.
+
+3. 파생 draft 상태
+
+PromptCompilerPanel에 derived-from draft metadata를 추가합니다.
+
+draft metadata 예:
+
+* derivedFromPromptAssetId?: string | null
+* derivedFromPromptVersionId?: string | null
+* derivationType?: "duplicate" | "derived" | "templated_from" | "improved_from_review" | null
+
+UI 표시:
+
+* “원본: {prompt title} v{versionNumber}에서 파생”
+* 원본 보기 버튼
+* 파생 관계 해제 버튼
+
+동작:
+
+* 파생 관계 해제는 draft metadata만 제거
+* originalInput과 compiledPrompt는 사용자가 명시적으로 지우지 않는 한 보존
+* 파생 metadata 변경 시 stale analyze / compile / quality review 결과 초기화
+
+4. Prompt Template 생성
+
+선택한 PromptVersion을 Prompt Template으로 저장할 수 있어야 합니다.
+
+UI 액션:
+
+* “템플릿으로 저장”
+* “Save as Prompt Template”
+
+입력:
+
+* name, 필수
+* description, 선택
+* variables, 선택
+* tags, 선택
+* scenario
+* targetAgent
+* template_body
+
+template_body 기본값:
+
+* 선택된 PromptVersion의 compiled_prompt를 기반으로 생성
+* 사용자가 직접 편집 가능
+* 반복해서 바뀌는 부분은 placeholder로 바꿀 수 있음
+
+지원 placeholder 예:
+
+* {{objective}}
+* {{projectContext}}
+* {{techStack}}
+* {{taskDetails}}
+* {{constraints}}
+* {{acceptanceCriteria}}
+* {{validationCommands}}
+* {{additionalNotes}}
+
+주의:
+
+* 자동으로 placeholder를 과하게 만들지 마세요.
+* MVP에서는 사용자가 직접 placeholder를 편집하게 해도 충분합니다.
+* LLM을 사용해 template variables를 자동 추출하지 마세요.
+* 자동 LLM 호출 금지
+
+5. Prompt Template 목록 / 상세 / 편집 UI
+
+Prompt Template을 관리할 수 있어야 합니다.
+
+기능:
+
+* 목록 표시
+* 검색
+* scenario 필터
+* targetAgent 필터
+* 상세 보기
+* 생성
+* 수정
+* 복제
+* 삭제
+* source prompt로 이동, source가 있는 경우
+
+표시 정보:
+
+* name
+* description
+* scenario
+* targetAgent
+* variables
+* source prompt title, 가능하면
+* updated_at
+
+주의:
+
+* Prompt Template은 Harness Template과 다른 섹션에 표시하세요.
+* 이름이 비슷해 사용자가 헷갈릴 수 있으므로 UI 라벨을 명확히 하세요.
+
+  * Harness Template: 컴파일 규칙
+  * Prompt Template: 재사용 프롬프트
+
+6. Prompt Template 적용
+
+PromptCompilerPanel에서 Prompt Template을 선택해 draft에 적용할 수 있어야 합니다.
+
+동작:
+
+* 템플릿 선택만으로 draft를 변경하지 않습니다.
+* “템플릿 적용” 버튼을 명시적으로 눌렀을 때만 적용합니다.
+* 적용 전 기존 originalInput 또는 compiledPrompt가 있으면 overwrite confirmation 표시
+* append 옵션은 제공하지 않습니다.
+* 적용 시 template_body를 compiledPrompt draft 또는 originalInput draft 중 어디에 넣을지 정책을 명확히 합니다.
+
+권장 정책:
+
+* Prompt Template은 compiledPrompt draft에 적용
+* originalInput은 비워두거나 사용자가 별도 입력
+* 템플릿 안에 {{taskDetails}} 같은 placeholder가 있으면 사용자가 채울 수 있게 표시
+
+대안:
+
+* template_body를 originalInput에 넣어 LLM compile의 입력으로 사용
+* 이 경우 “템플릿을 원본 요청으로 사용”이라는 명확한 UI가 필요
+
+MVP 권장:
+
+* “compiledPrompt 초안으로 적용”
+* 원본 originalInput은 자동 변경하지 않음
+* 사용자가 명시적으로 originalInput도 덮어쓰겠다고 선택한 경우만 변경
+
+7. Prompt Template 변수 입력
+
+템플릿에 placeholder가 있으면 변수 입력 UI를 표시합니다.
+
+동작:
+
+* template_body에서 {{variableName}} 패턴 추출
+* variableName 목록 표시
+* 각 변수에 대한 textarea 또는 input 제공
+* 사용자가 값을 입력하고 preview를 볼 수 있음
+* “적용” 버튼을 누르면 placeholder가 입력값으로 치환된 결과를 draft에 반영
+
+요구사항:
+
+* placeholder 치환은 단순 문자열 치환
+* unknown placeholder는 그대로 두거나 경고
+* 입력값 whitespace 보존
+* code block / Markdown / diff 훼손 금지
+* eval / new Function 금지
+
+8. Prompt lineage 보기
+
+PromptAsset 상세 화면에서 파생 관계를 볼 수 있어야 합니다.
+
+표시:
+
+* 이 프롬프트가 어떤 PromptAsset / PromptVersion에서 파생되었는지
+* 이 프롬프트에서 파생된 child prompts 목록
+* relationship_type
+* created_at
+* source version 정보, 있으면
+
+MVP UI:
+
+* “원본 프롬프트” 카드
+* “파생된 프롬프트” 목록
+
+기능:
+
+* 원본 프롬프트로 이동
+* child prompt로 이동
+* lineage 정보가 없으면 “파생 관계 없음” 표시
+
+주의:
+
+* 그래프 시각화는 필수 아닙니다.
+* 트리/카드 목록이면 충분합니다.
+* 복잡한 canvas나 graph library 추가하지 마세요.
+
+9. 개선안에서 파생 관계 연결
+
+Phase 14의 improvedPromptDraft를 새 PromptVersion으로 저장하거나 새 PromptAsset으로 만들 때 lineage를 기록할 수 있어야 합니다.
+
+요구사항:
+
+* improvedPromptDraft를 기존 PromptAsset의 새 version으로 저장하는 기존 흐름은 유지
+* 만약 improvedPromptDraft를 새 PromptAsset으로 저장하는 옵션을 추가한다면 relationship_type은 improved_from_review
+* prompt_quality_review_id를 저장하는 별도 필드는 선택
+* 범위가 커지면 Phase 14의 기존 “새 버전 저장”만 유지하고, lineage 연결은 PromptAsset 파생에서만 구현
+
+10. IPC API 요구사항
+
+preload bridge에 다음 API를 추가하거나 기존 prompts API를 보완합니다.
+
+Prompt derivation:
+
+* window.prompter.prompts.duplicateAsset(input)
+* window.prompter.prompts.createDerivedDraft(input), renderer-only draft helper면 IPC 불필요
+* window.prompter.prompts.createAssetFromDerivedDraft(input)
+* window.prompter.prompts.getLineage(promptAssetId)
+* window.prompter.prompts.listChildren(promptAssetId)
+
+Prompt templates:
+
+* window.prompter.promptTemplates.create(input)
+* window.prompter.promptTemplates.list(input?)
+* window.prompter.promptTemplates.get(id)
+* window.prompter.promptTemplates.update(id, input)
+* window.prompter.promptTemplates.delete(id)
+* window.prompter.promptTemplates.duplicate(id)
+* window.prompter.promptTemplates.preview(input)
+* window.prompter.promptTemplates.extractVariables(input)
+
+선택:
+
+* window.prompter.promptTemplates.createFromPromptVersion(input)
+
+금지:
+
+* promptRuns 관련 API 추가 금지
+* executionResults 관련 API 추가 금지
+* Codex 실행 API 추가 금지
+* shortcuts/appEvents/globalShortcut API 추가 금지
+
+11. Zod schema 요구사항
+
+다음 schema를 정의합니다.
+
+* DuplicatePromptAssetInputSchema
+* CreateDerivedPromptAssetInputSchema
+* PromptLineageSchema
+* PromptLineageRelationshipTypeSchema
+* CreatePromptTemplateInputSchema
+* UpdatePromptTemplateInputSchema
+* ListPromptTemplatesInputSchema
+* DeletePromptTemplateInputSchema
+* DuplicatePromptTemplateInputSchema
+* CreatePromptTemplateFromVersionInputSchema
+* PromptTemplatePreviewInputSchema
+* ExtractPromptTemplateVariablesInputSchema
+
+검증 규칙:
+
+* promptAssetId는 빈 문자열 불가
+* promptVersionId는 빈 문자열 불가
+* name은 trim 후 빈 문자열 불가
+* scenario는 허용된 enum
+* targetAgent는 허용된 enum
+* templateBody는 빈 문자열 불가
+* variables는 string array 또는 JSON string을 안전하게 처리
+* relationship_type은 허용 enum만 사용
+* projectId는 string 또는 null
+* tags 복사 여부는 boolean
+
+추가하지 말아야 할 schema:
+
+* PromptRunSchema
+* AgentRunSchema
+* ExecutionResultSchema
+* ValidationResultSchema
+* QuickCaptureSettingsSchema
+* RegisterGlobalShortcutInputSchema
+
+12. UI 구조 권장
+
+Renderer:
+
+* src/renderer/components/prompt/PromptDerivationActions.tsx
+* src/renderer/components/prompt/PromptLineagePanel.tsx
+* src/renderer/components/promptTemplates/PromptTemplateList.tsx
+* src/renderer/components/promptTemplates/PromptTemplateDetail.tsx
+* src/renderer/components/promptTemplates/PromptTemplateEditor.tsx
+* src/renderer/components/promptTemplates/PromptTemplateSelector.tsx
+* src/renderer/components/promptTemplates/PromptTemplatePreview.tsx
+* src/renderer/hooks/usePromptTemplates.ts
+* src/renderer/hooks/usePromptLineage.ts
+
+Shared:
+
+* src/shared/promptTemplates/promptTemplateTypes.ts
+* src/shared/promptTemplates/promptTemplateSchemas.ts
+* src/shared/promptTemplates/renderPromptTemplate.ts
+* src/shared/promptTemplates/extractTemplateVariables.ts
+* src/shared/promptLineage/promptLineageTypes.ts
+* src/shared/promptLineage/promptLineageSchemas.ts
+
+Main:
+
+* src/main/repositories/promptTemplateRepository.ts
+* src/main/services/promptTemplateService.ts
+* src/main/ipc/promptTemplates.ts
+* src/main/services/promptDerivationService.ts
+* 기존 promptRepository 보완
+
+Compiler 연결:
+
+* 기존 PromptCompilerPanel draft state
+* 기존 stale state 초기화 유틸
+* 기존 createPromptAsset / createPromptVersion 흐름
+
+13. stale state 규칙
+
+다음 변경이 발생하면 기존 analyze / compile / quality review 결과는 stale 처리하거나 초기화해야 합니다.
+
+초기화 트리거:
+
+* promptTemplateId 변경
+* prompt template 적용
+* template variable 값 변경 후 적용
+* derivedFromPromptAssetId 변경
+* derivedFromPromptVersionId 변경
+* compiledPrompt draft 변경
+* originalInput 변경
+* scenario 변경
+* targetAgent 변경
+* harnessTemplateId 변경
+* projectContextProfileId 변경
+* includeProjectContextProfile 변경
+
+중요:
+
+* stale state 초기화는 originalInput을 임의로 비우거나 바꾸면 안 됩니다.
+* 템플릿 적용 전 confirmation이 필요한 경우 반드시 표시합니다.
+* 템플릿 선택만으로 자동 적용하지 마세요.
+* 템플릿 적용은 자동 LLM 호출을 실행하지 않습니다.
+* 템플릿 적용은 자동 저장하지 않습니다.
+
+14. 보안 요구사항
+
+* Prompt Template body는 실행 가능한 코드가 아닙니다.
+* eval, new Function, 동적 import 사용 금지
+* placeholder 치환은 단순 문자열 치환만 수행합니다.
+* renderer에서 DB, fs, path, process에 직접 접근하지 않습니다.
+* renderer에서 ipcRenderer를 직접 사용하지 않습니다.
+* prompt template 내용, originalInput, compiledPrompt를 불필요하게 console.log하지 마세요.
+* 사용자가 템플릿에 secret을 넣을 수 있으므로 로그에 주의하세요.
+* LLM 호출은 사용자가 명시적으로 analyze / compile / LLM review를 실행할 때만 발생해야 합니다.
+* prompt execution 또는 외부 프로세스 실행 기능을 추가하지 않습니다.
+* 실행 결과 저장 관련 테이블과 API를 추가하지 않습니다.
+
+15. TDD 구현 순서
+
+가능하면 다음 순서로 구현하세요.
+
+1. prompt template schema 테스트 작성
+
+* valid create input
+* invalid name
+* invalid scenario
+* invalid targetAgent
+* empty templateBody 거부
+* variables JSON 처리
+* tags JSON 처리
+
+2. extractTemplateVariables 테스트 작성
+
+* {{objective}} 추출
+* 중복 변수 제거
+* unknown 형식 무시
+* code block 안 placeholder도 안전하게 추출
+* whitespace 보존
+
+3. renderPromptTemplate 테스트 작성
+
+* placeholder 치환
+* unknown placeholder 처리
+* whitespace 보존
+* code fence 보존
+* diff block 보존
+* original input cleanup 없음
+* eval 실행 없음
+
+4. prompt derivation service 테스트 작성, 가능하면
+
+* duplicate asset
+* duplicate creates new prompt asset
+* duplicated version starts at version_number 1
+* parent_prompt_id 설정
+* tags copy option
+* quality_score copy 정책 확인
+* lineage 조회
+
+5. prompt template repository/service 테스트, 가능하면
+
+* create/list/get/update/delete
+* duplicate
+* createFromPromptVersion
+* preview
+
+6. renderer behavior 테스트, 가능하면
+
+* template 선택만으로 draft 변경 없음
+* apply 버튼 후 confirmation
+* apply 후 compiledPrompt draft 변경
+* apply 후 stale state 초기화
+* derived draft가 parent metadata 표시
+* lineage panel 표시
+
+16. 파일별 예상 변경
+
+예상 변경 파일:
+
+* DB schema / migration 파일, prompt_templates 또는 prompt_asset_lineage 추가 시
+* shared prompt template schema/type 파일 추가
+* prompt template rendering utility 추가
+* prompt template variable extraction utility 추가
+* promptTemplateRepository 추가
+* promptTemplateService 추가
+* promptTemplates IPC handler 추가
+* promptDerivationService 추가
+* promptRepository 보완
+* preload bridge 타입 추가
+* PromptVersion detail actions에 duplicate / derive / save as template 추가
+* PromptCompilerPanel에 promptTemplateId / derivedFrom metadata 추가
+* PromptTemplateList / Detail / Editor / Selector 컴포넌트 추가
+* PromptLineagePanel 추가
+* 관련 테스트 파일 추가
+
+건드리지 말아야 할 것:
+
+* quick capture trim/cleanup 추가 금지
+* quick_capture settings 추가 금지
+* globalShortcut 추가 금지
+* appEvents bridge 추가 금지
+* shortcuts bridge 추가 금지
+* prompt_runs 관련 schema 추가 금지
+* 실행 결과 저장 관련 코드 추가 금지
+* 외부 repo 자동 스캔 추가 금지
+* prompt execution service 추가 금지
+
+17. 의존성 그래프
+
+권장 의존성 방향:
+
+shared/promptTemplates schemas
+→ shared/promptTemplates render/extract utilities
+→ main promptTemplate repository/service
+→ main promptDerivation service
+→ main IPC promptTemplates/prompts
+→ preload typed bridge
+→ renderer hooks
+→ renderer prompt template components
+→ PromptCompilerPanel integration
+→ PromptVersion detail actions / PromptLineagePanel
+
+금지 방향:
+
+* renderer → DB 직접 접근
+* renderer → Electron ipcRenderer 직접 접근
+* renderer → fs/path/process 직접 접근
+* prompt template → external agent execution
+* prompt template → LLM auto call
+* prompt derivation → prompt run history
+* template rendering → executable code
+
+18. 자동 테스트 목록
+
+가능한 경우 다음 테스트를 추가하세요.
+
+Schema:
+
+* CreatePromptTemplateInputSchema accepts valid input
+* rejects empty name
+* rejects empty templateBody
+* rejects invalid scenario
+* rejects invalid targetAgent
+* DuplicatePromptAssetInputSchema rejects empty promptAssetId
+* CreatePromptTemplateFromVersionInputSchema rejects empty promptVersionId
+
+Template utilities:
+
+* extracts variables from template
+* deduplicates variables
+* renders placeholders with provided values
+* preserves Markdown
+* preserves code fences
+* preserves diff blocks
+* leaves unknown placeholders safe
+* does not trim user-provided values
+* does not execute template content
+
+Derivation:
+
+* duplicates prompt asset
+* creates version_number 1 for duplicate
+* sets parent_prompt_id or lineage record
+* copies tags only when requested
+* does not copy quality_score if policy says null
+* creates derived asset from draft with parent metadata
+
+Lineage:
+
+* gets parent prompt
+* lists child prompts
+* handles no lineage
+* handles deleted parent safely
+
+UI behavior:
+
+* selecting template does not modify draft
+* applying template requires explicit action
+* applying template with existing compiledPrompt asks confirmation
+* applying template clears stale analyze/compile/review state
+* derive action opens draft with source metadata
+* saving derived draft records lineage
+
+19. 수동 QA 체크리스트
+
+| 항목                   | 기대 결과                            |
+| -------------------- | -------------------------------- |
+| PromptAsset 복제       | 새 PromptAsset 생성                 |
+| 복제된 PromptAsset      | version_number 1로 시작             |
+| 복제된 PromptAsset      | parent 관계 기록                     |
+| 복제 옵션                | tags 복사 여부 동작                    |
+| quality_score 정책     | null 또는 명시한 정책대로 처리              |
+| PromptVersion에서 파생   | PromptCompilerPanel draft로 이동    |
+| 파생 draft             | 원본 PromptAsset/Version 표시        |
+| 파생 draft 저장          | 새 PromptAsset 생성 및 lineage 기록    |
+| Prompt Template 생성   | 선택된 version에서 template 생성        |
+| Prompt Template 목록   | 템플릿 표시 및 필터 가능                   |
+| Prompt Template 편집   | 저장 후 갱신                          |
+| Prompt Template 복제   | 복사본 생성                           |
+| Prompt Template 삭제   | 확인 후 삭제                          |
+| Template 변수 추출       | {{variable}} 목록 표시               |
+| Template preview     | 변수 치환 결과 표시                      |
+| Template 선택          | draft 자동 변경 없음                   |
+| Template 적용          | 명시적 클릭 필요                        |
+| 기존 compiledPrompt 있음 | overwrite confirmation 표시        |
+| Template 적용 후        | stale analyze/compile/review 초기화 |
+| Lineage panel        | 원본과 child prompts 표시             |
+| 앱 재시작                | templates와 lineage 유지            |
+| prompt_runs 확인       | 실행 결과 관련 데이터 생성 없음               |
+
+20. Attribution
+
+이 Phase 15 명세는 Phase 11, Phase 12, Phase 13, Phase 14의 최종 guardrail을 반영합니다.
+
+반영된 Phase 11 결정:
+
+* 빠른 캡처는 버튼 + File 메뉴 + 앱 포커스 상태의 CmdOrCtrl+Shift+V accelerator로 한정
+* window.prompter.appEvents.* 추가 없음
+* window.prompter.shortcuts.* 추가 없음
+* OS globalShortcut 없음
+* quick_capture_* settings 없음
+* 클립보드 텍스트 원문 보존
+* 자동 trim/cleanup 없음
+* append 옵션 없음
+* no-auto-LLM, no-auto-save, no-log, no-persistence guardrail 유지
+
+반영된 Phase 12 결정:
+
+* 하네스 템플릿은 프롬프트 구조와 컴파일 규칙을 담당
+* 하네스 선택은 originalInput/scenario/targetAgent를 자동 덮어쓰지 않음
+* 하네스 선택은 자동 analyze/compile/save를 실행하지 않음
+* 하네스 선택은 stale compiler state를 초기화
+* template_body는 코드로 실행하지 않음
+
+반영된 Phase 13 결정:
+
+* 프로젝트 컨텍스트는 사용자 제공 프로젝트 맥락으로만 반영
+* project context 선택은 originalInput/manual context/scenario/targetAgent를 자동 덮어쓰지 않음
+* project context 선택은 자동 analyze/compile/save를 실행하지 않음
+* repo_path는 저장할 수 있어도 파일 시스템 자동 접근 없음
+
+반영된 Phase 14 결정:
+
+* 품질 리뷰는 프롬프트 실행이 아님
+* 품질 리뷰는 자동 LLM 호출을 실행하지 않음
+* 리뷰 결과는 자동으로 prompt를 수정하지 않음
+* improvedPromptDraft는 자동 덮어쓰기 없이 명시적 액션으로만 반영
+* prompt_quality_reviews는 prompt_runs와 분리됨
+
+Phase 15에서 이 결정을 깨뜨리지 마세요.
+
+21. 이번 단계에서 구현하지 말 것
+
+다음은 절대 구현하지 마세요.
+
+* 프롬프트 실행 기능
+* Codex CLI 실행
+* Codex OAuth
+* Claude Code 실행
+* Cursor 실행
+* 외부 앱 자동 제어
+* 외부 repo 자동 스캔
+* repo_path 기반 파일 읽기
+* git 명령 실행
+* OS 전역 단축키
+* window.prompter.appEvents.*
+* window.prompter.shortcuts.*
+* quick_capture_* settings
+* QuickCaptureSettingsSchema
+* RegisterGlobalShortcutInputSchema
+* clipboard history
+* background clipboard watch
+* external selected text 읽기
+* prompt_runs
+* agent_runs
+* execution_results
+* validation_results
+* run_logs
+* 실행 결과 저장
+* 클라우드 동기화
+* 팀 협업
+* prompt template marketplace
+* 원격 템플릿 다운로드
+* 템플릿 안에서 코드 실행
+* 템플릿 선택 시 자동 LLM 호출
+* 템플릿 선택 시 자동 저장
+* 템플릿 적용 시 append 옵션
+
+완료 기준:
+
+* PromptAsset을 복제할 수 있습니다.
+* 복제된 PromptAsset은 원본과 parent 관계를 가집니다.
+* 선택한 PromptVersion에서 새 derived draft를 만들 수 있습니다.
+* derived draft는 원본 PromptAsset / PromptVersion 정보를 표시합니다.
+* derived draft를 저장하면 새 PromptAsset과 lineage가 기록됩니다.
+* 선택한 PromptVersion을 Prompt Template으로 저장할 수 있습니다.
+* Prompt Template 목록, 상세, 생성, 수정, 복제, 삭제 UI가 구현되어 있습니다.
+* Prompt Template의 placeholder 변수를 추출하고 입력값으로 preview할 수 있습니다.
+* Prompt Template 선택만으로 draft가 변경되지 않습니다.
+* Prompt Template 적용은 사용자의 명시적 액션과 confirmation을 통해서만 수행됩니다.
+* Prompt Template 적용 후 stale analyze / compile / quality review state가 초기화됩니다.
+* PromptAsset 상세에서 원본과 child prompts lineage를 볼 수 있습니다.
+* template content는 코드로 실행되지 않습니다.
+* 모든 IPC 입력값은 Zod로 검증됩니다.
+* renderer는 DB, fs, path, process, ipcRenderer에 직접 접근하지 않습니다.
+* Phase 11, 12, 13, 14 guardrail이 유지됩니다.
+* TypeScript 타입 검사가 통과합니다.
+* 앱이 개발 모드에서 정상 실행됩니다.
+* 프롬프트 실행이나 실행 결과 저장 기능은 추가되지 않았습니다.
+
+작업 전:
+
+1. 현재 Phase 0부터 Phase 14까지의 코드 구조를 확인합니다.
+2. prompt_assets.parent_prompt_id 사용 여부를 확인합니다.
+3. prompt_versions와 current version 조회 흐름을 확인합니다.
+4. PromptCompilerPanel draft state 구조를 확인합니다.
+5. Phase 11 quick capture stale state 초기화 로직을 확인합니다.
+6. Phase 12 harnessTemplateId draft state와 stale state 초기화 방식을 확인합니다.
+7. Phase 13 projectContextProfileId/includeProjectContextProfile draft state와 stale state 초기화 방식을 확인합니다.
+8. Phase 14 quality review state와 stale 처리 방식을 확인합니다.
+9. prompt_templates와 lineage를 새 테이블로 추가할지, 기존 parent_prompt_id만 활용할지 결정합니다.
+10. TDD 순서에 따라 schema와 template rendering 테스트를 먼저 작성합니다.
+11. 간결한 구현 계획을 세운 뒤 Phase 15만 구현합니다.
+
+작업 후:
+
+1. 변경된 내용을 요약합니다.
+2. 생성되거나 수정된 파일 목록을 제공합니다.
+3. schema 또는 migration 변경을 설명합니다.
+4. PromptAsset 복제 데이터 흐름을 설명합니다.
+5. PromptVersion에서 derived draft를 만드는 흐름을 설명합니다.
+6. derived draft 저장 시 lineage 기록 방식을 설명합니다.
+7. Prompt Template CRUD 데이터 흐름을 설명합니다.
+8. Prompt Template 적용이 자동 저장/자동 LLM 호출을 하지 않는 방식을 설명합니다.
+9. placeholder 치환이 코드 실행 없이 안전하게 동작하는 방식을 설명합니다.
+10. stale analyze / compile / quality review state 초기화 방식을 설명합니다.
+11. Phase 11 quick capture, Phase 12 harness, Phase 13 project context, Phase 14 quality review guardrail을 유지한 방식을 설명합니다.
+12. 추가한 테스트와 테스트 결과를 설명합니다.
+13. 앱 실행 및 타입 검사 명령어를 제공합니다.
+14. 수동 테스트 절차를 제공합니다.
+15. 아직 구현하지 않은 기능을 명확히 구분해서 설명합니다.
+```
+
+# Phase 16
+
+```
+당신은 Prompter라는 Electron 데스크톱 앱을 개발하고 있습니다.
+
+Prompter는 로컬 우선(local-first) 프롬프트 컴파일러이자 프롬프트 라이브러리입니다. 이 앱의 목적은 모호한 인간의 요청을 에이전트가 실행 가능한 프롬프트로 변환하고, 이를 버전 관리되는 프롬프트 자산으로 저장하며, Codex, Claude Code, Cursor 및 일반 LLM 에이전트에 사용할 수 있도록 내보내는 것입니다.
+
+현재까지 완료되었다고 가정하는 단계:
+
+Phase 0:
+
+* Electron, React, TypeScript, Vite 기반 앱 골격
+* main, preload, renderer 분리
+* 안전한 Electron 기본 설정
+* typed preload bridge
+* IPC ping/pong 테스트
+
+Phase 1:
+
+* Tailwind CSS 기반 기본 UI
+* 3단 레이아웃
+* 재사용 가능한 기본 UI 컴포넌트
+
+Phase 2:
+
+* SQLite + Drizzle ORM + better-sqlite3 기반 로컬 DB
+* DB는 Electron main process에서만 접근
+* renderer는 typed IPC를 통해서만 DB 기능 호출
+* Zod 기반 IPC 입력값 검증
+
+Phase 3:
+
+* 프로젝트 생성 및 프로젝트별 프롬프트 목록 표시
+* PromptAsset + PromptVersion 저장
+* 프롬프트 선택 및 상세 표시
+
+Phase 4:
+
+* 정적 템플릿 기반 프롬프트 컴파일러 UI
+* 생성 프롬프트 저장 가능
+
+Phase 9:
+
+* Settings UI
+* OpenAI API Key 안전 저장
+* 기본 모델, 대상 에이전트, 시나리오 설정
+
+Phase 5:
+
+* LLM 기반 analyze / compile
+* clarification question 생성
+* 최종 compiledPrompt 생성
+* LLM 호출은 Electron main process에서만 수행
+
+Phase 6:
+
+* 프롬프트 버전 관리
+* current version 지정
+* 새 버전 저장
+* diff view
+
+Phase 7:
+
+* SQLite FTS 검색
+* 태그 생성, 연결, 제거
+* 프로젝트, 태그, 시나리오, 대상 에이전트 필터
+
+Phase 8:
+
+* Markdown, Codex, Claude Code, Cursor, Generic Agent export
+* AGENTS.md snippet export
+* SKILL.md draft export
+* 클립보드 복사 및 파일 저장
+
+Phase 10:
+
+* 테스트, polish, macOS 패키징
+* 키보드 단축키
+* 앱 메뉴
+* 보안 점검
+* README 및 QA 체크리스트
+* narrow menu action channel 구현
+
+Phase 11:
+
+* 빠른 캡처는 버튼 + File 메뉴 + 앱 포커스 상태의 CmdOrCtrl+Shift+V accelerator로 한정
+* window.prompter.clipboard.readText() 최소 API 구현
+* 기존 menu.onAction / MENU_ACTION_CHANNEL 재사용
+* OS 전역 단축키 없음
+* quick_capture_* settings 없음
+* 클립보드 텍스트 원문 보존
+* 자동 trim/cleanup 없음
+* append 옵션 없음
+* 자동 LLM 호출 없음
+* 자동 저장 없음
+* 클립보드 내용 로그 없음
+* 클립보드 내용 자동 persistence 없음
+
+Phase 12:
+
+* 기본 하네스 템플릿 seed
+* 하네스 템플릿 목록, 상세, 생성, 수정, 복제, 삭제 UI
+* PromptCompilerPanel에서 하네스 템플릿 선택 가능
+* 선택된 하네스 템플릿이 정적 컴파일러와 LLM PromptCompilerService에 반영됨
+* 하네스 선택은 originalInput, scenario, targetAgent를 자동 덮어쓰지 않음
+* 하네스 선택은 자동 analyze, 자동 compile, 자동 저장을 실행하지 않음
+* 하네스 선택 시 stale compiler state 초기화
+* template_body는 코드로 실행되지 않음
+
+Phase 13:
+
+* 프로젝트별 context profile CRUD
+* 프로젝트마다 default context profile 지정 가능
+* PromptCompilerPanel에서 project context profile 선택 및 include 가능
+* 정적 컴파일러와 LLM PromptCompilerService에 project context profile 반영
+* project context는 originalInput, manual context, scenario, targetAgent를 자동 덮어쓰지 않음
+* context 선택은 자동 analyze, 자동 compile, 자동 저장을 실행하지 않음
+* repo_path가 있어도 파일 시스템 자동 접근 없음
+
+Phase 14:
+
+* Local heuristic Prompt Quality Reviewer
+* 저장된 PromptVersion과 현재 draft compiledPrompt 품질 리뷰 가능
+* API Key 없이 local review 동작
+* LLM review는 사용자가 명시적으로 클릭한 경우에만 main process에서 실행
+* 리뷰 결과는 자동으로 prompt를 수정하지 않음
+* 리뷰 결과는 자동으로 quality_score를 업데이트하지 않음
+* improvedPromptDraft는 자동 덮어쓰기 없이 새 PromptVersion으로 저장 가능
+* prompt_quality_reviews 테이블을 추가한 경우에도 prompt_runs와 분리됨
+
+Phase 15:
+
+* PromptAsset 복제
+* PromptVersion에서 derived draft 생성
+* PromptAsset lineage 추적
+* Prompt Template 생성, 목록, 상세, 수정, 복제, 삭제
+* Prompt Template placeholder 변수 추출 및 preview
+* Prompt Template 적용은 명시적 액션과 confirmation 필요
+* Prompt Template 선택은 자동 LLM 호출, 자동 compile, 자동 저장을 실행하지 않음
+* template content는 코드로 실행되지 않음
+
+이 작업은 Phase 16: 백업 / 가져오기 / 라이브러리 내보내기입니다.
+
+목표:
+Prompter의 로컬 데이터를 안전하게 백업 파일로 내보내고, 백업 파일을 검증하고, 사용자의 명시적 확인 후 다시 가져올 수 있도록 합니다. 또한 전체 라이브러리뿐 아니라 프로젝트 단위, PromptAsset 단위, Prompt Template pack 단위의 선택적 내보내기를 지원합니다.
+
+이 단계의 핵심:
+
+* 전체 Prompter 라이브러리 백업
+* 프로젝트 단위 백업
+* 선택된 PromptAsset 단위 백업
+* Prompt Template pack 내보내기
+* 하네스 템플릿 pack 내보내기
+* 백업 파일 검증
+* import preview
+* ID 충돌 처리
+* transaction 기반 import
+* secret/API Key 제외
+* 실행 결과 저장 기능은 계속 없음
+
+중요:
+프롬프트 실행 기능을 추가하지 마세요.
+Codex CLI를 호출하지 마세요.
+Claude Code CLI를 호출하지 마세요.
+Cursor를 자동 실행하지 마세요.
+외부 앱을 자동 제어하지 마세요.
+외부 repo를 자동 스캔하지 마세요.
+repo_path 기반 파일 읽기를 하지 마세요.
+git 명령을 실행하지 마세요.
+프롬프트 실행 결과 저장 기능을 추가하지 마세요.
+prompt_runs, agent_runs, execution_results, validation_results, run_logs를 만들거나 사용하지 마세요.
+OS 전역 단축키를 추가하지 마세요.
+window.prompter.appEvents.*를 추가하지 마세요.
+window.prompter.shortcuts.*를 추가하지 마세요.
+quick_capture_* settings key를 추가하지 마세요.
+이번 단계는 백업, 검증, 가져오기, 선택적 라이브러리 내보내기에만 집중합니다.
+
+Phase 11 / 12 / 13 / 14 / 15 guardrail:
+
+* quick capture 동작을 변경하지 마세요.
+* 클립보드 텍스트를 자동 정리하지 마세요.
+* 하네스 템플릿 선택 로직을 변경하지 마세요.
+* 프로젝트 컨텍스트 프로파일 선택 로직을 변경하지 마세요.
+* 품질 리뷰어 동작을 자동화하지 마세요.
+* Prompt Template 선택/적용 규칙을 변경하지 마세요.
+* 백업 또는 import는 자동 LLM 호출을 실행하면 안 됩니다.
+* 백업 또는 import는 프롬프트를 실행하면 안 됩니다.
+* 백업 또는 import는 외부 repo나 파일 시스템을 스캔하면 안 됩니다.
+* repo_path는 백업할 수 있지만 해당 경로를 읽거나 검증하지 않습니다.
+* import 후 자동 analyze / compile / review / export를 실행하지 않습니다.
+* import 후 사용자가 명시적으로 선택하기 전까지 자동으로 current draft를 덮어쓰지 않습니다.
+
+백업 범위:
+
+전체 백업에 포함할 수 있는 데이터:
+
+* projects
+* prompt_assets
+* prompt_versions
+* tags
+* prompt_tags
+* harness_templates
+* project_context_profiles
+* prompt_quality_reviews, 구현된 경우
+* prompt_templates
+* prompt_asset_lineage, 구현된 경우
+* non-secret settings, 선택
+
+전체 백업에서 반드시 제외할 데이터:
+
+* OpenAI API Key
+* secret store 파일
+* safeStorage ciphertext
+* OS keychain 관련 값
+* DB 파일 경로
+* userData 실제 경로
+* clipboard content
+* clipboard history, 애초에 없어야 함
+* prompt_runs
+* agent_runs
+* execution_results
+* validation_results
+* run_logs
+* 외부 repo 파일 내용
+* repo_path가 가리키는 실제 파일 내용
+* 로그 파일
+
+주의:
+
+* settings를 내보내는 경우에도 secret은 절대 포함하지 마세요.
+* default_model, default_target_agent, default_scenario 같은 non-secret settings만 선택적으로 포함합니다.
+* API Key 저장 여부 상태도 백업에 포함하지 않는 것을 권장합니다.
+
+백업 파일 포맷:
+
+JSON 기반 파일을 사용합니다.
+
+권장 확장자:
+
+* .prompter-backup.json
+* .prompter-project.json
+* .prompter-templates.json
+
+BackupEnvelope 구조:
+
+* schemaVersion: number
+* appName: "Prompter"
+* backupType: "full" | "project" | "prompt_assets" | "prompt_templates" | "harness_templates"
+* exportedAt: number
+* exportedByAppVersion?: string
+* metadata: object
+* data: object
+* checksum?: string
+
+schemaVersion:
+
+* 첫 버전은 1로 시작합니다.
+* future migration을 위해 반드시 포함합니다.
+
+metadata 예:
+
+* itemCounts
+* projectNames
+* promptAssetCount
+* promptVersionCount
+* includesSettings
+* excludesSecrets: true
+
+checksum:
+
+* 선택 구현
+* 구현한다면 백업 content의 안정적인 JSON 문자열 기준으로 SHA-256 hash를 계산합니다.
+* checksum은 파일 변조 탐지용이지 보안 암호화가 아닙니다.
+* checksum 구현이 범위를 키우면 생략해도 됩니다.
+
+암호화:
+
+* 이번 Phase에서는 백업 파일 암호화를 구현하지 마세요.
+* 암호화는 별도 Phase로 미룹니다.
+* 대신 export UI에 “이 백업 파일에는 프롬프트 내용이 평문으로 포함됩니다. 안전한 위치에 보관하세요.” 안내를 표시합니다.
+
+인간은 백업 파일을 바탕화면에 `real-final-backup.json`으로 올려놓는 기묘한 생물이므로, 최소한 경고는 해줍니다.
+
+이번 단계에서 구현할 주요 기능:
+
+1. Full Library Backup 생성
+
+전체 라이브러리 데이터를 JSON으로 내보낼 수 있어야 합니다.
+
+동작:
+
+* 사용자가 Settings 또는 File 메뉴에서 “전체 백업 내보내기” 선택
+* main process가 DB에서 백업 대상 데이터를 읽음
+* BackupEnvelope 생성
+* save dialog를 열어 파일 저장
+* 저장 성공/취소/실패 상태 표시
+
+요구사항:
+
+* 파일 저장은 Electron main process에서만 수행
+* renderer는 fs, path, process에 직접 접근하지 않음
+* renderer는 파일 경로를 직접 다루지 않음
+* API Key와 secret은 포함하지 않음
+* prompt_runs 관련 데이터는 포함하지 않음
+* repo_path가 있어도 실제 파일 내용은 포함하지 않음
+
+2. Project Backup 생성
+
+선택된 Project 하나를 백업 파일로 내보낼 수 있어야 합니다.
+
+포함 데이터:
+
+* 해당 project
+* 해당 project의 prompt_assets
+* 해당 prompt_assets의 prompt_versions
+* 관련 prompt_tags
+* 관련 tags
+* 해당 project의 project_context_profiles
+* 해당 prompt_versions의 prompt_quality_reviews, 구현된 경우
+* 해당 prompt_assets의 lineage 중 내부 관계
+* source가 같은 project 안에 있는 prompt_templates, 선택
+
+주의:
+
+* 다른 project와 연결된 parent_prompt_id 또는 lineage가 있는 경우:
+
+  * 외부 parent를 포함하지 않거나
+  * reference placeholder metadata만 포함
+* import 시 외부 parent가 없으면 lineage는 “missing external source”로 표시하거나 생략합니다.
+* 앱이 crash되면 안 됩니다.
+
+3. PromptAsset Backup 생성
+
+선택한 PromptAsset 하나 또는 여러 개를 백업할 수 있어야 합니다.
+
+포함 데이터:
+
+* prompt_assets
+* prompt_versions
+* tags
+* prompt_tags
+* quality reviews, 구현된 경우
+* lineage metadata, 가능한 경우
+
+사용 사례:
+
+* 좋은 프롬프트 묶음을 다른 Prompter 인스턴스로 옮기기
+* 특정 프로젝트의 일부 프롬프트만 공유하기
+
+주의:
+
+* 공유 파일이므로 secret과 로컬 경로가 포함되지 않도록 합니다.
+* project context profile은 기본적으로 포함하지 않아도 됩니다.
+* 옵션으로 포함할 수는 있지만, MVP에서는 제외해도 됩니다.
+
+4. Prompt Template Pack Export
+
+Prompt Template을 pack으로 내보낼 수 있어야 합니다.
+
+포함 데이터:
+
+* prompt_templates
+* template metadata
+* source_prompt_asset_id / source_prompt_version_id는 optional reference로만 포함
+* source prompt 내용은 기본적으로 포함하지 않음
+
+요구사항:
+
+* 사용자가 선택한 Prompt Template만 export 가능
+* 전체 Prompt Template export 가능
+* import 후 새 Prompt Template으로 추가 가능
+
+주의:
+
+* Prompt Template body는 평문으로 들어갑니다.
+* API Key와 secret은 포함하지 않습니다.
+* template body는 코드로 실행되지 않습니다.
+
+5. Harness Template Pack Export
+
+하네스 템플릿도 pack으로 내보낼 수 있어야 합니다.
+
+포함 데이터:
+
+* harness_templates
+* required_fields
+* clarification_policy
+* template_body
+
+요구사항:
+
+* builtin harness template 포함 여부를 선택할 수 있으면 좋습니다.
+* 사용자 생성 harness template만 export하는 옵션을 우선 구현해도 됩니다.
+
+주의:
+
+* 하네스 템플릿은 LLM 시스템 프롬프트 전체를 덮어쓰는 용도가 아닙니다.
+* import 후에도 기존 Phase 12 규칙을 유지해야 합니다.
+* template_body는 코드로 실행되지 않습니다.
+
+6. Backup File Validation
+
+백업 파일을 import하기 전에 검증해야 합니다.
+
+동작:
+
+* 사용자가 “백업 가져오기” 선택
+* main process에서 open dialog를 열고 JSON 파일 읽기
+* Zod schema로 BackupEnvelope 검증
+* schemaVersion 확인
+* backupType 확인
+* 데이터 구조 확인
+* itemCounts 계산
+* conflicts 계산
+* import preview 반환
+
+검증 실패 시:
+
+* “Prompter 백업 파일이 아니거나 손상되었습니다.”
+* “지원하지 않는 schemaVersion입니다.”
+* “필수 데이터가 누락되었습니다.”
+* “JSON 파싱에 실패했습니다.”
+
+주의:
+
+* 검증 중 DB에 아무것도 쓰지 마세요.
+* import preview는 read-only여야 합니다.
+
+7. Import Preview
+
+실제 import 전에 사용자가 내용을 확인할 수 있어야 합니다.
+
+표시 항목:
+
+* backupType
+* exportedAt
+* schemaVersion
+* 포함된 project 수
+* promptAsset 수
+* promptVersion 수
+* tag 수
+* harnessTemplate 수
+* projectContextProfile 수
+* promptTemplate 수
+* qualityReview 수
+* 충돌 가능성
+* secret 제외 여부
+* warnings
+
+Conflict 예:
+
+* 같은 id가 이미 존재
+* 같은 project name이 이미 존재
+* 같은 tag name이 이미 존재
+* 같은 prompt template name이 이미 존재
+* parent lineage source가 현재 DB에 없음
+* unsupported schemaVersion
+* 일부 optional table이 현재 앱에 없음
+
+Import Preview는 import 버튼을 누르기 전까지 DB를 변경하면 안 됩니다.
+
+8. Import Strategy
+
+사용자가 import 전략을 선택할 수 있어야 합니다.
+
+MVP 전략:
+
+* safe duplicate import
+
+safe duplicate import 정책:
+
+* 기존 데이터를 덮어쓰지 않음
+* import되는 모든 entity에 새 id를 부여
+* oldId → newId mapping 생성
+* 관계는 newId 기준으로 다시 연결
+* tag name이 이미 있으면 기존 tag를 재사용하거나 새 tag를 만들지 선택
+
+권장 기본:
+
+* Projects: 같은 이름이 있으면 “{name} Imported” 또는 “{name} 복사본”으로 생성
+* PromptAssets: 새 id 생성
+* PromptVersions: 새 id 생성
+* Tags: 같은 name이 있으면 기존 tag 재사용
+* HarnessTemplates: 같은 name이 있으면 “{name} Imported”로 생성
+* PromptTemplates: 같은 name이 있으면 “{name} Imported”로 생성
+* ProjectContextProfiles: 새 id 생성
+* QualityReviews: 연결된 imported promptVersion에 새 id로 연결
+* Lineage: import된 entity끼리만 재연결, 외부 parent는 warning 처리
+
+추후 전략으로 미루기:
+
+* overwrite existing
+* merge by id
+* merge by name
+* selective row-level import
+
+이번 Phase에서는 overwrite를 구현하지 마세요.
+덮어쓰기는 데이터 손실을 부릅니다. 인간에게 “덮어쓸까요?”라고 물으면 언젠가 누릅니다. 그리고 울죠.
+
+9. Transaction 기반 Import
+
+import는 transaction으로 처리해야 합니다.
+
+요구사항:
+
+* import 중 오류 발생 시 전체 rollback
+* partial import 방지
+* import 완료 후 검색 인덱스 재생성 또는 필요한 FTS index 갱신
+* import 완료 후 UI 목록 갱신
+* import 완료 후 자동으로 imported project를 선택할 수 있음, 선택
+* import 완료 후 자동 analyze/compile/review 실행 금지
+
+주의:
+
+* main process에서 transaction 처리
+* renderer가 여러 CRUD를 순차 호출해서 import하지 않도록 합니다.
+* import service 하나가 전체 import를 책임져야 합니다.
+
+10. Backup / Import UI
+
+Settings 또는 별도 Backup 화면에 UI를 추가합니다.
+
+권장 위치:
+
+* Settings 화면에 “Backup & Import” 섹션 추가
+* File 메뉴에 “Export Library Backup…” 추가
+* File 메뉴에 “Import Backup…” 추가
+
+메뉴를 추가하는 경우:
+
+* 기존 menu.onAction / MENU_ACTION_CHANNEL 패턴을 재사용
+* window.prompter.appEvents.* 추가 금지
+* window.prompter.shortcuts.* 추가 금지
+* globalShortcut 추가 금지
+
+UI 구성:
+
+* 전체 백업 내보내기 버튼
+* 현재 프로젝트 백업 내보내기 버튼, 프로젝트 선택 시
+* 선택된 프롬프트 백업 내보내기 버튼, prompt 선택 시
+* Prompt Template pack 내보내기
+* Harness Template pack 내보내기
+* 백업 파일 가져오기 버튼
+* import preview dialog
+* import strategy 설명
+* import confirmation
+* import result summary
+
+상태:
+
+* exporting
+* export success
+* export cancelled
+* export failed
+* validating import
+* validation failed
+* import preview ready
+* importing
+* import success
+* import failed and rolled back
+
+11. Non-secret Settings Export
+
+전체 백업에서 settings를 포함할지 선택할 수 있습니다.
+
+포함 가능한 settings:
+
+* default_model
+* default_target_agent
+* default_scenario
+* app_theme
+* compiler_default_language
+* default_project_id는 import 후 id mapping 문제 때문에 제외하거나 warning 처리
+
+제외해야 하는 settings:
+
+* API Key
+* secret 관련 상태
+* safeStorage 관련 값
+* quick_capture 관련 settings, 없어야 함
+* global shortcut settings, 없어야 함
+
+MVP 정책:
+
+* settings export는 기본 off
+* 사용자가 체크하면 non-secret settings만 포함
+* import 시 settings를 덮어쓰지 않고 preview에서 사용자가 선택해야 함
+* 구현 부담이 크면 settings import는 제외하고 settings export도 제외해도 됩니다.
+
+12. Search Index Handling
+
+import 후 검색 기능이 정상 동작해야 합니다.
+
+요구사항:
+
+* import된 prompt_versions가 FTS 검색에 포함되어야 합니다.
+* 가장 단순한 방식은 import 완료 후 rebuildSearchIndex() 호출
+* 이미 Phase 7에서 rebuildSearchIndex가 있다면 재사용
+* rebuild 실패 시 import 자체는 성공했지만 검색 인덱스 경고를 표시할 수 있음
+* 가능하면 transaction 안에서 데이터 import를 완료한 뒤 index rebuild를 수행합니다.
+
+13. Data Redaction / Sanitization
+
+백업 파일에 포함되면 안 되는 데이터를 제거합니다.
+
+반드시 제거:
+
+* apiKey
+* openaiKey
+* secret
+* token
+* accessToken
+* refreshToken
+* safeStorage
+* ciphertext
+* auth
+* userData path
+* DB path
+* log path
+
+주의:
+
+* 사용자가 프롬프트 본문에 직접 API Key를 적은 경우, 앱이 완벽히 감지할 수는 없습니다.
+* 다만 export UI에서 “프롬프트 본문에 민감정보가 들어 있으면 백업에 포함됩니다” 경고를 표시합니다.
+* 자동 redaction은 본문을 훼손할 수 있으므로 기본으로 하지 마세요.
+* 선택 기능으로 simple secret pattern warning 정도는 가능하지만, 자동 삭제는 하지 않습니다.
+
+14. Backup Schema Versioning
+
+schemaVersion을 도입합니다.
+
+요구사항:
+
+* 현재 export schemaVersion = 1
+* import 시 schemaVersion이 없으면 reject
+* schemaVersion > currentSupportedVersion이면 reject
+* schemaVersion < currentSupportedVersion이면 migration path가 없으면 reject
+* error message는 명확해야 함
+
+향후 확장:
+
+* backup migration function을 둘 수 있음
+* 이번 Phase에서는 schemaVersion 1만 지원
+
+15. IPC API 요구사항
+
+preload bridge에 다음 API를 추가합니다.
+
+권장 API:
+
+* window.prompter.backup.exportFullBackup(input)
+* window.prompter.backup.exportProjectBackup(input)
+* window.prompter.backup.exportPromptAssetsBackup(input)
+* window.prompter.backup.exportPromptTemplatesPack(input)
+* window.prompter.backup.exportHarnessTemplatesPack(input)
+* window.prompter.backup.validateBackupFile()
+* window.prompter.backup.importBackup(input)
+
+주의:
+
+* validateBackupFile은 main process에서 open dialog를 열고 파일을 읽은 뒤 preview를 반환합니다.
+* renderer에 파일 경로를 직접 노출하지 않는 것을 권장합니다.
+* importBackup은 validateBackupFile 결과에서 받은 temporary import session id를 사용해도 됩니다.
+* 더 단순한 구현은 validateBackupFile이 parsed payload를 main memory에 보관하고 importBackup이 이를 사용합니다.
+* 앱 재시작 시 import session은 사라져도 됩니다.
+
+input 예시:
+
+ExportFullBackupInput:
+
+* includeSettings?: boolean
+* includeQualityReviews?: boolean
+* includePromptTemplates?: boolean
+* includeHarnessTemplates?: boolean
+* includeProjectContextProfiles?: boolean
+
+ExportProjectBackupInput:
+
+* projectId: string
+* includeQualityReviews?: boolean
+* includeProjectContextProfiles?: boolean
+
+ExportPromptAssetsBackupInput:
+
+* promptAssetIds: string[]
+* includeQualityReviews?: boolean
+* includeTags?: boolean
+
+ExportPromptTemplatesPackInput:
+
+* promptTemplateIds?: string[]
+* includeAll?: boolean
+
+ExportHarnessTemplatesPackInput:
+
+* harnessTemplateIds?: string[]
+* includeAllUserTemplates?: boolean
+* includeBuiltin?: boolean
+
+ImportBackupInput:
+
+* importSessionId: string
+* strategy: "safe_duplicate"
+* options:
+
+  * reuseExistingTagsByName?: boolean
+  * importQualityReviews?: boolean
+  * importPromptTemplates?: boolean
+  * importHarnessTemplates?: boolean
+  * importProjectContextProfiles?: boolean
+
+금지:
+
+* promptRuns 관련 API 추가 금지
+* executionResults 관련 API 추가 금지
+* Codex 실행 API 추가 금지
+* shortcuts/appEvents/globalShortcut API 추가 금지
+
+16. Zod schema 요구사항
+
+다음 schema를 정의합니다.
+
+Backup:
+
+* BackupEnvelopeSchema
+* BackupTypeSchema
+* BackupMetadataSchema
+* BackupDataSchema
+* BackupItemCountsSchema
+* BackupValidationPreviewSchema
+* BackupConflictSchema
+* BackupWarningSchema
+* BackupImportStrategySchema
+* BackupImportResultSchema
+
+Export input:
+
+* ExportFullBackupInputSchema
+* ExportProjectBackupInputSchema
+* ExportPromptAssetsBackupInputSchema
+* ExportPromptTemplatesPackInputSchema
+* ExportHarnessTemplatesPackInputSchema
+
+Import input:
+
+* ValidateBackupFileResultSchema
+* ImportBackupInputSchema
+* ImportBackupOptionsSchema
+
+Entity backup schemas:
+
+* ProjectBackupSchema
+* PromptAssetBackupSchema
+* PromptVersionBackupSchema
+* TagBackupSchema
+* PromptTagBackupSchema
+* HarnessTemplateBackupSchema
+* ProjectContextProfileBackupSchema
+* PromptQualityReviewBackupSchema
+* PromptTemplateBackupSchema
+* PromptAssetLineageBackupSchema
+
+검증 규칙:
+
+* schemaVersion은 number
+* appName은 "Prompter"
+* backupType은 허용 enum
+* exportedAt은 number
+* IDs는 string
+* optional table은 없을 수 있음
+* prompt_runs, execution_results 등 금지 데이터 키가 있으면 warning 또는 reject
+* API Key로 보이는 top-level key가 있으면 reject
+* backup file size가 너무 크면 경고
+
+추가하지 말아야 할 schema:
+
+* PromptRunSchema
+* AgentRunSchema
+* ExecutionResultSchema
+* ValidationResultSchema
+* QuickCaptureSettingsSchema
+* RegisterGlobalShortcutInputSchema
+* ClipboardHistorySchema
+
+17. UI 구조 권장
+
+Renderer:
+
+* src/renderer/components/backup/BackupSettingsPanel.tsx
+* src/renderer/components/backup/BackupExportActions.tsx
+* src/renderer/components/backup/ImportBackupDialog.tsx
+* src/renderer/components/backup/ImportPreview.tsx
+* src/renderer/components/backup/ImportResultSummary.tsx
+* src/renderer/hooks/useBackup.ts
+
+Shared:
+
+* src/shared/backup/backupTypes.ts
+* src/shared/backup/backupSchemas.ts
+* src/shared/backup/backupVersion.ts
+* src/shared/backup/backupRedaction.ts
+* src/shared/backup/backupValidation.ts
+
+Main:
+
+* src/main/services/backup/BackupExportService.ts
+* src/main/services/backup/BackupImportService.ts
+* src/main/services/backup/BackupValidationService.ts
+* src/main/ipc/backup.ts
+
+Repository integration:
+
+* existing project repository
+* existing prompt repository
+* existing tag repository
+* existing harness template repository
+* existing project context repository
+* existing prompt quality repository
+* existing prompt template repository
+* existing search index service
+
+18. Menu Integration
+
+File 메뉴에 다음 항목을 추가할 수 있습니다.
+
+* Export Full Backup…
+* Import Backup…
+
+요구사항:
+
+* 기존 menu.onAction / MENU_ACTION_CHANNEL 패턴 재사용
+* 새 appEvents bridge 만들지 않음
+* shortcuts bridge 만들지 않음
+* OS globalShortcut 만들지 않음
+* 메뉴 action은 renderer에 “backup UI 열기” 정도의 신호만 전달
+* 실제 파일 읽기/쓰기는 backup IPC를 통해 main process에서 처리
+
+19. Stale State 규칙
+
+import 후 다음 상태를 갱신해야 합니다.
+
+갱신 대상:
+
+* project list
+* prompt library list
+* tag list
+* harness template list
+* project context profile list
+* prompt template list
+* search index
+* selected project/prompt 상태, 필요한 경우
+
+주의:
+
+* import가 current draft를 자동 덮어쓰지 않게 합니다.
+* import가 PromptCompilerPanel의 originalInput을 변경하지 않게 합니다.
+* import가 자동 analyze / compile / review를 실행하지 않게 합니다.
+* import 완료 후 “가져온 프로젝트 보기” 버튼을 제공할 수 있습니다.
+
+20. 보안 요구사항
+
+* renderer에서 fs, path, process에 직접 접근하지 않습니다.
+* renderer에서 ipcRenderer를 직접 사용하지 않습니다.
+* 파일 읽기와 쓰기는 main process에서만 수행합니다.
+* 백업 파일에 API Key를 포함하지 않습니다.
+* secret store를 백업하지 않습니다.
+* safeStorage ciphertext를 백업하지 않습니다.
+* 백업 파일에 DB 경로, userData 경로, log path를 포함하지 않습니다.
+* 프롬프트 본문 전체를 로그로 남기지 않습니다.
+* import 파일 내용을 console.log하지 않습니다.
+* 백업 파일은 평문 JSON임을 사용자에게 안내합니다.
+* import 중 template_body, prompt content, project context text를 코드로 실행하지 않습니다.
+* repo_path는 import/export할 수 있지만 파일 시스템 접근에 사용하지 않습니다.
+* prompt execution 또는 외부 프로세스 실행 기능을 추가하지 않습니다.
+* 실행 결과 저장 관련 테이블과 API를 추가하지 않습니다.
+
+21. TDD 구현 순서
+
+가능하면 다음 순서로 구현하세요.
+
+1. backup schema 테스트 작성
+
+* valid full backup envelope
+* invalid appName
+* missing schemaVersion
+* unsupported schemaVersion
+* invalid backupType
+* forbidden prompt_runs key 감지
+* forbidden secret key 감지
+
+2. backup redaction 테스트 작성
+
+* API Key top-level field 제거 또는 reject
+* secret 관련 key 감지
+* settings에서 secret 제외
+* repo_path는 유지하되 파일 내용은 없음
+
+3. backup export service 테스트 작성, 가능하면
+
+* full backup item counts
+* project backup includes only selected project data
+* prompt asset backup includes versions and tags
+* prompt template pack export
+* harness template pack export
+* excludes API Key
+* excludes prompt_runs
+
+4. backup validation service 테스트 작성
+
+* valid backup preview 생성
+* conflicts 계산
+* warnings 계산
+* no DB writes during validation
+
+5. backup import service 테스트 작성, 가능하면
+
+* safe duplicate import
+* oldId → newId mapping
+* tag reuse by name
+* transaction rollback on error
+* imported prompt versions searchable after rebuild
+* lineage remapping
+* no overwrite
+
+6. renderer behavior 테스트, 가능하면
+
+* export button loading/success/cancelled
+* import preview 표시
+* import confirmation 필요
+* import result summary 표시
+* cancel does not mutate DB
+
+22. 파일별 예상 변경
+
+예상 변경 파일:
+
+* shared backup schema/type 파일 추가
+* backup redaction utility 추가
+* backup validation utility 추가
+* BackupExportService 추가
+* BackupImportService 추가
+* BackupValidationService 추가
+* backup IPC handler 추가
+* preload bridge 타입 추가
+* Settings에 BackupSettingsPanel 추가
+* File menu action 추가
+* ImportBackupDialog 추가
+* ImportPreview 추가
+* ImportResultSummary 추가
+* search index rebuild 호출 연결
+* 관련 테스트 파일 추가
+
+건드리지 말아야 할 것:
+
+* quick capture trim/cleanup 추가 금지
+* quick_capture settings 추가 금지
+* globalShortcut 추가 금지
+* appEvents bridge 추가 금지
+* shortcuts bridge 추가 금지
+* prompt_runs 관련 schema 추가 금지
+* 실행 결과 저장 관련 코드 추가 금지
+* 외부 repo 자동 스캔 추가 금지
+* prompt execution service 추가 금지
+* 백업 암호화 추가 금지, 별도 Phase로 미룸
+
+23. 의존성 그래프
+
+권장 의존성 방향:
+
+shared/backup schemas
+→ shared/backup validation/redaction utilities
+→ main backup export/import services
+→ existing repositories
+→ main backup IPC
+→ preload typed bridge
+→ renderer backup hooks
+→ renderer backup UI
+→ menu action integration
+
+금지 방향:
+
+* renderer → fs/path/process 직접 접근
+* renderer → DB 직접 접근
+* renderer → Electron ipcRenderer 직접 접근
+* backup import → prompt execution
+* backup export → secret store
+* backup import → external repo scanner
+* repo_path → automatic filesystem read
+* import → automatic LLM call
+
+24. 자동 테스트 목록
+
+가능한 경우 다음 테스트를 추가하세요.
+
+Schema:
+
+* BackupEnvelopeSchema accepts valid full backup
+* rejects missing schemaVersion
+* rejects unsupported schemaVersion
+* rejects invalid backupType
+* detects forbidden prompt_runs key
+* detects suspicious secret keys
+
+Export:
+
+* full backup includes projects/prompts/tags/templates
+* full backup excludes API Key
+* full backup excludes secret store
+* project backup includes only one project
+* prompt asset backup includes selected prompt versions
+* prompt template pack includes selected templates
+* harness template pack includes selected harness templates
+* backup metadata itemCounts are correct
+
+Validation:
+
+* validate backup returns preview
+* validate backup does not write DB
+* detects ID conflicts
+* detects name conflicts
+* detects missing external lineage source
+* detects unsupported schema
+
+Import:
+
+* safe duplicate creates new ids
+* preserves relationships using id map
+* reuses tags by name when option enabled
+* renames conflicting project names
+* imports prompt templates
+* imports harness templates
+* imports project context profiles
+* imports quality reviews only when option enabled
+* rolls back transaction on failure
+* rebuilds or updates search index
+* does not create prompt_runs or execution_results
+
+UI behavior:
+
+* export cancel shows cancelled state
+* import preview required before import
+* import confirmation required
+* import success updates lists
+* current draft is not overwritten
+* no automatic analyze/compile/review after import
+
+25. 수동 QA 체크리스트
+
+| 항목                    | 기대 결과                        |
+| --------------------- | ---------------------------- |
+| 전체 백업 내보내기            | .prompter-backup.json 저장     |
+| 백업 파일 열기              | API Key 없음                   |
+| 백업 파일 열기              | secret store 없음              |
+| 백업 파일 열기              | prompt_runs 없음               |
+| 프로젝트 백업               | 선택 프로젝트 데이터만 포함              |
+| PromptAsset 백업        | 선택 프롬프트와 버전 포함               |
+| Prompt Template pack  | 선택 템플릿 포함                    |
+| Harness Template pack | 선택 하네스 포함                    |
+| 잘못된 JSON import       | validation error 표시          |
+| 지원하지 않는 schemaVersion | import 거부                    |
+| import preview        | item counts와 warnings 표시     |
+| import 취소             | DB 변경 없음                     |
+| safe duplicate import | 기존 데이터 덮어쓰기 없음               |
+| tag reuse 옵션          | 같은 이름 tag 재사용                |
+| import 완료             | project/prompt 목록 갱신         |
+| import 완료             | 검색으로 imported prompt 검색 가능   |
+| import 완료             | current draft 변경 없음          |
+| import 완료             | 자동 analyze/compile/review 없음 |
+| 백업 파일에 repo_path 있음   | 파일 시스템 접근 없음                 |
+| 앱 재시작                 | imported data 유지             |
+| prompt_runs 확인        | 실행 결과 관련 데이터 생성 없음           |
+
+26. Attribution
+
+이 Phase 16 명세는 Phase 11, Phase 12, Phase 13, Phase 14, Phase 15의 최종 guardrail을 반영합니다.
+
+반영된 Phase 11 결정:
+
+* 빠른 캡처는 버튼 + File 메뉴 + 앱 포커스 상태의 CmdOrCtrl+Shift+V accelerator로 한정
+* window.prompter.appEvents.* 추가 없음
+* window.prompter.shortcuts.* 추가 없음
+* OS globalShortcut 없음
+* quick_capture_* settings 없음
+* 클립보드 텍스트 원문 보존
+* 자동 trim/cleanup 없음
+* append 옵션 없음
+* no-auto-LLM, no-auto-save, no-log, no-persistence guardrail 유지
+
+반영된 Phase 12 결정:
+
+* 하네스 템플릿은 프롬프트 구조와 컴파일 규칙을 담당
+* 하네스 선택은 originalInput/scenario/targetAgent를 자동 덮어쓰지 않음
+* 하네스 선택은 자동 analyze/compile/save를 실행하지 않음
+* 하네스 선택은 stale compiler state를 초기화
+* template_body는 코드로 실행하지 않음
+
+반영된 Phase 13 결정:
+
+* 프로젝트 컨텍스트는 사용자 제공 프로젝트 맥락으로만 반영
+* project context 선택은 originalInput/manual context/scenario/targetAgent를 자동 덮어쓰지 않음
+* project context 선택은 자동 analyze/compile/save를 실행하지 않음
+* repo_path는 저장할 수 있어도 파일 시스템 자동 접근 없음
+
+반영된 Phase 14 결정:
+
+* 품질 리뷰는 프롬프트 실행이 아님
+* 품질 리뷰는 자동 LLM 호출을 실행하지 않음
+* 리뷰 결과는 자동으로 prompt를 수정하지 않음
+* improvedPromptDraft는 자동 덮어쓰기 없이 명시적 액션으로만 반영
+* prompt_quality_reviews는 prompt_runs와 분리됨
+
+반영된 Phase 15 결정:
+
+* Prompt Template 선택은 자동 LLM 호출, 자동 compile, 자동 저장을 실행하지 않음
+* Prompt Template 적용은 명시적 액션과 confirmation 필요
+* template content는 코드로 실행하지 않음
+* derived draft 저장 시에만 lineage 기록
+* prompt_runs와 실행 결과 저장 기능은 없음
+
+Phase 16에서 이 결정을 깨뜨리지 마세요.
+
+27. 이번 단계에서 구현하지 말 것
+
+다음은 절대 구현하지 마세요.
+
+* 프롬프트 실행 기능
+* Codex CLI 실행
+* Codex OAuth
+* Claude Code 실행
+* Cursor 실행
+* 외부 앱 자동 제어
+* 외부 repo 자동 스캔
+* repo_path 기반 파일 읽기
+* git 명령 실행
+* OS 전역 단축키
+* window.prompter.appEvents.*
+* window.prompter.shortcuts.*
+* quick_capture_* settings
+* QuickCaptureSettingsSchema
+* RegisterGlobalShortcutInputSchema
+* clipboard history
+* background clipboard watch
+* external selected text 읽기
+* prompt_runs
+* agent_runs
+* execution_results
+* validation_results
+* run_logs
+* 실행 결과 저장
+* 클라우드 동기화
+* 팀 협업
+* 자동 백업 스케줄러
+* 백그라운드 백업
+* 원격 백업 업로드
+* 백업 암호화
+* 백업 파일 자동 동기화
+* import 후 자동 LLM 호출
+* import 후 자동 prompt 실행
+* import overwrite 전략
+
+완료 기준:
+
+* 전체 라이브러리 백업을 JSON 파일로 내보낼 수 있습니다.
+* 프로젝트 단위 백업을 JSON 파일로 내보낼 수 있습니다.
+* 선택된 PromptAsset 백업을 JSON 파일로 내보낼 수 있습니다.
+* Prompt Template pack을 내보낼 수 있습니다.
+* Harness Template pack을 내보낼 수 있습니다.
+* 백업 파일에는 API Key, secret store, safeStorage 값, DB 경로, prompt_runs가 포함되지 않습니다.
+* 백업 파일은 schemaVersion과 backupType을 포함합니다.
+* 백업 파일을 import 전에 검증할 수 있습니다.
+* import preview가 item counts, conflicts, warnings를 표시합니다.
+* import는 safe duplicate strategy로만 수행됩니다.
+* import는 기존 데이터를 덮어쓰지 않습니다.
+* import는 transaction 기반으로 처리되고 실패 시 rollback됩니다.
+* import 후 관계가 oldId → newId mapping으로 올바르게 복원됩니다.
+* import 후 검색 인덱스가 갱신됩니다.
+* import 후 current draft는 자동 변경되지 않습니다.
+* import 후 자동 analyze, compile, review, execution이 실행되지 않습니다.
+* 모든 IPC 입력값은 Zod로 검증됩니다.
+* renderer는 DB, fs, path, process, ipcRenderer에 직접 접근하지 않습니다.
+* Phase 11, 12, 13, 14, 15 guardrail이 유지됩니다.
+* TypeScript 타입 검사가 통과합니다.
+* 앱이 개발 모드에서 정상 실행됩니다.
+* 프롬프트 실행이나 실행 결과 저장 기능은 추가되지 않았습니다.
+
+작업 전:
+
+1. 현재 Phase 0부터 Phase 15까지의 코드 구조를 확인합니다.
+2. DB schema 전체를 확인합니다.
+3. prompt_templates와 lineage 구현 방식을 확인합니다.
+4. prompt_quality_reviews 테이블이 있는지 확인합니다.
+5. search index rebuild 함수가 있는지 확인합니다.
+6. Settings UI와 File menu action 구조를 확인합니다.
+7. 기존 menu.onAction / MENU_ACTION_CHANNEL 패턴을 확인합니다.
+8. preload bridge 타입 선언 방식을 확인합니다.
+9. 백업 대상 entity와 제외 대상 entity를 명확히 정리합니다.
+10. import strategy는 safe_duplicate만 구현하도록 계획합니다.
+11. TDD 순서에 따라 backup schema와 validation 테스트를 먼저 작성합니다.
+12. 간결한 구현 계획을 세운 뒤 Phase 16만 구현합니다.
+
+작업 후:
+
+1. 변경된 내용을 요약합니다.
+2. 생성되거나 수정된 파일 목록을 제공합니다.
+3. schema 또는 migration 변경이 있다면 설명합니다.
+4. 백업 파일 포맷과 schemaVersion을 설명합니다.
+5. export 범위와 제외 데이터를 설명합니다.
+6. API Key와 secret이 백업에 포함되지 않는 방식을 설명합니다.
+7. import validation과 preview 흐름을 설명합니다.
+8. safe duplicate import 전략과 ID mapping 방식을 설명합니다.
+9. transaction rollback 방식을 설명합니다.
+10. search index 갱신 방식을 설명합니다.
+11. renderer가 파일 시스템에 직접 접근하지 않는 방식을 설명합니다.
+12. Phase 11 quick capture, Phase 12 harness, Phase 13 project context, Phase 14 quality review, Phase 15 prompt template guardrail을 유지한 방식을 설명합니다.
+13. 추가한 테스트와 테스트 결과를 설명합니다.
+14. 앱 실행 및 타입 검사 명령어를 제공합니다.
+15. 수동 테스트 절차를 제공합니다.
+16. 아직 구현하지 않은 기능을 명확히 구분해서 설명합니다.
 
 ```
 
 
 
-# Phase 15
+# Phase 17
+
+
+
+# Phase 18
+
+
+
+# Phase 19
+
+
+
+# Phase 20
+
+

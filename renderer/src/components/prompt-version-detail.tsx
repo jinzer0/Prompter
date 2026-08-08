@@ -130,11 +130,13 @@ export function PromptVersionDetail({
         </p>
       </section>
       <PromptExportActions
+        canSaveToFile
         copyButtonLabel="Copy version export"
         exportBase={exportBase}
         formatLabel="Version export format"
         rawContent={selectedVersion.compiledPrompt}
         saveButtonLabel="Save version export"
+        saveDisabledDescriptionId={null}
         title="Version export"
       />
       <SavePromptTemplateFromVersion

@@ -96,7 +96,7 @@ test("saves compiler output as a new version on the selected prompt without crea
     await expect(run.page.getByText("Version 2")).toBeVisible()
     await expect(run.page.getByText(revisedCompiledPrompt)).toBeVisible()
     await expect(run.page.getByRole("combobox", { name: "Version export format" })).toBeVisible()
-    await expect(run.page.getByRole("button", { name: "Save version export" })).toBeVisible()
+    await expect(run.page.getByRole("button", { name: "Save version export" })).toBeEnabled()
     await run.page
       .getByRole("combobox", { name: "Version export format" })
       .selectOption("claude_code")

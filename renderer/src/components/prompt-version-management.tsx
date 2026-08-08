@@ -92,7 +92,7 @@ export function PromptVersionManagement({
   }
 
   return (
-    <Card className="flex flex-1 flex-col">
+    <Card data-insights-target="prompt-version" tabIndex={-1} className="flex flex-1 flex-col">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle>{selectedAsset.title}</CardTitle>

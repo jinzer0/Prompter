@@ -12,9 +12,11 @@ import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 
 type PromptCompilerDraftReviewProps = {
+  readonly canEditOutput: boolean
   readonly compiled: CompiledPromptResult | null
   readonly draft: PromptCompilerInput
   readonly editablePrompt: string
+  readonly guardDescriptionId: string
   readonly outputRevision: number
   readonly projectContextPreview: ProjectContextCompilerBuildResult | null
   readonly onUseImprovedPrompt: (prompt: string) => void
@@ -58,9 +60,11 @@ function scoreRows(review: NonNullable<ReturnType<typeof usePromptQuality>["revi
 }
 
 export function PromptCompilerDraftReview({
+  canEditOutput,
   compiled,
   draft,
   editablePrompt,
+  guardDescriptionId,
   outputRevision,
   projectContextPreview,
   onUseImprovedPrompt,
@@ -87,7 +91,11 @@ export function PromptCompilerDraftReview({
   const improvedPrompt = quality.review?.improvedPromptDraft ?? null
 
   function useImprovedPrompt(): void {
-    if (quality.actionState.useImprovedPromptAsCurrent.isEnabled && improvedPrompt !== null) {
+    if (
+      canEditOutput &&
+      quality.actionState.useImprovedPromptAsCurrent.isEnabled &&
+      improvedPrompt !== null
+    ) {
       onUseImprovedPrompt(improvedPrompt)
     }
   }
@@ -135,9 +143,10 @@ export function PromptCompilerDraftReview({
             Apply score
           </Button>
           <Button
+            aria-describedby={canEditOutput ? undefined : guardDescriptionId}
             type="button"
             variant="ghost"
-            disabled={!quality.actionState.useImprovedPromptAsCurrent.isEnabled}
+            disabled={!canEditOutput || !quality.actionState.useImprovedPromptAsCurrent.isEnabled}
             onClick={useImprovedPrompt}
           >
             Use improved prompt

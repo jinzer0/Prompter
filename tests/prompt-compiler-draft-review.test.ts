@@ -144,9 +144,11 @@ describe("prompt compiler draft review", () => {
   it("renders explicit local draft review controls enabled only for reviewable drafts", () => {
     const enabledMarkup = renderToStaticMarkup(
       createElement(PromptCompilerDraftReview, {
+        canEditOutput: true,
         compiled,
         draft,
         editablePrompt: "Compiled text",
+        guardDescriptionId: "compiler-project-rebind-description",
         outputRevision: 1,
         projectContextPreview: null,
         onUseImprovedPrompt: () => undefined,
@@ -154,9 +156,11 @@ describe("prompt compiler draft review", () => {
     )
     const disabledMarkup = renderToStaticMarkup(
       createElement(PromptCompilerDraftReview, {
+        canEditOutput: true,
         compiled: null,
         draft,
         editablePrompt: "Compiled text",
+        guardDescriptionId: "compiler-project-rebind-description",
         outputRevision: 1,
         projectContextPreview: null,
         onUseImprovedPrompt: () => undefined,

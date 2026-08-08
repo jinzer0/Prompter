@@ -144,7 +144,12 @@ export function PromptQualityReviewPanel({
   const isBusy = operation !== "idle"
 
   return (
-    <Card aria-busy={isBusy} aria-labelledby="prompt-quality-review-heading">
+    <Card
+      data-insights-target="prompt-quality"
+      tabIndex={-1}
+      aria-busy={isBusy}
+      aria-labelledby="prompt-quality-review-heading"
+    >
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle id="prompt-quality-review-heading">Prompt quality review</CardTitle>

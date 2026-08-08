@@ -5,12 +5,15 @@ searching, and compiling prompts for coding and agent workflows.
 
 Main stack:
 
-- Electron main/preload process for native shell, IPC, SQLite, and secret storage.
+- Electron main/preload process for native shell, IPC, SQLite, clipboard, file dialogs, and
+  secret storage.
 - Vite + React + TypeScript renderer for the UI.
 - SQLite through `better-sqlite3`.
 - Drizzle ORM and checked-in migrations under `drizzle/`.
 - Zod-based IPC contracts in `electron/ipc-contract.ts`.
 - OpenAI-powered prompt compiler in `electron/prompt-compiler/`.
+- Local services for project context, quality review, backup/import, manual maintenance, and
+  read-only Insights.
 - Biome for linting and formatting.
 - Vitest and Playwright for contract, persistence, compiler, UI, and smoke tests.
 
@@ -24,20 +27,34 @@ Main stack:
 - `electron/bridge.ts` and `electron/bridge-types.ts`: typed renderer-facing API that validates
   payloads and responses around `ipcRenderer.invoke`.
 - `electron/ipc-contract.ts`: central source of truth for IPC channels, payload schemas, response
-  schemas, scenarios, target agents, settings defaults, secret status, and prompt compiler output
-  requirements.
+  schemas, scenarios, target agents, settings defaults, secret status, prompt compiler output
+  requirements, project contexts, quality reviews, backups, maintenance, and Insights.
 - `electron/ipc-handlers.ts`: main-process validation and service dispatch boundary. Payloads are
   parsed here before repositories or services are called.
 - `electron/db/schema.ts`: Drizzle schema for projects, prompt assets, prompt versions, tags,
-  prompt/tag links, harness templates, and settings.
+  prompt/tag links, harness templates, project context profiles and values, prompt templates,
+  prompt quality reviews, and settings.
 - `electron/db/repositories/*`: persistence behavior for projects, prompts, versions, tags,
-  harness templates, settings, and search.
-- `electron/prompt-compiler/*`: LLM prompt compiler prompts, service, OpenAI client, and test
-  client.
+  harness templates, project context profiles, prompt templates and lineage, quality reviews,
+  settings, and search.
+- `electron/db/services.ts`: app database service bundle, including repositories, search,
+  backups, manual maintenance scanning, and Insights service wiring used by IPC.
+- `electron/prompt-compiler/*`: static and LLM prompt compiler prompts, service, OpenAI client,
+  test client, project context builder, and compiler context assembly.
+- `electron/prompt-quality/*`: local prompt quality review, saved review access, and quality score
+  application to prompt versions. LLM review currently returns unavailable or missing-key status.
+- `electron/backup/*`: JSON backup export, validation preview, import conflict resolution,
+  session storage, native save/open dialogs, and import writing.
+- `electron/maintenance/*`: user-triggered scan reports, action planning, preview sessions,
+  confirmation flow, and selected manual maintenance actions.
+- `electron/insights/*`: read-only local dashboard queries for health, quality, activity, tags,
+  templates, project context, and maintenance availability. Insights must not mutate data or start
+  maintenance.
 - `electron/secrets/*`: OpenAI key encryption, masked status, deletion, and main-process-only key
   retrieval.
 - `renderer/src/*`: React UI, hooks, component wrappers, renderer-only prompt compiler helpers,
-  and styles.
+  workspace navigation, compiler binding/default handling, project context, templates, backup,
+  maintenance, Insights, and styles.
 - `tests/*`: Electron contract tests, persistence tests, migration/schema tests, compiler tests,
   UI tests, and Playwright smoke tests.
 - `DESIGN.md`: visual design system and UI constraints for the compact dark native shell.
@@ -55,6 +72,10 @@ Main stack:
 6. Do not add new scenarios or target agents without updating schemas, UI options, compiler
    prompts, tests, and any defaults that depend on them.
 7. Do not add prompt execution/run-result storage unless the task explicitly asks for it.
+8. Insights is read-only. It may navigate back into Library or Settings, but must not auto-run
+   maintenance scans, actions, fixes, LLM calls, repo scans, or filesystem reads.
+9. Manual Maintenance is allowed only through explicit user actions with scan, preview,
+   confirmation, and session checks. Do not claim persisted maintenance reports or scheduled scans.
 
 # Security and Secrets
 
@@ -107,11 +128,14 @@ Follow `DESIGN.md` and the existing renderer shell:
 
 - Preserve the compact dark native command-center feel.
 - Follow the existing three-panel layout: left sidebar, prompt library, and prompt compiler.
+- Library remains the canonical three-panel workspace. Insights may intentionally keep the left
+  sidebar visible while replacing the Library and Compiler columns with its dashboard workspace.
 - Use existing design tokens and CSS variables from `renderer/src/styles.css`.
 - Do not introduce new visual colors unless `DESIGN.md` is updated.
 - Preserve visible focus states and keyboard accessibility.
 - Prefer local component wrappers over raw one-off controls when matching existing UI patterns.
-- Keep desktop panels visible; do not collapse required panels casually.
+- Keep required desktop Library panels visible outside the Insights workspace swap; do not collapse
+  required panels casually.
 
 # Testing Guidance by Change Type
 

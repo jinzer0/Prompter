@@ -2,7 +2,10 @@
 
 ## 1. Atmosphere & Identity
 
-Prompter feels like a quiet native command center for serious prompt work: compact, dark, precise, and calm under long sessions. The signature combines Linear's hairline hierarchy with Raycast-like native density: a three-panel instrument surface where hierarchy comes from tonal shifts, hairline borders, and one restrained violet accent rather than decorative color.
+Prompter feels like a quiet native command center for serious prompt work: compact, dark, precise,
+and calm under long sessions. The signature combines Linear's hairline hierarchy with Raycast-like
+native density: a Library three-panel instrument surface where hierarchy comes from tonal shifts,
+hairline borders, and one restrained violet accent rather than decorative color.
 
 ## 2. Color
 
@@ -74,13 +77,20 @@ All spacing derives from a base of `4px`.
 ### Grid
 
 - Shell columns: `210px` sidebar, fluid prompt library with `320px` minimum, `460px` compiler.
-- App minimum content width: `1040px`; narrower windows intentionally scroll horizontally so all required panels remain accessible.
+- Library is the canonical desktop workspace: sidebar, prompt library, and prompt compiler stay as
+  the primary three-panel rule.
+- Insights is the intentional workspace exception. It keeps the sidebar visible and lets the
+  dashboard span the library and compiler columns. Hidden Library and Compiler panels stay mounted
+  as a workspace group and restore when the user returns to Library.
+- App minimum content width: `1040px`; narrower windows intentionally scroll horizontally so all
+  required panels remain accessible.
 - Breakpoints follow Tailwind defaults; desktop smoke targets `900x720` and `1280x800`.
 
 ### Rules
 
 - Use CSS variables or Tailwind tokens derived from this scale.
-- No panel can hide at desktop widths; preserve visible/accesssible three-panel structure.
+- Outside the Insights workspace swap, no Library panel can hide at desktop widths. Preserve the
+  visible and accessible three-panel Library structure.
 
 ## 5. Components
 
@@ -89,7 +99,8 @@ All spacing derives from a base of `4px`.
 - **Structure**: native `button` with local `Button` wrapper.
 - **Variants**: `default`, `secondary`, `ghost`.
 - **Spacing**: height `32px` or `28px`, horizontal padding from `--space-3`/`--space-4`.
-- **States**: default tonal fill, hover lighter tonal fill, active slight inset tone, focus violet ring, disabled muted text and no pointer.
+- **States**: default tonal fill, hover lighter tonal fill, active slight inset tone, focus violet
+  ring, disabled muted text and no pointer.
 - **Accessibility**: native keyboard semantics; visible focus ring.
 - **Motion**: color and border transitions only, `150ms ease-out`.
 
@@ -104,11 +115,17 @@ All spacing derives from a base of `4px`.
 
 ### Textarea
 
-- **Structure**: native `textarea` with local `Textarea` wrapper; used for prompt draft entry and compiler preview wells, never as a raw inline control.
-- **Variants**: `editable` for prompt authoring and `preview` for compiled output. Preview is read-only by default, but compiler flows may keep it editable when the saved `compiled_prompt` must reflect user edits.
-- **Spacing**: minimum height `160px`; padding from `--space-4`; mono text only for preview/compiler output.
+- **Structure**: native `textarea` with local `Textarea` wrapper; used for prompt draft entry and
+  compiler preview wells, never as a raw inline control.
+- **Variants**: `editable` for prompt authoring and `preview` for compiled output. Preview is
+  editable only while the compiler is bound to the selected project. Preserved-unbound output is
+  read-only but selectable, with nearby Rebind copy explaining that Copy still works and compile,
+  template, and save actions resume after rebind.
+- **Spacing**: minimum height `160px`; padding from `--space-4`; mono text only for
+  preview/compiler output.
 - **States**: placeholder muted, focus violet border/ring, disabled or read-only muted panel well.
-- **Accessibility**: label via `aria-label` or visible label; preview names must describe the generated or compiled prompt output and its editable state when relevant.
+- **Accessibility**: label via `aria-label` or visible label; preview names must describe the
+  generated or compiled prompt output and its editable state when relevant.
 - **Motion**: border/background transition, `150ms ease-out`.
 
 ### Badge
@@ -116,7 +133,8 @@ All spacing derives from a base of `4px`.
 - **Structure**: inline semantic `span` or status element with local `Badge` wrapper.
 - **Variants**: `neutral`, `accent`, `success`.
 - **Spacing**: compact pill height `22px`, horizontal padding from `--space-2`/`--space-3`.
-- **States**: static by default; accent only for active compiler/library metadata; success only for connected status.
+- **States**: static by default; accent only for active compiler/library metadata; success only for
+  connected status.
 - **Accessibility**: visible text is required; do not use icon-only badges.
 - **Motion**: none by default.
 
@@ -165,7 +183,9 @@ All spacing derives from a base of `4px`.
 ### Panel
 
 - **Structure**: bordered tonal region with header, content, and optional footer/status.
-- **States**: default visible desktop panel; no collapsed state in initial shell.
+- **States**: default visible desktop panel for Library. Insights may hide the Library and Compiler
+  workspace group while the dashboard spans those columns, then restore it without changing Library
+  panel rules.
 - **Accessibility**: landmark or labelled region when appropriate.
 
 ## 6. Motion & Interaction

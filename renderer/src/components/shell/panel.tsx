@@ -11,7 +11,7 @@ export function Panel({ className, headingId, ...props }: PanelProps) {
     <section
       aria-labelledby={headingId}
       className={cn(
-        "flex min-w-0 flex-col rounded-panel border border-border-subtle bg-panel p-5 shadow-panel",
+        "flex min-h-0 min-w-0 flex-col overflow-y-auto rounded-panel border border-border-subtle bg-panel p-5 shadow-panel",
         className,
       )}
       {...props}

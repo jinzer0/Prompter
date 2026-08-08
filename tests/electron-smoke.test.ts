@@ -2,7 +2,7 @@ import { access, mkdtemp, rm } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { _electron as electron, expect, test } from "@playwright/test"
+import { type ElectronApplication, _electron as electron, expect, test } from "@playwright/test"
 
 const requireElectron = createRequire(import.meta.url)
 const electronExecutable: unknown = requireElectron("electron")
@@ -13,6 +13,20 @@ const desktopSmokeViewports = [
 
 if (typeof electronExecutable !== "string") {
   throw new TypeError("Electron executable path must resolve to a string")
+}
+
+async function clickApplicationMenuItem(app: ElectronApplication, label: string): Promise<void> {
+  await app.evaluate(({ BrowserWindow, Menu }, itemLabel) => {
+    const menuItem = Menu.getApplicationMenu()
+      ?.items.flatMap((item) => item.submenu?.items ?? [])
+      .find((item) => item.label === itemLabel)
+
+    if (menuItem?.click === undefined) {
+      throw new TypeError(`Expected application menu item: ${itemLabel}`)
+    }
+
+    menuItem.click(menuItem, BrowserWindow.getAllWindows()[0], {})
+  }, label)
 }
 
 test("opens the main window and resolves the preload ping bridge", async ({
@@ -33,6 +47,12 @@ test("opens the main window and resolves the preload ping bridge", async ({
 
   try {
     const page = await app.firstWindow()
+    const consoleErrors: string[] = []
+    const pageErrors: string[] = []
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text())
+    })
+    page.on("pageerror", (error) => pageErrors.push(error.message))
     await access(join(userDataDirectory, "prompter.sqlite"))
 
     await expect(page.locator('[data-testid="app-shell"]')).toBeVisible()
@@ -48,6 +68,10 @@ test("opens the main window and resolves the preload ping bridge", async ({
     await expect(page.getByText("Select a project to view prompts")).toBeVisible()
     await expect(page.getByText("Select a project first")).toBeVisible()
     await expect(page.getByRole("button", { name: "New Project" })).toBeVisible()
+    await expect(page.getByRole("textbox", { name: "Search prompt templates" })).toHaveAttribute(
+      "placeholder",
+      "Search templates",
+    )
     await expect(
       page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }),
     ).toBeDisabled()
@@ -57,6 +81,38 @@ test("opens the main window and resolves the preload ping bridge", async ({
     await expect(page.locator('[data-testid="ui-button"]').first()).toBeVisible()
     await expect(page.locator('[data-testid="ui-card"]').first()).toBeVisible()
     await expect(page.locator('[data-testid="ui-empty-state"]').first()).toBeVisible()
+
+    // Given: an in-progress compiler draft in the mounted library workspace.
+    const originalRequest = page.getByRole("textbox", { name: "Original request" })
+    await originalRequest.fill("Preserve this compiler draft while viewing insights.")
+    // When: Insights is opened and the user returns to the library.
+    await page.getByRole("button", { name: "Library Insights" }).click()
+    await expect(page.getByTestId("insights-workspace")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Insights Dashboard" })).toBeVisible()
+    await expect(page.getByText("No project or prompt inventory")).toBeVisible()
+    for (const viewport of desktopSmokeViewports) {
+      await page.setViewportSize(viewport)
+      const screenshotName = `insights-workspace-${viewport.width}x${viewport.height}.png`
+      const insightsScreenshot = testInfo.outputPath(screenshotName)
+      await page.screenshot({ path: insightsScreenshot })
+      await testInfo.attach(screenshotName, {
+        path: insightsScreenshot,
+        contentType: "image/png",
+      })
+    }
+    await page.getByRole("button", { name: "Back to library" }).click()
+    // Then: both original columns return with the compiler draft unchanged.
+    await expect(page.getByTestId("prompt-library")).toBeVisible()
+    await expect(page.getByTestId("prompt-compiler")).toBeVisible()
+    await expect(originalRequest).toHaveValue(
+      "Preserve this compiler draft while viewing insights.",
+    )
+    await clickApplicationMenuItem(app, "Library Insights")
+    await expect(page.getByTestId("insights-workspace")).toBeVisible()
+    await page.getByRole("button", { name: "Back to library" }).click()
+    await expect(originalRequest).toHaveValue(
+      "Preserve this compiler draft while viewing insights.",
+    )
 
     await page.getByRole("button", { name: "New Project" }).click()
     await expect(page.getByRole("textbox", { name: "Project name" })).toBeVisible()
@@ -142,6 +198,8 @@ test("opens the main window and resolves the preload ping bridge", async ({
         page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }),
       ).toHaveCSS("white-space", "nowrap")
     }
+    expect(consoleErrors).toEqual([])
+    expect(pageErrors).toEqual([])
     await testInfo.attach("electron-window-title", {
       body: await page.title(),
       contentType: "text/plain",

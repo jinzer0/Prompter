@@ -8,6 +8,15 @@ import type {
   PromptAsset,
   PromptVersion,
 } from "../../../electron/ipc-types"
+import {
+  executeCompiledPromptSave,
+  promptSaveDisabledReasons,
+} from "../lib/compiler-persistence-save"
+import {
+  COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE,
+  type CompilerProjectBinding,
+  executeGuardedCompilerPersistence,
+} from "../lib/compiler-project-binding"
 import type { CompiledPromptResult } from "../lib/prompt-compiler/types"
 import { versionInputFromCompiled } from "../lib/prompt-compiler/version-input"
 import type { CreatePrompt } from "./prompt-library-data"
@@ -28,48 +37,8 @@ type SuggestedTagsActions = {
   readonly selectedSuggestedTags: readonly string[]
 }
 
-type ExecuteCompiledPromptSaveInput = {
-  readonly compiled: CompiledPromptResult | null
-  readonly editablePrompt: string
-  readonly selectedProject: Project | null
-  readonly tagNames: readonly string[]
-}
-
-export function promptSaveDisabledReasons(
-  input: Pick<ExecuteCompiledPromptSaveInput, "compiled" | "editablePrompt" | "selectedProject">,
-): readonly string[] {
-  const reasons: string[] = []
-
-  if (input.selectedProject === null) {
-    reasons.push("Select a project before saving compiled prompt")
-  }
-
-  if (input.compiled === null) {
-    reasons.push("Compile a prompt before saving")
-    return reasons
-  }
-
-  if (input.compiled.title.trim().length === 0) {
-    reasons.push("Prompt title is required")
-  }
-  if (input.compiled.originalInput.trim().length === 0) {
-    reasons.push("Original request is required")
-  }
-  if (input.editablePrompt.trim().length === 0) {
-    reasons.push("Compiled prompt output is required")
-  }
-
-  return reasons
-}
-
-export type ExecuteCompiledPromptSaveActions = {
-  readonly createPrompt: CreatePrompt
-  readonly onTagsChanged: () => void
-  readonly setIsSaving: (isSaving: boolean) => void
-  readonly setMessage: (message: string | null) => void
-}
-
 type UseCompilerPersistenceActionsConfig = {
+  readonly binding: CompilerProjectBinding
   readonly compiled: CompiledPromptResult | null
   readonly createDerivedAsset: CreateDerivedAsset
   readonly createNextVersion: CreateNextVersion
@@ -84,57 +53,14 @@ type UseCompilerPersistenceActionsConfig = {
   readonly suggestedTags: SuggestedTagsActions
 }
 
-export async function executeCompiledPromptSave(
-  input: ExecuteCompiledPromptSaveInput,
-  actions: ExecuteCompiledPromptSaveActions,
-): Promise<void> {
-  if (input.selectedProject === null) {
-    actions.setMessage("Select a project before saving compiled prompt")
-    return
-  }
-
-  if (input.compiled === null) {
-    actions.setMessage("Compile a prompt before saving")
-    return
-  }
-
-  const [disabledReason] = promptSaveDisabledReasons(input)
-
-  if (disabledReason !== undefined) {
-    actions.setMessage(disabledReason)
-    return
-  }
-
-  const { compiled, selectedProject } = input
-
-  actions.setIsSaving(true)
-  actions.setMessage(null)
-
-  try {
-    await actions.createPrompt({
-      projectId: selectedProject.id,
-      title: compiled.title,
-      scenario: compiled.scenario,
-      targetAgent: compiled.targetAgent,
-      ...versionInputFromCompiled(compiled, input.editablePrompt.trim()),
-      tagNames: [...input.tagNames],
-    })
-
-    if (input.tagNames.length > 0) {
-      actions.onTagsChanged()
-    }
-
-    actions.setMessage("Compiled prompt saved.")
-  } catch (error) {
-    actions.setMessage(
-      error instanceof Error ? error.message : "Compiled prompt could not be saved",
-    )
-  } finally {
-    actions.setIsSaving(false)
-  }
-}
+export {
+  type ExecuteCompiledPromptSaveActions,
+  executeCompiledPromptSave,
+  promptSaveDisabledReasons,
+} from "../lib/compiler-persistence-save"
 
 export function useCompilerPersistenceActions({
+  binding,
   compiled,
   createDerivedAsset,
   createNextVersion,
@@ -157,6 +83,16 @@ export function useCompilerPersistenceActions({
   })
 
   async function savePrompt(): Promise<void> {
+    const action = derivedPromptSource === null ? "save_prompt" : "save_derived"
+    const guardResult = await executeGuardedCompilerPersistence(
+      { action, binding, currentProjectId: selectedProject?.id ?? null },
+      () => undefined,
+    )
+    if (guardResult === "blocked") {
+      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
+      return
+    }
+
     if (derivedPromptSource !== null) {
       if (compiled === null) {
         setMessage("Compile a prompt before saving")
@@ -198,6 +134,7 @@ export function useCompilerPersistenceActions({
 
     await executeCompiledPromptSave(
       {
+        binding,
         compiled,
         editablePrompt,
         selectedProject,
@@ -208,6 +145,15 @@ export function useCompilerPersistenceActions({
   }
 
   async function saveNextVersion(): Promise<void> {
+    const guardResult = await executeGuardedCompilerPersistence(
+      { action: "save_next_version", binding, currentProjectId: selectedProject?.id ?? null },
+      () => undefined,
+    )
+    if (guardResult === "blocked") {
+      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
+      return
+    }
+
     if (selectedAsset === null) {
       setMessage("Select a prompt before saving a new version")
       return

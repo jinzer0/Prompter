@@ -14,6 +14,7 @@ import {
   executeCompiledPromptSave,
   promptSaveDisabledReasons,
 } from "../renderer/src/hooks/use-compiler-persistence-actions"
+import { createCompilerProjectBinding } from "../renderer/src/lib/compiler-project-binding"
 import type { CompiledPromptResult } from "../renderer/src/lib/prompt-compiler/types"
 
 const projectId = "11111111-1111-4111-8111-111111111111"
@@ -145,6 +146,7 @@ describe("Phase 15 normal prompt saves", () => {
 
     await executeCompiledPromptSave(
       {
+        binding: createCompilerProjectBinding(project.id),
         compiled,
         editablePrompt: "  # Objective\nCreate atomically  ",
         selectedProject: project,
@@ -195,6 +197,7 @@ describe("Phase 15 normal prompt saves", () => {
 
     await executeCompiledPromptSave(
       {
+        binding: createCompilerProjectBinding(project.id),
         compiled,
         editablePrompt: version.compiledPrompt,
         selectedProject: project,

@@ -1,22 +1,12 @@
 import { type FormEvent, useEffect, useRef } from "react"
-import type {
-  ComparePromptVersionsResult,
-  CreateDerivedPromptAssetInput,
-  CreateNextPromptVersionInput,
-  CreatePromptWithInitialVersionResult,
-  DuplicatePromptAssetInput,
-  Project,
-  PromptAsset,
-  PromptVersion,
-} from "../../../electron/ipc-types"
-import type { CreatePrompt } from "../hooks/prompt-library-data"
 import { useAvailableHarnessTemplates } from "../hooks/use-available-harness-templates"
 import { useCompilerProjectContext } from "../hooks/use-compiler-project-context"
 import { useHarnessTemplates } from "../hooks/use-harness-templates"
 import { usePromptCompilerPanel } from "../hooks/use-prompt-compiler-panel"
 import { usePromptTemplates } from "../hooks/use-prompt-templates"
-import type { LoadStatus } from "../hooks/use-prompter-library"
+import { COMPILER_PROJECT_REBIND_DESCRIPTION_ID } from "../lib/compiler-project-binding"
 import { buildDerivedPromptDraft, duplicatePromptInput } from "../lib/prompt-derivation"
+import { CompilerProjectBindingNotice } from "./compiler-project-binding-notice"
 import { HarnessTemplateSelector } from "./harness-template-selector"
 import { ProjectContextProfileSelector } from "./project-context-profile-selector"
 import { PromptCompilerActions } from "./prompt-compiler-actions"
@@ -25,41 +15,8 @@ import { PromptCompilerDetailSection } from "./prompt-compiler-detail-section"
 import { PromptCompilerForm } from "./prompt-compiler-form"
 import { PromptCompilerHeader } from "./prompt-compiler-header"
 import { PromptCompilerOutputWorkspace } from "./prompt-compiler-output-workspace"
+import type { PromptCompilerPanelProps } from "./prompt-compiler-panel-types"
 import { Panel } from "./shell/panel"
-
-type PromptCompilerPanelProps = {
-  readonly assets: readonly PromptAsset[]
-  readonly compareVersions: (
-    baseVersionId: string,
-    compareVersionId: string,
-  ) => Promise<ComparePromptVersionsResult>
-  readonly createDerivedAsset: (
-    input: CreateDerivedPromptAssetInput,
-  ) => Promise<CreatePromptWithInitialVersionResult>
-  readonly createNextVersion: (input: CreateNextPromptVersionInput) => Promise<PromptVersion>
-  readonly createPrompt: CreatePrompt
-  readonly duplicateAsset: (
-    input: DuplicatePromptAssetInput,
-  ) => Promise<CreatePromptWithInitialVersionResult>
-  readonly changedProjectContextProfileId: string | null
-  readonly currentVersion: PromptVersion | null
-  readonly deletedHarnessTemplateIds: readonly string[]
-  readonly deletedProjectContextProfileIds: readonly string[]
-  readonly error: string | null
-  readonly harnessTemplateRefreshSignal: number
-  readonly projectContextProfileRefreshSignal: number
-  readonly promptTemplateRefreshSignal: number
-  readonly selectedAsset: PromptAsset | null
-  readonly selectedVersion: PromptVersion | null
-  readonly selectedProject: Project | null
-  readonly selectAsset: (id: string) => void
-  readonly selectVersion: (id: string) => void
-  readonly setCurrentVersion: (promptAssetId: string, versionId: string) => Promise<void>
-  readonly status: LoadStatus
-  readonly versions: readonly PromptVersion[]
-  readonly onPromptTemplatesChanged: () => void
-  readonly onTagsChanged: () => void
-}
 
 export function PromptCompilerPanel({
   assets,
@@ -69,6 +26,7 @@ export function PromptCompilerPanel({
   createPrompt,
   duplicateAsset,
   changedProjectContextProfileId,
+  compilerStatePreservationRequest,
   currentVersion,
   deletedHarnessTemplateIds,
   deletedProjectContextProfileIds,
@@ -100,9 +58,11 @@ export function PromptCompilerPanel({
   const originalRequestRef = useRef<HTMLTextAreaElement>(null)
   const projectContext = useCompilerProjectContext({
     changedProjectContextProfileId,
+    compilerStatePreservationRequest,
     deletedProjectContextProfileIds,
     draft: compiler.draft,
     onIncludedProfileChanged: compiler.clearStaleOutput,
+    onProjectTransition: compiler.handleProjectTransition,
     projectContextProfileRefreshSignal,
     selectedProject,
     setDraft: compiler.setDraft,
@@ -146,17 +106,6 @@ export function PromptCompilerPanel({
     compiler.compileStatic(selectedTemplate, profileBuildResult)
   }
 
-  async function duplicateSelectedPrompt(
-    asset: PromptAsset,
-    version: PromptVersion,
-  ): Promise<void> {
-    await duplicateAsset(duplicatePromptInput(asset.id, version.id))
-  }
-
-  function deriveSelectedPrompt(asset: PromptAsset, version: PromptVersion): void {
-    compiler.seedDerivedPrompt(buildDerivedPromptDraft(asset, version))
-  }
-
   return (
     <Panel data-testid="prompt-compiler" headingId="prompt-compiler-heading">
       <PromptCompilerHeader />
@@ -182,6 +131,7 @@ export function PromptCompilerPanel({
         <ProjectContextProfileSelector
           error={projectContext.error}
           includeProjectContextProfile={projectContext.includeProjectContextProfile}
+          isSelectedProfileUnavailable={projectContext.isSelectedProfileUnavailable}
           preview={projectContext.preview}
           previewError={projectContext.previewError}
           previewStatus={projectContext.previewStatus}
@@ -193,6 +143,17 @@ export function PromptCompilerPanel({
           onManageProfiles={() => document.getElementById("context-profiles-heading")?.focus()}
           onSelectProfile={projectContext.selectProfile}
         />
+        {selectedProject !== null && (
+          <CompilerProjectBindingNotice
+            binding={compiler.projectBinding}
+            projectName={selectedProject.name}
+            onRebind={() => {
+              if (compiler.rebindProject()) {
+                projectContext.releasePreservedProjectContext()
+              }
+            }}
+          />
+        )}
         {compiler.message !== null && (
           <p className="text-[12px] text-muted-strong">{compiler.message}</p>
         )}
@@ -210,6 +171,8 @@ export function PromptCompilerPanel({
             compiler.editablePrompt.trim().length > 0
           }
           canSavePrompt={compiler.saveDisabledReasons.length === 0}
+          compilerActionsEnabled={compiler.compilerActionsEnabled}
+          guardDescriptionId={COMPILER_PROJECT_REBIND_DESCRIPTION_ID}
           isAnalyzing={compiler.isAnalyzing}
           isCompilingLLM={compiler.isCompilingLLM}
           isReadingClipboard={compiler.isReadingClipboard}
@@ -244,8 +207,12 @@ export function PromptCompilerPanel({
           selectedVersion={selectedVersion}
           status={status}
           versions={versions}
-          onDerivePrompt={deriveSelectedPrompt}
-          onDuplicatePrompt={duplicateSelectedPrompt}
+          onDerivePrompt={(asset, version) =>
+            compiler.seedDerivedPrompt(buildDerivedPromptDraft(asset, version))
+          }
+          onDuplicatePrompt={(asset, version) =>
+            duplicateAsset(duplicatePromptInput(asset.id, version.id)).then(() => undefined)
+          }
           onNavigatePrompt={selectAsset}
           onPromptTemplatesChanged={onPromptTemplatesChanged}
           onSelectVersion={selectVersion}

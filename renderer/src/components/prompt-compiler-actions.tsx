@@ -4,6 +4,8 @@ type PromptCompilerActionsProps = {
   readonly canCopy: boolean
   readonly canSaveNextVersion: boolean
   readonly canSavePrompt: boolean
+  readonly compilerActionsEnabled: boolean
+  readonly guardDescriptionId: string
   readonly isAnalyzing: boolean
   readonly isCompilingLLM: boolean
   readonly isReadingClipboard: boolean
@@ -21,6 +23,8 @@ export function PromptCompilerActions({
   canCopy,
   canSaveNextVersion,
   canSavePrompt,
+  compilerActionsEnabled,
+  guardDescriptionId,
   isAnalyzing,
   isCompilingLLM,
   isReadingClipboard,
@@ -44,11 +48,18 @@ export function PromptCompilerActions({
       >
         {isReadingClipboard ? "Reading Clipboard..." : "Import from Clipboard"}
       </Button>
-      <Button type="submit">프롬프트 컴파일</Button>
+      <Button
+        type="submit"
+        aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+        disabled={!compilerActionsEnabled}
+      >
+        프롬프트 컴파일
+      </Button>
       <Button
         type="button"
         variant="secondary"
-        disabled={isAnalyzing || isCompilingLLM}
+        aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+        disabled={!compilerActionsEnabled || isAnalyzing || isCompilingLLM}
         onClick={onAnalyzeWithLLM}
       >
         {isAnalyzing ? "분석 중..." : "분석하기"}
@@ -56,7 +67,8 @@ export function PromptCompilerActions({
       <Button
         type="button"
         variant="secondary"
-        disabled={isAnalyzing || isCompilingLLM}
+        aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+        disabled={!compilerActionsEnabled || isAnalyzing || isCompilingLLM}
         onClick={onCompileWithLLM}
       >
         {isCompilingLLM ? "생성 중..." : "최종 프롬프트 생성"}
@@ -65,7 +77,8 @@ export function PromptCompilerActions({
         data-menu-action-target="save-compiled-prompt"
         type="button"
         variant="secondary"
-        disabled={!canSavePrompt || isSaving}
+        aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+        disabled={!compilerActionsEnabled || !canSavePrompt || isSaving}
         onClick={() => void onSavePrompt()}
       >
         {isSaving ? "Saving..." : "Save compiled prompt"}
@@ -74,7 +87,8 @@ export function PromptCompilerActions({
         <Button
           type="button"
           variant="secondary"
-          disabled={isSavingNextVersion}
+          aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+          disabled={!compilerActionsEnabled || isSavingNextVersion}
           onClick={() => void onSaveNextVersion()}
         >
           {isSavingNextVersion ? "Saving..." : "Save as new version"}

@@ -1,6 +1,7 @@
 import { useId, useState } from "react"
 
 import type { ExportFormat } from "../../../electron/ipc-types"
+import { COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE } from "../lib/compiler-project-binding"
 import {
   type PromptExportBase,
   type PromptExportChoice,
@@ -14,11 +15,13 @@ import { Select } from "./ui/select"
 import { Textarea } from "./ui/textarea"
 
 type PromptExportActionsProps = {
+  readonly canSaveToFile: boolean
   readonly copyButtonLabel: string
   readonly exportBase: PromptExportBase | null
   readonly formatLabel: string
   readonly rawContent: string
   readonly saveButtonLabel: string
+  readonly saveDisabledDescriptionId: string | null
   readonly title: string
 }
 
@@ -27,11 +30,13 @@ function isExportFormat(format: PromptExportChoice): format is ExportFormat {
 }
 
 export function PromptExportActions({
+  canSaveToFile,
   copyButtonLabel,
   exportBase,
   formatLabel,
   rawContent,
   saveButtonLabel,
+  saveDisabledDescriptionId,
   title,
 }: PromptExportActionsProps) {
   const [selectedFormat, setSelectedFormat] = useState<PromptExportChoice>("raw")
@@ -100,6 +105,11 @@ export function PromptExportActions({
   }
 
   async function saveExport(): Promise<void> {
+    if (!canSaveToFile) {
+      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
+      return
+    }
+
     setIsWorking(true)
     setMessage(null)
 
@@ -179,10 +189,11 @@ export function PromptExportActions({
             {copyButtonLabel}
           </Button>
           <Button
+            aria-describedby={canSaveToFile ? undefined : (saveDisabledDescriptionId ?? undefined)}
             data-menu-action-target="save-compiled-export"
             type="button"
             variant="ghost"
-            disabled={!hasContent || isWorking}
+            disabled={!canSaveToFile || !hasContent || isWorking}
             onClick={saveExport}
           >
             {saveButtonLabel}

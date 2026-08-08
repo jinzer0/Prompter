@@ -72,20 +72,40 @@ not be exposed through the preload bridge, logs, exports, settings rows, or test
 - Current-version selection and version diff display.
 - SQLite FTS search with project, tag, scenario, and target-agent filters.
 - Tag creation, attachment, detachment, and suggested-tag save flow.
-- Static and LLM-assisted prompt compilation.
+- Project context profiles with defaults, compiler preview, and saved context fields.
+- Harness templates for scenario/agent-specific compiler requirements.
+- Static and LLM-assisted prompt compilation with harness and project context input.
+- Prompt templates, template derivation from saved versions, and source lineage display.
+- Local prompt quality review for drafts and saved versions, including score application.
 - OpenAI key status, save, and delete settings flow.
-- Markdown, Codex, Claude Code, Cursor, Generic Agent, AGENTS.md snippet, and SKILL.md draft exports.
+- Markdown, Codex, Claude Code, Cursor, Generic Agent, AGENTS.md snippet, and SKILL.md draft
+  exports.
 - Clipboard copy, clipboard import into Prompt Compiler, and native file export.
+- Full library, project, prompt asset, prompt template, and harness template backup export.
+- Backup validation, conflict preview, session-based import, and post-import library refresh.
+- Manual Maintenance scans, action previews, confirmation sessions, and selected cleanup actions.
 - macOS app menu and keyboard shortcuts, including quick capture from clipboard.
+- Local read-only Library Insights with project and date filters, dashboard cards,
+  library health, quality, activity, tag, template, context, and maintenance snapshots.
+- Insights navigation opens library items without changing Prompt Compiler state unless
+  the user explicitly navigates to compiler context.
+- Compiler output is editable while bound to the selected project. When Insights navigation
+  preserves output across a project change, analyze, compile, template, and save actions pause
+  until Rebind; Copy stays available for the preserved output.
 
 ## Explicitly Excluded
 
 - Prompt execution.
+- Insights LLM calls, automatic maintenance scans, scheduled cleanup, automatic fixes,
+  external repository scans, and repo-path filesystem reads.
+- Insights never starts Maintenance. Manual Phase 17 Maintenance remains available from Settings,
+  with user-triggered scans, previews, confirmation, and selected actions.
 - Codex, Claude Code, Cursor, or external app launching.
 - Codex OAuth.
 - Prompt run/result/history storage.
 - `prompt_runs`, `agent_runs`, `execution_results`, `validation_results`, or `run_logs` tables.
-- Cloud sync, accounts, billing, remote server features, vector search, embeddings, plugins, and team collaboration.
+- Cloud sync, accounts, billing, remote server features, vector search, embeddings, plugins, and
+  team collaboration.
 
 ## Packaging Status
 

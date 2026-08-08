@@ -39,7 +39,12 @@ export function MaintenanceScanControls({
             selected project context applied.
           </p>
         </div>
-        <Button type="button" disabled={isWorking} onClick={onScan}>
+        <Button
+          className="w-full whitespace-normal"
+          type="button"
+          disabled={isWorking}
+          onClick={onScan}
+        >
           {scanPhase === "scanning" ? "Scanning..." : "Run maintenance scan"}
         </Button>
       </div>

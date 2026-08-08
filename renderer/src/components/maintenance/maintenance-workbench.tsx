@@ -36,6 +36,7 @@ export function MaintenanceWorkbenchView({
     <Card
       aria-labelledby="settings-maintenance-heading"
       className="focus:outline-none focus:ring-2 focus:ring-accent/45"
+      data-insights-target="settings-maintenance"
       data-menu-action-target="settings-maintenance"
       tabIndex={-1}
     >

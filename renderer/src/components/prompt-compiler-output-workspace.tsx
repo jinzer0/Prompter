@@ -1,6 +1,7 @@
 import type { Project, ProjectContextCompilerBuildResult } from "../../../electron/ipc-types"
 import type { usePromptCompilerPanel } from "../hooks/use-prompt-compiler-panel"
 import type { usePromptTemplates } from "../hooks/use-prompt-templates"
+import { COMPILER_PROJECT_REBIND_DESCRIPTION_ID } from "../lib/compiler-project-binding"
 import { PromptCompilerAnalysis } from "./prompt-compiler-analysis"
 import { PromptCompilerOutputPanel } from "./prompt-compiler-output-panel"
 import { PromptTemplateProvenancePanel } from "./prompt-template-provenance-panel"
@@ -30,6 +31,8 @@ export function PromptCompilerOutputWorkspace({
         selectedSuggestedTags={compiler.selectedSuggestedTags}
       />
       <PromptTemplateSelector
+        canApply={compiler.compilerActionsEnabled}
+        guardDescriptionId={COMPILER_PROJECT_REBIND_DESCRIPTION_ID}
         isConfirmationPending={compiler.isTemplateApplyConfirmationPending}
         pendingTemplate={compiler.pendingTemplate}
         preview={compiler.templatePreview}
@@ -44,9 +47,12 @@ export function PromptCompilerOutputWorkspace({
         onVariableChange={compiler.setTemplateVariable}
       />
       <PromptCompilerOutputPanel
+        canEditOutput={compiler.canEditOutput}
+        canSaveToFile={compiler.canSaveExportToFile}
         compiled={compiler.compiled}
         draft={compiler.draft}
         editablePrompt={compiler.editablePrompt}
+        guardDescriptionId={COMPILER_PROJECT_REBIND_DESCRIPTION_ID}
         outputRevision={compiler.outputRevision}
         projectContextPreview={projectContextPreview}
         selectedProject={selectedProject}

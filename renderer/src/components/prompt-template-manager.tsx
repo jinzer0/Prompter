@@ -1,11 +1,14 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 
 import type { PromptTemplate } from "../../../electron/ipc-types"
+import type { InsightsSelectionRequest } from "../hooks/use-insights-workspace-navigation"
 import { type PromptTemplateFilters, usePromptTemplates } from "../hooks/use-prompt-templates"
+import { focusInsightsTarget } from "../lib/insights-selection-request"
 import {
   type NormalizedPromptTemplateForm,
   updateInputFromPromptTemplateForm,
 } from "../lib/prompt-template-form"
+import { continuePromptTemplateSelection } from "../lib/prompt-template-selection-request"
 import { PromptTemplateEditor, type PromptTemplateEditorMode } from "./prompt-template-editor"
 import {
   type PromptTemplateScenarioFilter,
@@ -22,6 +25,7 @@ type DeleteConfirmation = {
 type PromptTemplateManagerProps = {
   readonly refreshSignal: number
   readonly onTemplatesChanged: () => void
+  readonly selectionRequest: InsightsSelectionRequest | null
 }
 
 export function promptTemplateManagerFiltersFromState(
@@ -43,6 +47,7 @@ function confirmationFromTemplate(template: PromptTemplate | null): DeleteConfir
 export function PromptTemplateManager({
   refreshSignal,
   onTemplatesChanged,
+  selectionRequest,
 }: PromptTemplateManagerProps) {
   const promptTemplates = usePromptTemplates()
   const [query, setQuery] = useState("")
@@ -51,6 +56,8 @@ export function PromptTemplateManager({
   const [editorMode, setEditorMode] = useState<PromptTemplateEditorMode | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const appliedSelectionRequestId = useRef<number | null>(null)
+  const currentSelectionRequest = useRef<InsightsSelectionRequest | null>(selectionRequest)
 
   const hasActiveFilters = query.trim().length > 0 || scenario.length > 0 || targetAgent.length > 0
   const activeFilters = useMemo(
@@ -69,6 +76,34 @@ export function PromptTemplateManager({
       void promptTemplates.loadTemplates(activeFilters)
     }
   }, [activeFilters, promptTemplates.loadTemplates, refreshSignal])
+
+  useLayoutEffect(() => {
+    currentSelectionRequest.current = selectionRequest
+  }, [selectionRequest])
+
+  useEffect(() => {
+    if (
+      selectionRequest === null ||
+      appliedSelectionRequestId.current === selectionRequest.requestId
+    ) {
+      return
+    }
+
+    setQuery("")
+    setScenario("")
+    setTargetAgent("")
+    promptTemplates.setFilters({})
+    void continuePromptTemplateSelection(selectionRequest, {
+      getCurrentRequest: () => currentSelectionRequest.current,
+      loadTemplate: promptTemplates.loadTemplate,
+      onApplied: (requestId) => {
+        appliedSelectionRequestId.current = requestId
+        setEditorMode("edit")
+        setDeleteConfirmation(null)
+        focusInsightsTarget("prompt-templates")
+      },
+    })
+  }, [promptTemplates.loadTemplate, promptTemplates.setFilters, selectionRequest])
 
   function applyFilters(
     nextQuery: string,
@@ -149,7 +184,11 @@ export function PromptTemplateManager({
   }
 
   return (
-    <div className="min-w-0 space-y-3 overflow-hidden">
+    <div
+      data-insights-target="prompt-templates"
+      tabIndex={-1}
+      className="min-w-0 space-y-3 overflow-hidden"
+    >
       <PromptTemplateSidebarSection
         error={promptTemplates.error}
         hasActiveFilters={hasActiveFilters}

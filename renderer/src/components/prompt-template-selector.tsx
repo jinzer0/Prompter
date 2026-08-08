@@ -9,6 +9,8 @@ import { Input } from "./ui/input"
 import { Select } from "./ui/select"
 
 type PromptTemplateSelectorProps = {
+  readonly canApply: boolean
+  readonly guardDescriptionId: string
   readonly isConfirmationPending: boolean
   readonly pendingTemplate: PromptTemplate | null
   readonly preview: TemplateRenderResult | null
@@ -24,6 +26,8 @@ type PromptTemplateSelectorProps = {
 }
 
 export function PromptTemplateSelector({
+  canApply,
+  guardDescriptionId,
   isConfirmationPending,
   pendingTemplate,
   preview,
@@ -74,12 +78,18 @@ export function PromptTemplateSelector({
           <Button
             size="sm"
             variant="secondary"
-            disabled={pendingTemplate === null}
+            aria-describedby={canApply ? undefined : guardDescriptionId}
+            disabled={!canApply || pendingTemplate === null}
             onClick={onPreview}
           >
             Preview Prompt Template
           </Button>
-          <Button size="sm" disabled={pendingTemplate === null} onClick={onRequestApply}>
+          <Button
+            size="sm"
+            aria-describedby={canApply ? undefined : guardDescriptionId}
+            disabled={!canApply || pendingTemplate === null}
+            onClick={onRequestApply}
+          >
             Apply Prompt Template
           </Button>
         </div>
@@ -110,7 +120,12 @@ export function PromptTemplateSelector({
               <Button size="sm" variant="secondary" onClick={onCancelApply}>
                 Cancel Apply
               </Button>
-              <Button size="sm" onClick={onConfirmApply}>
+              <Button
+                size="sm"
+                aria-describedby={canApply ? undefined : guardDescriptionId}
+                disabled={!canApply}
+                onClick={onConfirmApply}
+              >
                 Confirm Apply Prompt Template
               </Button>
             </div>

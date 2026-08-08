@@ -80,7 +80,7 @@ export function PromptTemplateSidebarSection({
       <div className="space-y-2 rounded-card border border-border bg-panel-muted p-3">
         <Input
           aria-label="Search prompt templates"
-          placeholder="Search prompt templates"
+          placeholder="Search templates"
           value={query}
           onChange={(event) => onQueryChange(event.currentTarget.value)}
         />

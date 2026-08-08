@@ -89,6 +89,8 @@ describe("phase15 prompt template UI contracts", () => {
   it("renders selector preview, variables, apply confirmation, and accessible controls", () => {
     const markup = renderToStaticMarkup(
       createElement(PromptTemplateSelector, {
+        canApply: true,
+        guardDescriptionId: "compiler-project-rebind-description",
         isConfirmationPending: true,
         pendingTemplate: template,
         preview: { rendered: "Build search safely.", warnings: [] },

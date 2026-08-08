@@ -7,6 +7,7 @@ import type { DerivedPromptSaveSource } from "./use-compiler-persistence-actions
 type UseDerivedCompilerDraftConfig = {
   readonly clearSuggestedTags: () => void
   readonly draftRef: { current: PromptCompilerInput }
+  readonly markRoutingFieldsAuthored: () => void
   readonly replaceEditablePrompt: (prompt: string) => number
   readonly resetTemplateDraft: () => void
   readonly setCompiled: Dispatch<SetStateAction<PromptDerivationDraft["compiled"] | null>>
@@ -17,6 +18,7 @@ type UseDerivedCompilerDraftConfig = {
 export function useDerivedCompilerDraft({
   clearSuggestedTags,
   draftRef,
+  markRoutingFieldsAuthored,
   replaceEditablePrompt,
   resetTemplateDraft,
   setCompiled,
@@ -32,6 +34,7 @@ export function useDerivedCompilerDraft({
   }, [])
 
   function seedDerivedPrompt(derivation: PromptDerivationDraft): void {
+    markRoutingFieldsAuthored()
     draftRef.current = derivation.draft
     setDraft(derivation.draft)
     setCompiled(derivation.compiled)

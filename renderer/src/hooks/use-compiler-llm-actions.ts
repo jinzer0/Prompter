@@ -2,6 +2,11 @@ import { useCallback, useState } from "react"
 
 import type { Project, PromptCompilerAnalyzeOutput } from "../../../electron/ipc-types"
 import {
+  COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE,
+  type CompilerProjectBinding,
+  compilerProjectActionIsAllowed,
+} from "../lib/compiler-project-binding"
+import {
   analyzeInput,
   type ClarificationAnswersById,
   compiledFromLLM,
@@ -15,6 +20,7 @@ import {
 import type { CompiledPromptResult, PromptCompilerInput } from "../lib/prompt-compiler/types"
 
 type UseCompilerLlmActionsConfig = {
+  readonly binding: CompilerProjectBinding
   readonly draft: PromptCompilerInput
   readonly onCompiled: (compiled: CompiledPromptResult) => void
   readonly outputRevisionGate: OutputRevisionGate
@@ -23,6 +29,7 @@ type UseCompilerLlmActionsConfig = {
 }
 
 export function useCompilerLlmActions({
+  binding,
   draft,
   onCompiled,
   outputRevisionGate,
@@ -40,6 +47,11 @@ export function useCompilerLlmActions({
   }, [])
 
   async function analyzeWithLLM(): Promise<void> {
+    if (!compilerProjectActionIsAllowed(binding, selectedProject?.id ?? null, "analyze")) {
+      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
+      return
+    }
+
     if (draft.originalInput.trim().length === 0) {
       setMessage("Original request is required")
       return
@@ -88,6 +100,11 @@ export function useCompilerLlmActions({
   }
 
   async function compileWithLLM(): Promise<void> {
+    if (!compilerProjectActionIsAllowed(binding, selectedProject?.id ?? null, "compile_llm")) {
+      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
+      return
+    }
+
     if (draft.originalInput.trim().length === 0) {
       setMessage("Original request is required")
       return

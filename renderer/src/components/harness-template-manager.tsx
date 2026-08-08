@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import type { HarnessTemplate } from "../../../electron/ipc-types"
 import { type HarnessTemplateFilters, useHarnessTemplates } from "../hooks/use-harness-templates"
+import type { InsightsSelectionRequest } from "../hooks/use-insights-workspace-navigation"
 import type { NormalizedHarnessTemplateForm } from "../lib/harness-template-form"
+import { focusInsightsTarget } from "../lib/insights-selection-request"
 import { HarnessTemplateEditor, type HarnessTemplateEditorMode } from "./harness-template-editor"
 import {
   type HarnessScenarioFilter,
@@ -22,6 +24,7 @@ type HarnessTemplateChange = {
 
 type HarnessTemplateManagerProps = {
   readonly onTemplatesChanged: (change?: HarnessTemplateChange) => void
+  readonly selectionRequest: InsightsSelectionRequest | null
 }
 
 function filtersFromState(
@@ -40,7 +43,10 @@ function confirmationFromTemplate(template: HarnessTemplate | null): DeleteConfi
   return template === null ? null : { id: template.id, name: template.name }
 }
 
-export function HarnessTemplateManager({ onTemplatesChanged }: HarnessTemplateManagerProps) {
+export function HarnessTemplateManager({
+  onTemplatesChanged,
+  selectionRequest,
+}: HarnessTemplateManagerProps) {
   const harnesses = useHarnessTemplates()
   const [query, setQuery] = useState("")
   const [scenario, setScenario] = useState<HarnessScenarioFilter>("")
@@ -48,6 +54,7 @@ export function HarnessTemplateManager({ onTemplatesChanged }: HarnessTemplateMa
   const [editorMode, setEditorMode] = useState<HarnessTemplateEditorMode | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const appliedSelectionRequestId = useRef<number | null>(null)
 
   const hasActiveFilters = query.trim().length > 0 || scenario.length > 0 || targetAgent.length > 0
 
@@ -56,6 +63,21 @@ export function HarnessTemplateManager({ onTemplatesChanged }: HarnessTemplateMa
       void harnesses.loadTemplates({})
     }
   }, [harnesses.loadTemplates, harnesses.status])
+
+  useEffect(() => {
+    if (
+      selectionRequest !== null &&
+      selectionRequest.requestId !== appliedSelectionRequestId.current &&
+      harnesses.status === "ready" &&
+      harnesses.templates.some((template) => template.id === selectionRequest.id)
+    ) {
+      appliedSelectionRequestId.current = selectionRequest.requestId
+      setEditorMode("edit")
+      setDeleteConfirmation(null)
+      harnesses.selectTemplate(selectionRequest.id)
+      focusInsightsTarget("harness-templates")
+    }
+  }, [harnesses.selectTemplate, harnesses.status, harnesses.templates, selectionRequest])
 
   function applyFilters(
     nextQuery: string,
@@ -155,7 +177,11 @@ export function HarnessTemplateManager({ onTemplatesChanged }: HarnessTemplateMa
   }
 
   return (
-    <div className="min-w-0 space-y-3 overflow-hidden">
+    <div
+      data-insights-target="harness-templates"
+      tabIndex={-1}
+      className="min-w-0 space-y-3 overflow-hidden"
+    >
       <HarnessTemplateSidebarSection
         error={harnesses.error}
         hasActiveFilters={hasActiveFilters}

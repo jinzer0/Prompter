@@ -1,87 +1,114 @@
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from "react"
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef } from "react"
 
-import type { Project, ProjectContextCompilerBuildResult } from "../../../electron/ipc-types"
+import type { Project } from "../../../electron/ipc-types"
+import {
+  type CompilerProjectTransitionResolution,
+  type CompilerStatePreservationRequest,
+  resolveCompilerProjectTransition,
+} from "../lib/compiler-project-binding"
 import {
   applyProjectContextProfileSelection,
+  type CompilerProjectContextPreviewStatus,
   clearProjectContextProfileSelection,
-  missingProjectContextProfilePreview,
   profileBelongsToSelection,
   recommendedProjectContextProfileId,
+  shouldHandleProjectContextProfileRefresh,
   shouldResetCompilerOutputForProfileRefresh,
-  shouldResetCompilerOutputForProjectContextChange,
+  useProjectContextProfilePreview,
 } from "../lib/project-context-profile-selection"
 import type { PromptCompilerInput } from "../lib/prompt-compiler/types"
 import { useProjectContextProfiles } from "./use-project-context-profiles"
 
-export type CompilerProjectContextPreviewStatus = "idle" | "loading" | "ready" | "error"
+export { shouldHandleProjectContextProfileRefresh } from "../lib/project-context-profile-selection"
+export type { CompilerProjectContextPreviewStatus }
 
 type UseCompilerProjectContextConfig = {
   readonly changedProjectContextProfileId: string | null
+  readonly compilerStatePreservationRequest: CompilerStatePreservationRequest | null
   readonly deletedProjectContextProfileIds: readonly string[]
   readonly selectedProject: Project | null
   readonly draft: PromptCompilerInput
   readonly onIncludedProfileChanged: () => void
+  readonly onProjectTransition: (transition: CompilerProjectTransitionResolution) => void
   readonly projectContextProfileRefreshSignal: number
   readonly setDraft: Dispatch<SetStateAction<PromptCompilerInput>>
 }
 
-type ProjectContextProfileRefreshState = {
-  readonly lastHandledRefreshSignal: number
-  readonly refreshSignal: number
-}
-
-export function shouldHandleProjectContextProfileRefresh({
-  lastHandledRefreshSignal,
-  refreshSignal,
-}: ProjectContextProfileRefreshState): boolean {
-  return refreshSignal > 0 && refreshSignal !== lastHandledRefreshSignal
+type ActiveCompilerStatePreservation = CompilerStatePreservationRequest & {
+  readonly profileId: string | null
 }
 
 export function useCompilerProjectContext({
   changedProjectContextProfileId,
+  compilerStatePreservationRequest,
   deletedProjectContextProfileIds,
   selectedProject,
   draft,
   onIncludedProfileChanged,
+  onProjectTransition,
   projectContextProfileRefreshSignal,
   setDraft,
 }: UseCompilerProjectContextConfig) {
   const projectId = selectedProject?.id ?? null
   const profiles = useProjectContextProfiles(projectId)
+  const appliedPreservationRequestId = useRef<number | null>(null)
   const lastHandledRefreshSignal = useRef(0)
   const recommendedProjectIdRef = useRef<string | null>(null)
   const previousProjectId = useRef<string | null>(projectId)
   const requestedProjectIdRef = useRef<string | null>(null)
-  const [preview, setPreview] = useState<ProjectContextCompilerBuildResult | null>(null)
-  const [previewStatus, setPreviewStatus] = useState<CompilerProjectContextPreviewStatus>("idle")
-  const [previewError, setPreviewError] = useState<string | null>(null)
+  const activePreservationRef = useRef<ActiveCompilerStatePreservation | null>(null)
   const selectedProfileId = draft.projectContextProfileId ?? null
+  const transitionResolution = resolveCompilerProjectTransition({
+    appliedRequestId: appliedPreservationRequestId.current,
+    currentProjectId: projectId,
+    previousProjectId: previousProjectId.current,
+    request: compilerStatePreservationRequest,
+  })
+  const activePreservation = activePreservationRef.current
+  const isPreservingProjectTransition =
+    transitionResolution.kind === "preserve" || activePreservation?.targetProjectId === projectId
+  const preservedUnavailableProfileId =
+    activePreservation?.targetProjectId === projectId
+      ? activePreservation.profileId
+      : transitionResolution.kind === "preserve"
+        ? selectedProfileId
+        : null
+  const previewProfileId = transitionResolution.kind === "reset" ? null : selectedProfileId
   const availableProfiles = useMemo(
     () =>
       profiles.profiles.filter((profile) => !deletedProjectContextProfileIds.includes(profile.id)),
     [deletedProjectContextProfileIds, profiles.profiles],
   )
-  const previewRequest = useMemo(
-    () => ({
-      projectId,
-      profileId: selectedProfileId,
-      refreshSignal: projectContextProfileRefreshSignal,
-    }),
-    [projectContextProfileRefreshSignal, projectId, selectedProfileId],
-  )
-
+  const { preview, previewError, previewStatus } = useProjectContextProfilePreview({
+    deletedProfileIds: deletedProjectContextProfileIds,
+    preservedUnavailableProfileId,
+    profileId: previewProfileId,
+    projectId,
+    refreshSignal: projectContextProfileRefreshSignal,
+  })
   useEffect(() => {
-    if (!shouldResetCompilerOutputForProjectContextChange(previousProjectId.current, projectId)) {
+    if (transitionResolution.kind === "unchanged") {
       return
     }
-
-    const shouldResetThroughSelection =
-      selectedProfileId !== null || draft.includeProjectContextProfile === true
 
     previousProjectId.current = projectId
     recommendedProjectIdRef.current = null
     requestedProjectIdRef.current = null
+    onProjectTransition(transitionResolution)
 
+    if (transitionResolution.kind === "preserve") {
+      appliedPreservationRequestId.current = transitionResolution.request.requestId
+      recommendedProjectIdRef.current = transitionResolution.request.targetProjectId
+      activePreservationRef.current = {
+        ...transitionResolution.request,
+        profileId: selectedProfileId,
+      }
+      return
+    }
+
+    activePreservationRef.current = null
+    const shouldResetThroughSelection =
+      selectedProfileId !== null || draft.includeProjectContextProfile === true
     if (!shouldResetThroughSelection) {
       onIncludedProfileChanged()
     }
@@ -90,9 +117,11 @@ export function useCompilerProjectContext({
   }, [
     draft.includeProjectContextProfile,
     onIncludedProfileChanged,
+    onProjectTransition,
     projectId,
     selectedProfileId,
     setDraft,
+    transitionResolution,
   ])
 
   useEffect(() => {
@@ -139,6 +168,9 @@ export function useCompilerProjectContext({
   ])
 
   useEffect(() => {
+    if (isPreservingProjectTransition) {
+      return
+    }
     if (
       projectId === null ||
       profiles.status !== "ready" ||
@@ -161,7 +193,14 @@ export function useCompilerProjectContext({
     if (!profileBelongsToSelection(availableProfiles, selectedProfileId)) {
       setDraft(clearProjectContextProfileSelection)
     }
-  }, [availableProfiles, profiles.status, projectId, selectedProfileId, setDraft])
+  }, [
+    availableProfiles,
+    isPreservingProjectTransition,
+    profiles.status,
+    projectId,
+    selectedProfileId,
+    setDraft,
+  ])
 
   useEffect(() => {
     if (selectedProfileId === null) {
@@ -173,67 +212,8 @@ export function useCompilerProjectContext({
     }
   }, [deletedProjectContextProfileIds, selectedProfileId, setDraft])
 
-  useEffect(() => {
-    let isActive = true
-    const profileId = previewRequest.profileId
-    const requestProjectId = previewRequest.projectId
-
-    if (requestProjectId === null || profileId === null) {
-      setPreview(null)
-      setPreviewStatus("idle")
-      setPreviewError(null)
-      return () => {
-        isActive = false
-      }
-    }
-
-    if (deletedProjectContextProfileIds.includes(profileId)) {
-      setPreview(missingProjectContextProfilePreview(profileId))
-      setPreviewStatus("ready")
-      setPreviewError(null)
-      return () => {
-        isActive = false
-      }
-    }
-
-    const selectedProjectId = requestProjectId
-    const selectedPreviewProfileId = profileId
-
-    async function loadPreview(): Promise<void> {
-      setPreviewStatus("loading")
-      setPreviewError(null)
-
-      try {
-        const result = await window.prompter.projectContextProfiles.buildCompilerContext(
-          selectedProjectId,
-          selectedPreviewProfileId,
-        )
-
-        if (isActive) {
-          setPreview(result)
-          setPreviewStatus("ready")
-        }
-      } catch (error) {
-        if (!(error instanceof Error)) {
-          throw error
-        }
-
-        if (isActive) {
-          setPreview(null)
-          setPreviewError(error.message)
-          setPreviewStatus("error")
-        }
-      }
-    }
-
-    void loadPreview()
-
-    return () => {
-      isActive = false
-    }
-  }, [deletedProjectContextProfileIds, previewRequest])
-
   function selectProfile(profileId: string | null): void {
+    activePreservationRef.current = null
     setDraft((current) =>
       applyProjectContextProfileSelection(current, {
         projectContextProfileId: profileId,
@@ -253,13 +233,19 @@ export function useCompilerProjectContext({
     )
   }
 
+  function releasePreservedProjectContext(): void {
+    activePreservationRef.current = null
+  }
+
   return {
     error: profiles.error,
     includeProjectContextProfile: draft.includeProjectContextProfile === true,
+    isSelectedProfileUnavailable: preservedUnavailableProfileId !== null,
     preview,
     previewError,
     previewStatus,
     profiles: availableProfiles,
+    releasePreservedProjectContext,
     selectedProfileId,
     selectProfile,
     setIncludeProjectContextProfile,

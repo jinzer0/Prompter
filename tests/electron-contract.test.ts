@@ -366,6 +366,7 @@ describe("Electron shell contract", () => {
       "exportFullBackup",
       "importBackup",
       "openSettings",
+      "openLibraryInsights",
       "openLibraryMaintenance",
       "closeActivePanel",
     ])
@@ -476,6 +477,7 @@ describe("Electron shell contract", () => {
       "promptTemplates",
       "search",
       "maintenance",
+      "insights",
       "tags",
       "harnessTemplates",
       "settings",

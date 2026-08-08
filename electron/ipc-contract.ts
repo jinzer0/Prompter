@@ -226,6 +226,16 @@ export const PERSISTENCE_CHANNELS = {
   validateBackupFile: "prompter:backup:validate-file",
   importBackup: "prompter:backup:import",
   cancelImportSession: "prompter:backup:cancel-import-session",
+  getDashboardSummary: "prompter:insights:get-dashboard-summary",
+  getProjectHealth: "prompter:insights:get-project-health",
+  getScenarioDistribution: "prompter:insights:get-scenario-distribution",
+  getTargetAgentDistribution: "prompter:insights:get-target-agent-distribution",
+  getQualityInsights: "prompter:insights:get-quality-insights",
+  getVersionActivity: "prompter:insights:get-version-activity",
+  getTagInsights: "prompter:insights:get-tag-insights",
+  getTemplateInsights: "prompter:insights:get-template-insights",
+  getProjectContextInsights: "prompter:insights:get-project-context-insights",
+  getMaintenanceSnapshot: "prompter:insights:get-maintenance-snapshot",
 } as const
 
 export type PingResponse = typeof PING_RESPONSE
@@ -1622,6 +1632,231 @@ export const promptAssetsImportBackupInputSchema = importBackupInputSchema.exten
 })
 export const cancelImportSessionInputSchema = z.object({ importSessionId: idSchema }).strict()
 
+const insightsCountSchema = z.number().int().nonnegative()
+const insightsPercentageSchema = z.number().min(0).max(100)
+const insightsScoreSchema = z.number().min(0).max(100).nullable()
+const nullableTimestampSchema = timestampSchema.nullable()
+
+export const insightsDateRangeSchema = z.enum(["all", "7d", "30d", "90d", "year"])
+export const insightsFilterInputSchema = z
+  .object({
+    projectId: idSchema.nullable().optional().default(null),
+    dateRange: insightsDateRangeSchema.optional().default("all"),
+  })
+  .strict()
+export const dashboardSummarySchema = z
+  .object({
+    projectCount: insightsCountSchema,
+    promptAssetCount: insightsCountSchema,
+    promptVersionCount: insightsCountSchema,
+    tagCount: insightsCountSchema,
+    promptTemplateCount: insightsCountSchema,
+    harnessTemplateCount: insightsCountSchema,
+    projectContextProfileCount: insightsCountSchema,
+    averageQualityScore: insightsScoreSchema,
+    unevaluatedCurrentPromptCount: insightsCountSchema,
+    maintenanceIssueCount: insightsCountSchema.nullable(),
+    lastUpdatedAt: nullableTimestampSchema,
+  })
+  .strict()
+export const projectHealthInsightSchema = z
+  .object({
+    projectId: idSchema,
+    projectName: nameSchema,
+    promptAssetCount: insightsCountSchema,
+    promptVersionCount: insightsCountSchema,
+    averageQualityScore: insightsScoreSchema,
+    unevaluatedCurrentPromptCount: insightsCountSchema,
+    tagCount: insightsCountSchema,
+    contextProfileCount: insightsCountSchema,
+    lastUpdatedAt: nullableTimestampSchema,
+    versionHeavyPromptCount: insightsCountSchema,
+    emptyPromptCount: insightsCountSchema,
+  })
+  .strict()
+export const projectHealthInsightsSchema = z
+  .object({ projects: z.array(projectHealthInsightSchema).default([]) })
+  .strict()
+export const scenarioDistributionInsightSchema = z
+  .object({
+    scenario: scenarioSchema,
+    count: insightsCountSchema,
+    percentage: insightsPercentageSchema,
+    averageQualityScore: insightsScoreSchema,
+    unevaluatedCurrentPromptCount: insightsCountSchema,
+    recentPromptCount: insightsCountSchema,
+  })
+  .strict()
+export const scenarioDistributionInsightsSchema = z
+  .object({ items: z.array(scenarioDistributionInsightSchema).default([]) })
+  .strict()
+export const targetAgentDistributionInsightSchema = z
+  .object({
+    targetAgent: targetAgentSchema,
+    count: insightsCountSchema,
+    percentage: insightsPercentageSchema,
+    averageQualityScore: insightsScoreSchema,
+    mostCommonScenario: scenarioSchema.nullable(),
+    unevaluatedCurrentPromptCount: insightsCountSchema,
+  })
+  .strict()
+export const targetAgentDistributionInsightsSchema = z
+  .object({ items: z.array(targetAgentDistributionInsightSchema).default([]) })
+  .strict()
+export const qualityScoreBucketSchema = z.enum([
+  "excellent",
+  "good",
+  "usable",
+  "needs_work",
+  "weak",
+  "no_score",
+])
+const qualityScoreDistributionSchema = z
+  .object({
+    bucket: qualityScoreBucketSchema,
+    count: insightsCountSchema,
+    percentage: insightsPercentageSchema,
+  })
+  .strict()
+export const qualityPromptInsightSchema = z
+  .object({
+    promptAssetId: idSchema,
+    currentVersionId: idSchema,
+    title: nameSchema,
+    projectId: idSchema.nullable(),
+    qualityScore: insightsScoreSchema,
+    updatedAt: nullableTimestampSchema,
+  })
+  .strict()
+const scenarioAverageScoreSchema = z
+  .object({ scenario: scenarioSchema, averageQualityScore: insightsScoreSchema })
+  .strict()
+const targetAgentAverageScoreSchema = z
+  .object({ targetAgent: targetAgentSchema, averageQualityScore: insightsScoreSchema })
+  .strict()
+export const qualityInsightsSchema = z
+  .object({
+    averageQualityScore: insightsScoreSchema,
+    scoreDistribution: z.array(qualityScoreDistributionSchema).default([]),
+    lowestQualityCurrentPrompts: z.array(qualityPromptInsightSchema).default([]),
+    highestQualityPrompts: z.array(qualityPromptInsightSchema).default([]),
+    unevaluatedCurrentPrompts: z.array(qualityPromptInsightSchema).default([]),
+    scenarioAverageScores: z.array(scenarioAverageScoreSchema).default([]),
+    targetAgentAverageScores: z.array(targetAgentAverageScoreSchema).default([]),
+  })
+  .strict()
+export const versionedPromptInsightSchema = z
+  .object({
+    promptAssetId: idSchema,
+    currentVersionId: idSchema,
+    title: nameSchema,
+    projectId: idSchema.nullable(),
+    versionCount: insightsCountSchema,
+    currentVersionCreatedAt: nullableTimestampSchema,
+  })
+  .strict()
+const versionActivityPointSchema = z
+  .object({ timestamp: timestampSchema, versionCount: insightsCountSchema })
+  .strict()
+export const versionActivityInsightsSchema = z
+  .object({
+    recentVersionCounts: z
+      .object({
+        last7Days: insightsCountSchema,
+        last30Days: insightsCountSchema,
+        all: insightsCountSchema,
+      })
+      .strict(),
+    averageVersionsPerPrompt: z.number().nonnegative(),
+    mostVersionedPrompts: z.array(versionedPromptInsightSchema).default([]),
+    staleCurrentPrompts: z.array(versionedPromptInsightSchema).default([]),
+    activity: z.array(versionActivityPointSchema).default([]),
+  })
+  .strict()
+export const tagUsageInsightSchema = z
+  .object({ tagId: idSchema, name: nameSchema, promptCount: insightsCountSchema })
+  .strict()
+export const projectTagDistributionInsightSchema = z
+  .object({
+    projectId: idSchema,
+    projectName: nameSchema,
+    tagCount: insightsCountSchema,
+    taggedPromptCount: insightsCountSchema,
+  })
+  .strict()
+export const scenarioTagFrequencyInsightSchema = z
+  .object({
+    scenario: scenarioSchema,
+    tagId: idSchema,
+    tagName: nameSchema,
+    promptCount: insightsCountSchema,
+  })
+  .strict()
+export const tagInsightsSchema = z
+  .object({
+    mostUsedTags: z.array(tagUsageInsightSchema).default([]),
+    unusedTagCount: insightsCountSchema,
+    projectTagDistribution: z.array(projectTagDistributionInsightSchema).default([]),
+    scenarioTagFrequency: z.array(scenarioTagFrequencyInsightSchema).default([]),
+    lowQualityTagConcentration: z.array(tagUsageInsightSchema).default([]),
+    duplicateTagCandidateCount: insightsCountSchema,
+  })
+  .strict()
+const templateDistributionSchema = z
+  .object({ count: insightsCountSchema, percentage: insightsPercentageSchema })
+  .strict()
+export const promptTemplateInsightSchema = z
+  .object({
+    promptTemplateId: idSchema,
+    name: nameSchema,
+    scenario: scenarioSchema,
+    targetAgent: targetAgentSchema,
+    sourcePromptAssetId: idSchema.nullable(),
+    sourcePromptVersionId: idSchema.nullable(),
+    placeholderCount: insightsCountSchema,
+    updatedAt: timestampSchema,
+  })
+  .strict()
+export const templateInsightsSchema = z
+  .object({
+    promptTemplateCount: insightsCountSchema,
+    harnessTemplateCount: insightsCountSchema,
+    promptTemplatesByScenario: z
+      .array(templateDistributionSchema.extend({ scenario: scenarioSchema }))
+      .default([]),
+    promptTemplatesByTargetAgent: z
+      .array(templateDistributionSchema.extend({ targetAgent: targetAgentSchema }))
+      .default([]),
+    sourcePromptTemplateCount: insightsCountSchema,
+    missingSourcePromptTemplateCount: insightsCountSchema,
+    placeholderHeavyPromptTemplates: z.array(promptTemplateInsightSchema).default([]),
+    recentPromptTemplates: z.array(promptTemplateInsightSchema).default([]),
+    harnessTemplatesByScenario: z
+      .array(templateDistributionSchema.extend({ scenario: scenarioSchema }))
+      .default([]),
+    harnessTemplatesByTargetAgent: z
+      .array(templateDistributionSchema.extend({ targetAgent: targetAgentSchema }))
+      .default([]),
+    invalidHarnessTemplateCount: insightsCountSchema,
+  })
+  .strict()
+const projectContextProfileInsightSchema = z
+  .object({ projectId: idSchema, projectName: nameSchema, profileCount: insightsCountSchema })
+  .strict()
+export const projectContextInsightsSchema = z
+  .object({
+    projectProfiles: z.array(projectContextProfileInsightSchema).default([]),
+    projectsWithoutDefaultProfileCount: insightsCountSchema,
+    profilesWithoutTechStackCount: insightsCountSchema,
+    profilesWithoutValidationCommandsCount: insightsCountSchema,
+    profilesWithoutForbiddenActionsCount: insightsCountSchema,
+    repoPathProfileCount: insightsCountSchema,
+  })
+  .strict()
+export const maintenanceSnapshotSchema = z
+  .object({ status: z.literal("unavailable"), lastScannedAt: z.null(), summary: z.null() })
+  .strict()
+
 export const payloadSchemas = {
   createProject: createProjectInputSchema,
   listProjects: noPayloadSchema,
@@ -1712,6 +1947,16 @@ export const payloadSchemas = {
   validateBackupFile: validateBackupFileInputSchema,
   importBackup: importBackupInputSchema,
   cancelImportSession: cancelImportSessionInputSchema,
+  getDashboardSummary: insightsFilterInputSchema,
+  getProjectHealth: insightsFilterInputSchema,
+  getScenarioDistribution: insightsFilterInputSchema,
+  getTargetAgentDistribution: insightsFilterInputSchema,
+  getQualityInsights: insightsFilterInputSchema,
+  getVersionActivity: insightsFilterInputSchema,
+  getTagInsights: insightsFilterInputSchema,
+  getTemplateInsights: insightsFilterInputSchema,
+  getProjectContextInsights: insightsFilterInputSchema,
+  getMaintenanceSnapshot: insightsFilterInputSchema,
 } as const
 
 export const responseSchemas = {
@@ -1804,6 +2049,16 @@ export const responseSchemas = {
   validateBackupFile: backupValidationResultSchema,
   importBackup: backupImportResultSchema,
   cancelImportSession: cancelImportSessionResultSchema,
+  getDashboardSummary: dashboardSummarySchema,
+  getProjectHealth: projectHealthInsightsSchema,
+  getScenarioDistribution: scenarioDistributionInsightsSchema,
+  getTargetAgentDistribution: targetAgentDistributionInsightsSchema,
+  getQualityInsights: qualityInsightsSchema,
+  getVersionActivity: versionActivityInsightsSchema,
+  getTagInsights: tagInsightsSchema,
+  getTemplateInsights: templateInsightsSchema,
+  getProjectContextInsights: projectContextInsightsSchema,
+  getMaintenanceSnapshot: maintenanceSnapshotSchema,
 } as const
 
 export type ProjectContextProfile = z.infer<typeof projectContextProfileSchema>

@@ -46,6 +46,7 @@ import type {
   createPromptWithInitialVersionInputSchema,
   createPromptWithInitialVersionResultSchema,
   createTagInputSchema,
+  dashboardSummarySchema,
   deletePromptTemplateResultSchema,
   deleteResultSchema,
   duplicatePromptAssetInputSchema,
@@ -64,6 +65,8 @@ import type {
   getPromptQualityReviewInputSchema,
   harnessTemplateSchema,
   importBackupInputSchema,
+  insightsDateRangeSchema,
+  insightsFilterInputSchema,
   listHarnessTemplatesInputSchema,
   listPromptQualityReviewsForVersionInputSchema,
   listPromptTemplatesInputSchema,
@@ -77,14 +80,19 @@ import type {
   maintenanceScanResultSchema,
   maintenanceScanSummarySchema,
   maintenanceSeveritySchema,
+  maintenanceSnapshotSchema,
   openAIKeyStatusSchema,
   PingResponse,
   payloadSchemas,
   preparedMaintenanceActionSchema,
   prepareMaintenanceActionInputSchema,
   projectContextCompilerBuildResultSchema,
+  projectContextInsightsSchema,
   projectContextProfileSchema,
+  projectHealthInsightSchema,
+  projectHealthInsightsSchema,
   projectSchema,
+  projectTagDistributionInsightSchema,
   promptAssetFilterSchema,
   promptAssetSchema,
   promptCompilerAnalyzeInputSchema,
@@ -105,20 +113,32 @@ import type {
   promptSearchFilterSchema,
   promptSearchResultItemSchema,
   promptSearchResultSchema,
+  promptTemplateInsightSchema,
   promptTemplateListResultSchema,
   promptTemplateSchema,
   promptVersionSchema,
+  qualityInsightsSchema,
+  qualityPromptInsightSchema,
+  qualityScoreBucketSchema,
   reviewPromptQualityDraftInputSchema,
   reviewPromptQualityVersionInputSchema,
   saveOpenAIKeyInputSchema,
   savePromptQualityReviewInputSchema,
   savePromptToFileInputSchema,
   savePromptToFileResultSchema,
+  scenarioDistributionInsightSchema,
+  scenarioDistributionInsightsSchema,
+  scenarioTagFrequencyInsightSchema,
   settingSchema,
   settingsDefaultsSchema,
+  tagInsightsSchema,
   tagLinkSchema,
   tagSchema,
+  tagUsageInsightSchema,
   tagWithCountSchema,
+  targetAgentDistributionInsightSchema,
+  targetAgentDistributionInsightsSchema,
+  templateInsightsSchema,
   updateDefaultsInputSchema,
   updateHarnessTemplateInputSchema,
   updateProjectContextProfileInputSchema,
@@ -126,6 +146,8 @@ import type {
   updatePromptAssetInputSchema,
   updatePromptTemplateInputSchema,
   updateTagInputSchema,
+  versionActivityInsightsSchema,
+  versionedPromptInsightSchema,
 } from "./ipc-contract.js"
 
 // allow: SIZE_OK - central renderer-facing IPC type surface mirrors the typed contract.
@@ -142,6 +164,7 @@ export const MENU_ACTIONS = [
   "exportFullBackup",
   "importBackup",
   "openSettings",
+  "openLibraryInsights",
   "openLibraryMaintenance",
   "closeActivePanel",
 ] as const
@@ -282,6 +305,46 @@ export type ExportPromptTemplatesPackInput = z.output<typeof exportPromptTemplat
 export type ExportHarnessTemplatesPackInput = z.output<typeof exportHarnessTemplatesPackInputSchema>
 export type ImportBackupInput = z.output<typeof importBackupInputSchema>
 export type CancelImportSessionInput = z.output<typeof cancelImportSessionInputSchema>
+export type InsightsDateRange = z.infer<typeof insightsDateRangeSchema>
+export type InsightsFilterInput = z.output<typeof insightsFilterInputSchema>
+export type DashboardSummary = z.infer<typeof dashboardSummarySchema>
+export type ProjectHealthInsight = z.infer<typeof projectHealthInsightSchema>
+export type ProjectHealthInsights = z.infer<typeof projectHealthInsightsSchema>
+export type ProjectTagDistributionInsight = z.infer<typeof projectTagDistributionInsightSchema>
+export type ScenarioDistributionInsight = z.infer<typeof scenarioDistributionInsightSchema>
+export type ScenarioDistributionInsights = z.infer<typeof scenarioDistributionInsightsSchema>
+export type ScenarioTagFrequencyInsight = z.infer<typeof scenarioTagFrequencyInsightSchema>
+export type TargetAgentDistributionInsight = z.infer<typeof targetAgentDistributionInsightSchema>
+export type TargetAgentDistributionInsights = z.infer<typeof targetAgentDistributionInsightsSchema>
+export type QualityScoreBucket = z.infer<typeof qualityScoreBucketSchema>
+export type QualityInsights = z.infer<typeof qualityInsightsSchema>
+export type QualityPromptInsight = z.infer<typeof qualityPromptInsightSchema>
+export type VersionActivityInsights = z.infer<typeof versionActivityInsightsSchema>
+export type VersionedPromptInsight = z.infer<typeof versionedPromptInsightSchema>
+export type TagInsights = z.infer<typeof tagInsightsSchema>
+export type TagUsageInsight = z.infer<typeof tagUsageInsightSchema>
+export type TemplateInsights = z.infer<typeof templateInsightsSchema>
+export type PromptTemplateInsight = z.infer<typeof promptTemplateInsightSchema>
+export type ProjectContextInsights = z.infer<typeof projectContextInsightsSchema>
+export type MaintenanceSnapshot = z.infer<typeof maintenanceSnapshotSchema>
+export type InsightsBridge = {
+  readonly getDashboardSummary: (input: InsightsFilterInput) => Promise<DashboardSummary>
+  readonly getProjectHealth: (input: InsightsFilterInput) => Promise<ProjectHealthInsights>
+  readonly getScenarioDistribution: (
+    input: InsightsFilterInput,
+  ) => Promise<ScenarioDistributionInsights>
+  readonly getTargetAgentDistribution: (
+    input: InsightsFilterInput,
+  ) => Promise<TargetAgentDistributionInsights>
+  readonly getQualityInsights: (input: InsightsFilterInput) => Promise<QualityInsights>
+  readonly getVersionActivity: (input: InsightsFilterInput) => Promise<VersionActivityInsights>
+  readonly getTagInsights: (input: InsightsFilterInput) => Promise<TagInsights>
+  readonly getTemplateInsights: (input: InsightsFilterInput) => Promise<TemplateInsights>
+  readonly getProjectContextInsights: (
+    input: InsightsFilterInput,
+  ) => Promise<ProjectContextInsights>
+  readonly getMaintenanceSnapshot: (input: InsightsFilterInput) => Promise<MaintenanceSnapshot>
+}
 export type DeleteResult = z.infer<typeof deleteResultSchema>
 export type CreateProjectInput = z.output<typeof createProjectInputSchema>
 export type UpdateProjectInput = z.output<typeof updateProjectInputSchema>
@@ -397,6 +460,7 @@ export type ElectronBridge = {
     readonly rebuildIndex: () => Promise<{ readonly rebuilt: true }>
   }
   readonly maintenance: MaintenanceBridge
+  readonly insights: InsightsBridge
   readonly tags: {
     readonly create: (input: CreateTagInput) => Promise<Tag>
     readonly list: () => Promise<readonly Tag[]>

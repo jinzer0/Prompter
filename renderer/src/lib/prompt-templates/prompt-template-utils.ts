@@ -1,32 +1,15 @@
-const TEMPLATE_VARIABLE_PATTERN = /\{\{([A-Za-z][A-Za-z0-9_]*)\}\}/g
+import {
+  extractTemplateVariables,
+  TEMPLATE_VARIABLE_PATTERN,
+} from "../../../../shared/prompt-template-variables.js"
+
+export { extractTemplateVariables as extractVariables }
 
 export type TemplateValues = Readonly<Record<string, string | undefined>>
 
 export type TemplateRenderResult = {
   readonly rendered: string
   readonly warnings: readonly string[]
-}
-
-export function extractVariables(template: string): readonly string[] {
-  const variables: string[] = []
-  const seen = new Set<string>()
-
-  for (const match of template.matchAll(TEMPLATE_VARIABLE_PATTERN)) {
-    const variable = match[1]
-
-    if (variable === undefined) {
-      continue
-    }
-
-    if (seen.has(variable)) {
-      continue
-    }
-
-    seen.add(variable)
-    variables.push(variable)
-  }
-
-  return variables
 }
 
 export function renderTemplate(template: string, values: TemplateValues): TemplateRenderResult {

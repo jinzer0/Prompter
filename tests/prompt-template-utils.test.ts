@@ -14,7 +14,7 @@ describe("prompt template utilities", () => {
 
   it("ignores invalid placeholders and malformed braces", () => {
     const template =
-      "{{1bad}} {{ bad }} {{objective {{objective}} objective}} {{objective_2}} {{objective_2}}"
+      "{{1bad}} {{ bad }} {{dotted.name}} {{hyphen-name}} {{objective {{objective}} objective}} {{objective_2}} {{objective_2}}"
 
     expect(extractVariables(template)).toEqual(["objective", "objective_2"])
   })

@@ -298,6 +298,68 @@ export function createElectronBridge(
           input,
         ),
     },
+    insights: {
+      getDashboardSummary: (input) =>
+        request(
+          ch.getDashboardSummary,
+          payload.getDashboardSummary,
+          response.getDashboardSummary,
+          input,
+        ),
+      getProjectHealth: (input) =>
+        request(ch.getProjectHealth, payload.getProjectHealth, response.getProjectHealth, input),
+      getScenarioDistribution: (input) =>
+        request(
+          ch.getScenarioDistribution,
+          payload.getScenarioDistribution,
+          response.getScenarioDistribution,
+          input,
+        ),
+      getTargetAgentDistribution: (input) =>
+        request(
+          ch.getTargetAgentDistribution,
+          payload.getTargetAgentDistribution,
+          response.getTargetAgentDistribution,
+          input,
+        ),
+      getQualityInsights: (input) =>
+        request(
+          ch.getQualityInsights,
+          payload.getQualityInsights,
+          response.getQualityInsights,
+          input,
+        ),
+      getVersionActivity: (input) =>
+        request(
+          ch.getVersionActivity,
+          payload.getVersionActivity,
+          response.getVersionActivity,
+          input,
+        ),
+      getTagInsights: (input) =>
+        request(ch.getTagInsights, payload.getTagInsights, response.getTagInsights, input),
+      getTemplateInsights: (input) =>
+        request(
+          ch.getTemplateInsights,
+          payload.getTemplateInsights,
+          response.getTemplateInsights,
+          input,
+        ),
+      getProjectContextInsights: (input) =>
+        request(
+          ch.getProjectContextInsights,
+          payload.getProjectContextInsights,
+          response.getProjectContextInsights,
+          input,
+        ),
+      getMaintenanceSnapshot: (input) =>
+        request(
+          ch.getMaintenanceSnapshot,
+          payload.getMaintenanceSnapshot,
+          response.getMaintenanceSnapshot,
+          input,
+        ),
+    },
     tags: {
       create: (input) => request(ch.createTag, payload.createTag, response.createTag, input),
       list: () => request(ch.listTags, payload.listTags, response.listTags, undefined),

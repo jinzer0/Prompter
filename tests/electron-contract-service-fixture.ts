@@ -180,5 +180,15 @@ export function createFailingServices(onServiceCall: () => void) {
     validateBackupFile: backupFailure,
     importBackup: backupFailure,
     cancelImportSession: backupFailure,
+    getDashboardSummary: maintenanceFailure,
+    getProjectHealth: maintenanceFailure,
+    getScenarioDistribution: maintenanceFailure,
+    getTargetAgentDistribution: maintenanceFailure,
+    getQualityInsights: maintenanceFailure,
+    getVersionActivity: maintenanceFailure,
+    getTagInsights: maintenanceFailure,
+    getTemplateInsights: maintenanceFailure,
+    getProjectContextInsights: maintenanceFailure,
+    getMaintenanceSnapshot: maintenanceFailure,
   }
 }

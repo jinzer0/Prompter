@@ -437,6 +437,48 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
         .cancelImportSession(parsed)
         .then((result) => responseSchemas.cancelImportSession.parse(result))
     },
+    getDashboardSummary: (payload: unknown) =>
+      responseSchemas.getDashboardSummary.parse(
+        services.getDashboardSummary(payloadSchemas.getDashboardSummary.parse(payload)),
+      ),
+    getProjectHealth: (payload: unknown) =>
+      responseSchemas.getProjectHealth.parse(
+        services.getProjectHealth(payloadSchemas.getProjectHealth.parse(payload)),
+      ),
+    getScenarioDistribution: (payload: unknown) =>
+      responseSchemas.getScenarioDistribution.parse(
+        services.getScenarioDistribution(payloadSchemas.getScenarioDistribution.parse(payload)),
+      ),
+    getTargetAgentDistribution: (payload: unknown) =>
+      responseSchemas.getTargetAgentDistribution.parse(
+        services.getTargetAgentDistribution(
+          payloadSchemas.getTargetAgentDistribution.parse(payload),
+        ),
+      ),
+    getQualityInsights: (payload: unknown) =>
+      responseSchemas.getQualityInsights.parse(
+        services.getQualityInsights(payloadSchemas.getQualityInsights.parse(payload)),
+      ),
+    getVersionActivity: (payload: unknown) =>
+      responseSchemas.getVersionActivity.parse(
+        services.getVersionActivity(payloadSchemas.getVersionActivity.parse(payload)),
+      ),
+    getTagInsights: (payload: unknown) =>
+      responseSchemas.getTagInsights.parse(
+        services.getTagInsights(payloadSchemas.getTagInsights.parse(payload)),
+      ),
+    getTemplateInsights: (payload: unknown) =>
+      responseSchemas.getTemplateInsights.parse(
+        services.getTemplateInsights(payloadSchemas.getTemplateInsights.parse(payload)),
+      ),
+    getProjectContextInsights: (payload: unknown) =>
+      responseSchemas.getProjectContextInsights.parse(
+        services.getProjectContextInsights(payloadSchemas.getProjectContextInsights.parse(payload)),
+      ),
+    getMaintenanceSnapshot: (payload: unknown) =>
+      responseSchemas.getMaintenanceSnapshot.parse(
+        services.getMaintenanceSnapshot(payloadSchemas.getMaintenanceSnapshot.parse(payload)),
+      ),
   }
 }
 
@@ -690,5 +732,35 @@ export function registerIpcHandlers(services: IpcServices): void {
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.cancelImportSession, (_event, payload) =>
     handlers.cancelImportSession(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getDashboardSummary, (_event, payload) =>
+    handlers.getDashboardSummary(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getProjectHealth, (_event, payload) =>
+    handlers.getProjectHealth(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getScenarioDistribution, (_event, payload) =>
+    handlers.getScenarioDistribution(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getTargetAgentDistribution, (_event, payload) =>
+    handlers.getTargetAgentDistribution(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getQualityInsights, (_event, payload) =>
+    handlers.getQualityInsights(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getVersionActivity, (_event, payload) =>
+    handlers.getVersionActivity(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getTagInsights, (_event, payload) =>
+    handlers.getTagInsights(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getTemplateInsights, (_event, payload) =>
+    handlers.getTemplateInsights(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getProjectContextInsights, (_event, payload) =>
+    handlers.getProjectContextInsights(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getMaintenanceSnapshot, (_event, payload) =>
+    handlers.getMaintenanceSnapshot(payload),
   )
 }

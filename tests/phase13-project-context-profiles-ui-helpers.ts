@@ -20,6 +20,8 @@ export type PromptCompilerIpcSnapshot = {
   readonly compile: number
   readonly lastAnalyzeInput: unknown
   readonly lastCompileInput: unknown
+  readonly lastSaveExportInput: unknown
+  readonly saveExport: number
 }
 
 export async function withPhase13Prompter(
@@ -79,6 +81,8 @@ export async function installPromptCompilerIpcRecorder(app: ElectronApplication)
         compile: number
         lastAnalyzeInput: unknown
         lastCompileInput: unknown
+        lastSaveExportInput: unknown
+        saveExport: number
       }
 
       const handlers = Reflect.get(ipcMain, "_invokeHandlers")
@@ -91,10 +95,12 @@ export async function installPromptCompilerIpcRecorder(app: ElectronApplication)
         compile: 0,
         lastAnalyzeInput: null,
         lastCompileInput: null,
+        lastSaveExportInput: null,
+        saveExport: 0,
       }
       Reflect.set(globalThis, "__prompterPromptCompilerIpcRecorder", recorder)
 
-      function wrapHandler(channel: string, kind: "analyze" | "compile"): void {
+      function wrapHandler(channel: string, kind: "analyze" | "compile" | "saveExport"): void {
         const handler = handlers.get(channel)
         if (typeof handler !== "function") {
           throw new Error(`Prompt compiler IPC handler for ${channel} was not registered`)
@@ -112,16 +118,24 @@ export async function installPromptCompilerIpcRecorder(app: ElectronApplication)
             recorder.lastCompileInput = payload
           }
 
+          if (kind === "saveExport") {
+            recorder.saveExport += 1
+            recorder.lastSaveExportInput = payload
+            return { cancelled: true }
+          }
+
           return Reflect.apply(handler, undefined, [event, payload])
         })
       }
 
       wrapHandler(channels.analyze, "analyze")
       wrapHandler(channels.compile, "compile")
+      wrapHandler(channels.saveExport, "saveExport")
     },
     {
       analyze: PERSISTENCE_CHANNELS.promptCompilerAnalyze,
       compile: PERSISTENCE_CHANNELS.promptCompilerCompile,
+      saveExport: PERSISTENCE_CHANNELS.savePromptToFile,
     },
   )
 }
@@ -137,7 +151,12 @@ export async function promptCompilerIpcSnapshot(
 
     const analyze = Reflect.get(value, "analyze")
     const compile = Reflect.get(value, "compile")
-    if (typeof analyze !== "number" || typeof compile !== "number") {
+    const saveExport = Reflect.get(value, "saveExport")
+    if (
+      typeof analyze !== "number" ||
+      typeof compile !== "number" ||
+      typeof saveExport !== "number"
+    ) {
       throw new Error("Prompt compiler IPC recorder has an invalid shape")
     }
 
@@ -146,6 +165,8 @@ export async function promptCompilerIpcSnapshot(
       compile,
       lastAnalyzeInput: Reflect.get(value, "lastAnalyzeInput"),
       lastCompileInput: Reflect.get(value, "lastCompileInput"),
+      lastSaveExportInput: Reflect.get(value, "lastSaveExportInput"),
+      saveExport,
     }
   })
 }
@@ -154,9 +175,13 @@ export async function expectNoPromptCompilerIpcCalls(app: ElectronApplication): 
   await expect
     .poll(async () => {
       const snapshot = await promptCompilerIpcSnapshot(app)
-      return { analyze: snapshot.analyze, compile: snapshot.compile }
+      return {
+        analyze: snapshot.analyze,
+        compile: snapshot.compile,
+        saveExport: snapshot.saveExport,
+      }
     })
-    .toEqual({ analyze: 0, compile: 0 })
+    .toEqual({ analyze: 0, compile: 0, saveExport: 0 })
 }
 
 export async function profileCountByProjectName(page: Page, projectName: string): Promise<number> {

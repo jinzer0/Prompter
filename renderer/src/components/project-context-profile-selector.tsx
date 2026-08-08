@@ -11,6 +11,7 @@ import { Select } from "./ui/select"
 type ProjectContextProfileSelectorProps = {
   readonly error: string | null
   readonly includeProjectContextProfile: boolean
+  readonly isSelectedProfileUnavailable: boolean
   readonly preview: ProjectContextCompilerBuildResult | null
   readonly previewError: string | null
   readonly previewStatus: CompilerProjectContextPreviewStatus
@@ -31,6 +32,7 @@ function previewText(preview: ProjectContextCompilerBuildResult | null): string 
 export function ProjectContextProfileSelector({
   error,
   includeProjectContextProfile,
+  isSelectedProfileUnavailable,
   preview,
   previewError,
   previewStatus,
@@ -71,11 +73,17 @@ export function ProjectContextProfileSelector({
         <Select
           id="project-context-profile"
           aria-label="Project context profile"
+          className="min-w-0 truncate pl-3 pr-10"
           disabled={isSelectionDisabled}
           value={selectedProfileId ?? ""}
           onChange={(event) => onSelectProfile(event.currentTarget.value || null)}
         >
           <option value="">No context profile</option>
+          {isSelectedProfileUnavailable && selectedProfileId !== null && (
+            <option value={selectedProfileId} disabled>
+              Unavailable Context Profile
+            </option>
+          )}
           {profiles.map((profile) => (
             <option key={profile.id} value={profile.id}>
               {profile.isDefault ? `${profile.name} (recommended)` : profile.name}
@@ -87,7 +95,7 @@ export function ProjectContextProfileSelector({
       <label className="flex items-center gap-2 text-[12px] text-muted-strong">
         <input
           aria-label="Include project context profile"
-          checked={includeProjectContextProfile && canInclude}
+          checked={includeProjectContextProfile}
           className="size-4 rounded-control accent-accent"
           disabled={!canInclude}
           type="checkbox"

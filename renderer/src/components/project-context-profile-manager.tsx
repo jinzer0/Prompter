@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 
 import type { Project, ProjectContextProfile } from "../../../electron/ipc-types"
+import type { InsightsSelectionRequest } from "../hooks/use-insights-workspace-navigation"
 import { useProjectContextProfiles } from "../hooks/use-project-context-profiles"
+import { focusInsightsTarget } from "../lib/insights-selection-request"
 import type { NormalizedProjectContextProfileForm } from "../lib/project-context-profile-form"
 import {
   ProjectContextProfileEditor,
@@ -19,6 +21,7 @@ type DeleteConfirmation = {
 type ProjectContextProfileManagerProps = {
   readonly selectedProject: Project | null
   readonly onProfilesChanged: (change?: ProjectContextProfileChange) => void
+  readonly selectionRequest: InsightsSelectionRequest | null
 }
 
 type ProjectContextProfileChange = {
@@ -32,6 +35,7 @@ function confirmationFromProfile(profile: ProjectContextProfile | null): DeleteC
 
 export function ProjectContextProfileManager({
   onProfilesChanged,
+  selectionRequest,
   selectedProject,
 }: ProjectContextProfileManagerProps) {
   const projectId = selectedProject?.id ?? null
@@ -40,6 +44,7 @@ export function ProjectContextProfileManager({
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const previousProjectId = useRef(projectId)
+  const appliedSelectionRequestId = useRef<number | null>(null)
 
   useEffect(() => {
     if (projectId !== null && profiles.status === "idle") {
@@ -54,6 +59,21 @@ export function ProjectContextProfileManager({
       setDeleteConfirmation(null)
     }
   }, [projectId])
+
+  useEffect(() => {
+    if (
+      selectionRequest !== null &&
+      selectionRequest.requestId !== appliedSelectionRequestId.current &&
+      profiles.status === "ready" &&
+      profiles.profiles.some((profile) => profile.id === selectionRequest.id)
+    ) {
+      appliedSelectionRequestId.current = selectionRequest.requestId
+      setEditorMode("edit")
+      setDeleteConfirmation(null)
+      profiles.selectProfile(selectionRequest.id)
+      focusInsightsTarget("project-context")
+    }
+  }, [profiles.profiles, profiles.selectProfile, profiles.status, selectionRequest])
 
   function startCreate(): void {
     setEditorMode("create")
@@ -163,7 +183,12 @@ export function ProjectContextProfileManager({
 
   if (selectedProject === null) {
     return (
-      <section className="space-y-3" aria-labelledby="context-profiles-heading">
+      <section
+        data-insights-target="project-context"
+        tabIndex={-1}
+        className="space-y-3"
+        aria-labelledby="context-profiles-heading"
+      >
         <h2
           id="context-profiles-heading"
           className="text-[16px] font-semibold text-foreground"
@@ -180,7 +205,11 @@ export function ProjectContextProfileManager({
   }
 
   return (
-    <div className="min-w-0 space-y-3 overflow-hidden">
+    <div
+      data-insights-target="project-context"
+      tabIndex={-1}
+      className="min-w-0 space-y-3 overflow-hidden"
+    >
       <ProjectContextProfileSidebarSection
         error={profiles.error}
         profiles={profiles.profiles}

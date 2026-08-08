@@ -145,11 +145,14 @@ export function ProjectSidebarSection({
           <SidebarItem
             key={project.id}
             aria-current={project.id === selectedProject?.id ? "page" : undefined}
+            className="gap-1"
             onClick={() => selectProject(project.id)}
             variant={project.id === selectedProject?.id ? "active" : "default"}
           >
-            <span>{project.name}</span>
-            <span className="font-mono text-[11px] text-muted">
+            <span className="min-w-0 flex-1 [overflow-wrap:anywhere] [word-break:keep-all]">
+              {project.name}
+            </span>
+            <span className="shrink-0 font-mono text-[11px] text-muted">
               {targetAgentLabel(project.defaultAgent)}
             </span>
           </SidebarItem>

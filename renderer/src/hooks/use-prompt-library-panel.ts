@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import type {
   Project,
@@ -11,6 +11,7 @@ import type { ScenarioFilter, TargetAgentFilter } from "../components/prompt-lib
 import type { PromptDraft } from "../components/prompt-library-new-prompt-form"
 import { emptyPromptDraft } from "../components/prompt-library-new-prompt-form"
 import type { CreatePrompt, LoadStatus, PromptVersionSummary } from "./prompt-library-data"
+import type { InsightsSelectionRequest } from "./use-insights-workspace-navigation"
 
 type VisiblePromptAsset = {
   readonly asset: PromptAsset
@@ -24,6 +25,7 @@ type UsePromptLibraryPanelConfig = {
   readonly selectedProject: Project | null
   readonly status: LoadStatus
   readonly tagRefreshSignal: number
+  readonly tagRequest: InsightsSelectionRequest | null
 }
 
 export function usePromptLibraryPanel({
@@ -33,6 +35,7 @@ export function usePromptLibraryPanel({
   selectedProject,
   status,
   tagRefreshSignal,
+  tagRequest,
 }: UsePromptLibraryPanelConfig) {
   const [draft, setDraft] = useState<PromptDraft>(emptyPromptDraft)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -46,6 +49,19 @@ export function usePromptLibraryPanel({
   const [searchResults, setSearchResults] = useState<readonly PromptSearchResultItem[] | null>(null)
   const [searchStatus, setSearchStatus] = useState<LoadStatus>("ready")
   const [searchError, setSearchError] = useState<string | null>(null)
+  const appliedTagRequestId = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (
+      tagRequest !== null &&
+      tagRequest.requestId !== appliedTagRequestId.current &&
+      selectedProject !== null &&
+      status === "ready"
+    ) {
+      appliedTagRequestId.current = tagRequest.requestId
+      setSelectedTagIds([tagRequest.id])
+    }
+  }, [selectedProject, status, tagRequest])
 
   const hasActiveFilters =
     searchQuery.trim().length > 0 ||

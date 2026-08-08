@@ -1,5 +1,6 @@
 import type { Project, PromptAsset } from "../../../electron/ipc-types"
 import type { CreatePrompt } from "../hooks/prompt-library-data"
+import type { InsightsSelectionRequest } from "../hooks/use-insights-workspace-navigation"
 import { usePromptLibraryPanel } from "../hooks/use-prompt-library-panel"
 import type { LoadStatus, PromptVersionSummary } from "../hooks/use-prompter-library"
 import { PromptAssetCard } from "./prompt-asset-card"
@@ -23,6 +24,7 @@ type PromptLibraryPanelProps = {
   readonly selectedProject: Project | null
   readonly status: LoadStatus
   readonly tagRefreshSignal: number
+  readonly tagRequest: InsightsSelectionRequest | null
 }
 
 export function PromptLibraryPanel({
@@ -36,6 +38,7 @@ export function PromptLibraryPanel({
   selectedProject,
   status,
   tagRefreshSignal,
+  tagRequest,
 }: PromptLibraryPanelProps) {
   const library = usePromptLibraryPanel({
     assets,
@@ -44,10 +47,16 @@ export function PromptLibraryPanel({
     selectedProject,
     status,
     tagRefreshSignal,
+    tagRequest,
   })
 
   return (
-    <Panel data-testid="prompt-library" headingId="prompt-library-heading">
+    <Panel
+      data-testid="prompt-library"
+      data-insights-target="prompt-library"
+      tabIndex={-1}
+      headingId="prompt-library-heading"
+    >
       <header className="flex items-start justify-between gap-4 border-b border-border-subtle pb-4">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">Library</p>

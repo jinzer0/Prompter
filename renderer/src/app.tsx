@@ -2,13 +2,16 @@ import { useEffect, useState } from "react"
 
 import type { BackupImportResult, PingResponse } from "../../electron/ipc-types"
 import { HarnessTemplateManager } from "./components/harness-template-manager"
+import { InsightsDashboard } from "./components/insights/insights-dashboard"
 import { ProjectContextProfileManager } from "./components/project-context-profile-manager"
 import { ProjectSidebarSection } from "./components/project-sidebar-section"
 import { PromptCompilerPanel } from "./components/prompt-compiler-panel"
 import { PromptLibraryPanel } from "./components/prompt-library-panel"
 import { PromptTemplateManager } from "./components/prompt-template-manager"
 import { SettingsPanel } from "./components/settings-panel"
+import { SidebarItem } from "./components/shell/sidebar-item"
 import { SidebarSection, sidebarSections } from "./components/shell/sidebar-section"
+import { useInsightsWorkspaceNavigation } from "./hooks/use-insights-workspace-navigation"
 import { useProjectPrompts, useProjects } from "./hooks/use-prompter-library"
 import { handleMenuAction, handleMenuKeyDown } from "./lib/menu-actions"
 
@@ -38,6 +41,20 @@ export function App() {
   >([])
   const projectLibrary = useProjects()
   const promptLibrary = useProjectPrompts(projectLibrary.selectedProject?.id ?? null)
+  const insightsNavigation = useInsightsWorkspaceNavigation({
+    selectAsset: promptLibrary.selectAsset,
+    selectProject: projectLibrary.selectProject,
+    selectVersion: promptLibrary.selectVersion,
+    snapshot: {
+      assetIds: promptLibrary.assets.map((asset) => asset.id),
+      assetStatus: promptLibrary.assetStatus,
+      selectedAssetId: promptLibrary.selectedAsset?.id ?? null,
+      selectedProjectId: projectLibrary.selectedProject?.id ?? null,
+      selectedVersionId: promptLibrary.selectedVersion?.id ?? null,
+      versionIds: promptLibrary.versions.map((version) => version.id),
+      versionStatus: promptLibrary.versionStatus,
+    },
+  })
 
   function refreshPromptTags(): void {
     setTagRefreshSignal((current) => current + 1)
@@ -112,22 +129,32 @@ export function App() {
     <main
       data-testid="app-shell"
       aria-label="Prompter shell"
-      className="min-h-[100dvh] overflow-x-auto bg-shell p-6 text-foreground"
+      className="h-[100dvh] overflow-x-auto overflow-y-hidden bg-shell p-6 text-foreground"
     >
-      <div className="prompter-shell-grid grid min-h-[calc(100dvh-48px)] min-w-[var(--layout-shell-min)] gap-4">
+      <div className="prompter-shell-grid grid h-[calc(100dvh-48px)] min-h-0 min-w-[var(--layout-shell-min)] gap-4">
         <aside
           data-testid="left-sidebar"
           aria-label="Projects, tags, and harnesses"
-          className="flex flex-col rounded-panel border border-border-subtle bg-panel p-4 shadow-panel"
+          className="flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-panel border border-border-subtle bg-panel p-4 shadow-panel [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           <div className="border-b border-border-subtle pb-4">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
               Prompter
             </p>
             <p className="mt-2 text-[14px] leading-5 text-muted-strong">Prompt workspace shell</p>
+            <nav className="mt-4" aria-label="Workspace views">
+              <SidebarItem
+                data-menu-action-target="library-insights"
+                aria-current={insightsNavigation.workspaceView === "insights" ? "page" : undefined}
+                variant={insightsNavigation.workspaceView === "insights" ? "active" : "default"}
+                onClick={insightsNavigation.openInsights}
+              >
+                Library Insights
+              </SidebarItem>
+            </nav>
           </div>
 
-          <div className="mt-5 flex flex-1 flex-col gap-5">
+          <div className="mt-5 flex min-w-0 flex-1 flex-col gap-5">
             <ProjectSidebarSection
               createProject={projectLibrary.createProject}
               error={projectLibrary.projectError}
@@ -137,17 +164,20 @@ export function App() {
               status={projectLibrary.projectStatus}
             />
             <ProjectContextProfileManager
+              selectionRequest={insightsNavigation.contextProfileRequest}
               selectedProject={projectLibrary.selectedProject}
               onProfilesChanged={recordProjectContextProfileChange}
             />
             <PromptTemplateManager
               refreshSignal={promptTemplateRefreshSignal}
+              selectionRequest={insightsNavigation.promptTemplateRequest}
               onTemplatesChanged={refreshPromptTemplates}
             />
             {sidebarSections.map((section) =>
               section.title === "Harnesses" ? (
                 <HarnessTemplateManager
                   key={section.title}
+                  selectionRequest={insightsNavigation.harnessTemplateRequest}
                   onTemplatesChanged={recordHarnessTemplateChange}
                 />
               ) : (
@@ -177,44 +207,57 @@ export function App() {
           </div>
         </aside>
 
-        <PromptLibraryPanel
-          assets={promptLibrary.assets}
-          currentVersionSummaries={promptLibrary.currentVersionSummaries}
-          createPrompt={promptLibrary.createPrompt}
-          error={promptLibrary.assetError}
-          selectAsset={promptLibrary.selectAsset}
-          selectedAsset={promptLibrary.selectedAsset}
-          selectedProject={projectLibrary.selectedProject}
-          status={promptLibrary.assetStatus}
-          tagRefreshSignal={tagRefreshSignal}
-          onTagsChanged={refreshPromptTags}
-        />
-        <PromptCompilerPanel
-          assets={promptLibrary.assets}
-          compareVersions={promptLibrary.compareVersions}
-          createDerivedAsset={promptLibrary.createDerivedAsset}
-          createNextVersion={promptLibrary.createNextVersion}
-          createPrompt={promptLibrary.createPrompt}
-          duplicateAsset={promptLibrary.duplicateAsset}
-          changedProjectContextProfileId={changedProjectContextProfileId}
-          currentVersion={promptLibrary.currentVersion}
-          deletedHarnessTemplateIds={deletedHarnessTemplateIds}
-          deletedProjectContextProfileIds={deletedProjectContextProfileIds}
-          error={promptLibrary.versionError}
-          harnessTemplateRefreshSignal={harnessTemplateRefreshSignal}
-          projectContextProfileRefreshSignal={projectContextProfileRefreshSignal}
-          promptTemplateRefreshSignal={promptTemplateRefreshSignal}
-          selectedAsset={promptLibrary.selectedAsset}
-          selectedVersion={promptLibrary.selectedVersion}
-          selectedProject={projectLibrary.selectedProject}
-          selectAsset={promptLibrary.selectAsset}
-          selectVersion={promptLibrary.selectVersion}
-          setCurrentVersion={promptLibrary.setCurrentVersion}
-          status={promptLibrary.versionStatus}
-          versions={promptLibrary.versions}
-          onPromptTemplatesChanged={refreshPromptTemplates}
-          onTagsChanged={refreshPromptTags}
-        />
+        <div className={insightsNavigation.workspaceView === "library" ? "contents" : "hidden"}>
+          <PromptLibraryPanel
+            assets={promptLibrary.assets}
+            currentVersionSummaries={promptLibrary.currentVersionSummaries}
+            createPrompt={promptLibrary.createPrompt}
+            error={promptLibrary.assetError}
+            selectAsset={promptLibrary.selectAsset}
+            selectedAsset={promptLibrary.selectedAsset}
+            selectedProject={projectLibrary.selectedProject}
+            status={promptLibrary.assetStatus}
+            tagRefreshSignal={tagRefreshSignal}
+            tagRequest={insightsNavigation.tagRequest}
+            onTagsChanged={refreshPromptTags}
+          />
+          <PromptCompilerPanel
+            assets={promptLibrary.assets}
+            compareVersions={promptLibrary.compareVersions}
+            createDerivedAsset={promptLibrary.createDerivedAsset}
+            createNextVersion={promptLibrary.createNextVersion}
+            createPrompt={promptLibrary.createPrompt}
+            duplicateAsset={promptLibrary.duplicateAsset}
+            changedProjectContextProfileId={changedProjectContextProfileId}
+            compilerStatePreservationRequest={insightsNavigation.statePreservationRequest}
+            currentVersion={promptLibrary.currentVersion}
+            deletedHarnessTemplateIds={deletedHarnessTemplateIds}
+            deletedProjectContextProfileIds={deletedProjectContextProfileIds}
+            error={promptLibrary.versionError}
+            harnessTemplateRefreshSignal={harnessTemplateRefreshSignal}
+            projectContextProfileRefreshSignal={projectContextProfileRefreshSignal}
+            promptTemplateRefreshSignal={promptTemplateRefreshSignal}
+            selectedAsset={promptLibrary.selectedAsset}
+            selectedVersion={promptLibrary.selectedVersion}
+            selectedProject={projectLibrary.selectedProject}
+            selectAsset={promptLibrary.selectAsset}
+            selectVersion={promptLibrary.selectVersion}
+            setCurrentVersion={promptLibrary.setCurrentVersion}
+            status={promptLibrary.versionStatus}
+            versions={promptLibrary.versions}
+            onPromptTemplatesChanged={refreshPromptTemplates}
+            onTagsChanged={refreshPromptTags}
+          />
+        </div>
+        {insightsNavigation.workspaceView === "insights" && (
+          <section data-testid="insights-workspace" className="col-span-2 h-full min-h-0">
+            <InsightsDashboard
+              projects={projectLibrary.projects}
+              onBackToLibrary={insightsNavigation.openLibrary}
+              onNavigate={insightsNavigation.navigate}
+            />
+          </section>
+        )}
       </div>
     </main>
   )

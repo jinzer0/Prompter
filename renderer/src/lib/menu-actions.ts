@@ -52,6 +52,9 @@ export function handleMenuAction(action: MenuAction): void {
     case "openSettings":
       focusMenuTarget("settings-panel")
       return
+    case "openLibraryInsights":
+      clickMenuTarget("library-insights")
+      return
     case "openLibraryMaintenance":
       focusMenuTarget("settings-maintenance")
       return

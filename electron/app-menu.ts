@@ -140,6 +140,10 @@ export function createApplicationMenuTemplate({
       label: "Tools",
       submenu: [
         {
+          label: "Library Insights",
+          click: () => sendAction("openLibraryInsights"),
+        },
+        {
           label: "Library Maintenance",
           click: () => sendAction("openLibraryMaintenance"),
         },

@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3"
+import { createInsightsService } from "../insights/service.js"
 import type {
   CreateDerivedPromptAssetInput,
   CreateProjectInput,
@@ -78,6 +79,7 @@ export function createPersistenceServices(
   const promptQualityReviews = createPromptQualityReviewRepository(db)
   const maintenanceActions = createMaintenanceActionRepository(sqlite)
   const maintenance = createMaintenanceScanService(sqlite)
+  const insights = createInsightsService({ sqlite })
   const promptQuality = createPromptQualityService({
     getPromptAsset: (id) => prompts.getPromptAsset(id),
     getPromptVersion: (id) => prompts.getPromptVersion(id),
@@ -262,5 +264,6 @@ export function createPersistenceServices(
     ...maintenance,
     ...promptCompiler,
     ...promptQuality,
+    ...insights,
   }
 }

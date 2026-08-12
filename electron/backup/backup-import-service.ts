@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto"
 import type Database from "better-sqlite3"
 
 import { eq } from "drizzle-orm"
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import type { AppDatabase } from "../db/repositories/common.js"
 import * as schema from "../db/schema.js"
 import { backupImportResultSchema, importBackupInputSchema } from "../ipc-contract.js"
@@ -18,6 +19,7 @@ type BackupImportServiceDependencies = {
   readonly sessions: BackupImportSessionStore
   readonly createId?: () => string
   readonly onWriteCheckpoint?: (checkpoint: BackupImportCheckpoint) => void
+  readonly appLockGuard?: AppLockGuard
 }
 
 export class BackupImportPreviewMismatchError extends Error {
@@ -55,6 +57,7 @@ function destinationProjectExists(db: AppDatabase, projectId: string): boolean {
 export function createBackupImportService(dependencies: BackupImportServiceDependencies) {
   return {
     async importBackup(input: ImportBackupInput): Promise<BackupImportResult> {
+      const epoch = dependencies.appLockGuard?.capture()
       const parsed = importBackupInputSchema.parse(input)
       const session = dependencies.sessions.requireReadyImportSession(parsed.importSessionId)
       if (parsed.previewFingerprint !== session.previewFingerprint) {
@@ -82,6 +85,7 @@ export function createBackupImportService(dependencies: BackupImportServiceDepen
       })
 
       try {
+        if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
         writeResolvedBackupImport({
           db: dependencies.db,
           sqlite: dependencies.sqlite,

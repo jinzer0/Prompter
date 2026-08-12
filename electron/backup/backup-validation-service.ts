@@ -1,3 +1,4 @@
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import type { AppDatabase } from "../db/repositories/common.js"
 import {
   BACKUP_FILE_MAX_BYTES,
@@ -39,6 +40,7 @@ type BackupValidationServiceDependencies = {
   readonly sessions: BackupImportSessionStore
   readonly encryptedImportSessions?: EncryptedBackupImportSessionStore
   readonly crypto?: ReturnType<typeof createEncryptedBackupCrypto>
+  readonly appLockGuard?: AppLockGuard
 }
 
 export class BackupValidationError extends Error {
@@ -128,19 +130,24 @@ export function createBackupValidationService(dependencies: BackupValidationServ
 
   return {
     async validateBackupFile(): Promise<BackupValidationResult> {
+      const epoch = dependencies.appLockGuard?.capture()
       dependencies.sessions.cleanupExpiredSessions()
       const opened = await dependencies.native.openBackupFile()
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       if ("cancelled" in opened) {
         return backupValidationResultSchema.parse({ cancelled: true })
       }
       const size = await dependencies.native.getBackupFileSize(opened.filePath)
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       if (size > BACKUP_FILE_MAX_BYTES) {
         throw new BackupValidationError(
           "file_too_large",
           `Backup file exceeds the ${BACKUP_FILE_MAX_BYTES}-byte limit`,
         )
       }
-      const envelope = parseEnvelope(await dependencies.native.readBackupFile(opened.filePath))
+      const content = await dependencies.native.readBackupFile(opened.filePath)
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
+      const envelope = parseEnvelope(content)
       return createPreview(envelope)
     },
     async cancelImportSession(input: CancelImportSessionInput): Promise<CancelImportSessionResult> {
@@ -149,22 +156,25 @@ export function createBackupValidationService(dependencies: BackupValidationServ
       return cancelImportSessionResultSchema.parse({ cancelled: true })
     },
     async validateEncryptedBackupFile(): Promise<ValidateEncryptedBackupResult> {
+      const epoch = dependencies.appLockGuard?.capture()
       dependencies.sessions.cleanupExpiredSessions()
       encryptedImportSessions.expireEncryptedBackupImportSessions()
       const opened = await dependencies.native.openBackupFile()
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       if ("cancelled" in opened) {
         return validateEncryptedBackupResultSchema.parse({ status: "cancelled" })
       }
       const size = await dependencies.native.getBackupFileSize(opened.filePath)
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       if (size > BACKUP_FILE_MAX_BYTES) {
         throw new BackupValidationError(
           "file_too_large",
           `Backup file exceeds the ${BACKUP_FILE_MAX_BYTES}-byte limit`,
         )
       }
-      const encryptedBackup = parseEncryptedEnvelope(
-        await dependencies.native.readBackupFile(opened.filePath),
-      )
+      const content = await dependencies.native.readBackupFile(opened.filePath)
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
+      const encryptedBackup = parseEncryptedEnvelope(content)
       const session = encryptedImportSessions.createEncryptedBackupImportSession({
         encryptedBackup,
       })
@@ -176,6 +186,7 @@ export function createBackupValidationService(dependencies: BackupValidationServ
       })
     },
     async unlockEncryptedBackup(input: UnlockEncryptedBackupInput) {
+      const epoch = dependencies.appLockGuard?.capture()
       const parsed = unlockEncryptedBackupInputSchema.parse(input)
       const session = encryptedImportSessions.claimEncryptedBackupImportSession(
         parsed.encryptedImportSessionId,
@@ -185,6 +196,7 @@ export function createBackupValidationService(dependencies: BackupValidationServ
           encryptedBackup: session.encryptedBackup,
           passphrase: parsed.passphrase,
         })
+        if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
         const preview = createPreview(envelope)
         encryptedImportSessions.consumeEncryptedBackupImportSessionAfterSuccess(session.id)
         return encryptedBackupUnlockValidationResultSchema.parse({

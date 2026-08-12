@@ -12,12 +12,8 @@ import type {
 } from "../ipc-types.js"
 import { createMaintenanceActionRepository } from "../maintenance/maintenance-action-repository.js"
 import { createMaintenanceScanService } from "../maintenance/scan-service.js"
-import {
-  createPromptCompilerService,
-  type PromptCompilerClientFactory,
-  type PromptCompilerServiceConfig,
-} from "../prompt-compiler/prompt-compiler-service.js"
-import { createPromptQualityService } from "../prompt-quality/prompt-quality-service.js"
+import { createPrivacyScanService } from "../privacy/privacy-scan-service.js"
+import type { PromptCompilerClientFactory } from "../prompt-compiler/prompt-compiler-service.js"
 import {
   createUnavailableOpenAIKeyStore,
   type OpenAIKeyStore,
@@ -27,6 +23,7 @@ import {
   PromptTemplateSourceOverrideError,
   PromptVersionOwnershipError,
 } from "./errors.js"
+import { createLLMServices } from "./llm-services.js"
 import type { AppDatabase } from "./repositories/common.js"
 import { createHarnessTemplateRepository } from "./repositories/harness-templates.js"
 import { createProjectContextProfileRepository } from "./repositories/project-context-profiles.js"
@@ -76,34 +73,23 @@ export function createPersistenceServices(
   const promptTemplates = createPromptTemplateRepository(db)
   const harnessTemplates = createHarnessTemplateRepository(db)
   const settings = createSettingsRepository(db)
+  const privacy = createPrivacyScanService({ db })
   const promptQualityReviews = createPromptQualityReviewRepository(db)
   const maintenanceActions = createMaintenanceActionRepository(sqlite)
   const maintenance = createMaintenanceScanService(sqlite)
   const insights = createInsightsService({ sqlite })
-  const promptQuality = createPromptQualityService({
+  const llm = createLLMServices({
+    getDefaults: () => settings.getDefaults(),
+    getHarnessTemplate: (id) => harnessTemplates.getHarnessTemplate(id),
+    getOpenAIKeyForMainProcessOnly: openAIKeyStore.getOpenAIKeyForMainProcessOnly,
+    getPrivacySettings: () => settings.getPrivacySettings(),
+    getProjectContextProfileForCompiler: (input) =>
+      projectContextProfiles.buildCompilerContext(input),
     getPromptAsset: (id) => prompts.getPromptAsset(id),
     getPromptVersion: (id) => prompts.getPromptVersion(id),
-    getOpenAIKeyForMainProcessOnly: openAIKeyStore.getOpenAIKeyForMainProcessOnly,
     reviews: promptQualityReviews,
+    ...(promptCompilerClientFactory === undefined ? {} : { promptCompilerClientFactory }),
   })
-  const promptCompilerConfig: PromptCompilerServiceConfig =
-    promptCompilerClientFactory === undefined
-      ? {
-          getDefaults: () => settings.getDefaults(),
-          getOpenAIKeyForMainProcessOnly: openAIKeyStore.getOpenAIKeyForMainProcessOnly,
-          getHarnessTemplate: (id) => harnessTemplates.getHarnessTemplate(id),
-          getProjectContextProfileForCompiler: (input) =>
-            projectContextProfiles.buildCompilerContext(input),
-        }
-      : {
-          getDefaults: () => settings.getDefaults(),
-          getOpenAIKeyForMainProcessOnly: openAIKeyStore.getOpenAIKeyForMainProcessOnly,
-          getHarnessTemplate: (id) => harnessTemplates.getHarnessTemplate(id),
-          getProjectContextProfileForCompiler: (input) =>
-            projectContextProfiles.buildCompilerContext(input),
-          createClient: promptCompilerClientFactory,
-        }
-  const promptCompiler = createPromptCompilerService(promptCompilerConfig)
 
   function resolveSourcePrompt(
     sourcePromptAssetId: string,
@@ -259,11 +245,11 @@ export function createPersistenceServices(
     },
     ...harnessTemplates,
     ...settings,
+    privacy,
     ...openAIKeyStore,
     ...maintenanceActions,
     ...maintenance,
-    ...promptCompiler,
-    ...promptQuality,
+    ...llm,
     ...insights,
   }
 }

@@ -1,7 +1,14 @@
 import { desc, eq } from "drizzle-orm"
 
 import { settingKeyIsPublic, settingsDefaultsSchema } from "../../ipc-contract.js"
-import type { Setting, SettingsDefaults, UpdateDefaultsInput } from "../../ipc-types.js"
+import type {
+  PrivacySettings,
+  Setting,
+  SettingsDefaults,
+  UpdateDefaultsInput,
+  UpdatePrivacySettingsInput,
+} from "../../ipc-types.js"
+import { privacySettingsSchema } from "../../privacy/privacy-schemas.js"
 import * as schema from "../schema.js"
 import { type AppDatabase, createTimestamp, requireRow } from "./common.js"
 
@@ -11,6 +18,8 @@ export type SettingsRepository = {
   readonly listSettings: () => readonly Setting[]
   readonly getDefaults: () => SettingsDefaults
   readonly updateDefaults: (input: UpdateDefaultsInput) => SettingsDefaults
+  readonly getPrivacySettings: () => PrivacySettings
+  readonly updatePrivacySettings: (input: UpdatePrivacySettingsInput) => PrivacySettings
 }
 
 const defaultSettings: SettingsDefaults = {
@@ -21,6 +30,13 @@ const defaultSettings: SettingsDefaults = {
   appTheme: "system",
   compilerDefaultLanguage: "ko",
 }
+
+const privacySettingKeys = {
+  warnBeforeLLM: "privacy_warn_before_llm",
+  warnBeforeExport: "privacy_warn_before_export",
+  warnBeforeBackup: "privacy_warn_before_backup",
+  enableLibraryScan: "privacy_enable_library_scan",
+} as const satisfies Record<keyof PrivacySettings, string>
 
 function publicSettingKey(key: string): string {
   if (!settingKeyIsPublic(key)) {
@@ -50,6 +66,26 @@ function defaultsFromSettings(settings: readonly Setting[]): SettingsDefaults {
     compilerDefaultLanguage:
       settingValue(settings, "compiler_default_language") ??
       defaultSettings.compilerDefaultLanguage,
+  })
+}
+
+function privacySettingValue(settings: readonly Setting[], key: string): boolean | undefined {
+  const value = settingValue(settings, key)
+  if (value === "true") {
+    return true
+  }
+  if (value === "false") {
+    return false
+  }
+  return undefined
+}
+
+function privacySettingsFromSettings(settings: readonly Setting[]): PrivacySettings {
+  return privacySettingsSchema.parse({
+    warnBeforeLLM: privacySettingValue(settings, privacySettingKeys.warnBeforeLLM),
+    warnBeforeExport: privacySettingValue(settings, privacySettingKeys.warnBeforeExport),
+    warnBeforeBackup: privacySettingValue(settings, privacySettingKeys.warnBeforeBackup),
+    enableLibraryScan: privacySettingValue(settings, privacySettingKeys.enableLibraryScan),
   })
 }
 
@@ -108,6 +144,28 @@ export function createSettingsRepository(db: AppDatabase): SettingsRepository {
       }
 
       return this.getDefaults()
+    },
+    getPrivacySettings() {
+      return privacySettingsFromSettings(db.select().from(schema.settings).all())
+    },
+    updatePrivacySettings(input) {
+      if (input.warnBeforeLLM !== undefined) {
+        this.setSetting(privacySettingKeys.warnBeforeLLM, String(input.warnBeforeLLM))
+      }
+
+      if (input.warnBeforeExport !== undefined) {
+        this.setSetting(privacySettingKeys.warnBeforeExport, String(input.warnBeforeExport))
+      }
+
+      if (input.warnBeforeBackup !== undefined) {
+        this.setSetting(privacySettingKeys.warnBeforeBackup, String(input.warnBeforeBackup))
+      }
+
+      if (input.enableLibraryScan !== undefined) {
+        this.setSetting(privacySettingKeys.enableLibraryScan, String(input.enableLibraryScan))
+      }
+
+      return this.getPrivacySettings()
     },
   }
 }

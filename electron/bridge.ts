@@ -298,6 +298,35 @@ export function createElectronBridge(
           input,
         ),
     },
+    privacy: {
+      scanText: (input) =>
+        request(ch.scanSensitiveText, payload.scanSensitiveText, response.scanSensitiveText, input),
+      scanDraft: (input) =>
+        request(ch.scanDraftPrivacy, payload.scanDraftPrivacy, response.scanDraftPrivacy, input),
+      scanLibrary: (input) =>
+        request(
+          ch.scanLibraryPrivacy,
+          payload.scanLibraryPrivacy,
+          response.scanLibraryPrivacy,
+          input,
+        ),
+      scanExportContent: (input) =>
+        request(ch.scanExportContent, payload.scanExportContent, response.scanExportContent, input),
+      getSettings: () =>
+        request(
+          ch.getPrivacySettings,
+          payload.getPrivacySettings,
+          response.getPrivacySettings,
+          undefined,
+        ),
+      updateSettings: (input) =>
+        request(
+          ch.updatePrivacySettings,
+          payload.updatePrivacySettings,
+          response.updatePrivacySettings,
+          input,
+        ),
+    },
     insights: {
       getDashboardSummary: (input) =>
         request(
@@ -540,13 +569,15 @@ export function createElectronBridge(
           response.applyPromptQualityScoreToVersion,
           input,
         ),
-      reviewWithLLM: () =>
-        request(
+      reviewWithLLM: (input) => {
+        const parsedInput = payload.reviewPromptQualityWithLLM.parse(input)
+        return request(
           ch.reviewPromptQualityWithLLM,
           payload.reviewPromptQualityWithLLM,
           response.reviewPromptQualityWithLLM,
-          undefined,
-        ),
+          parsedInput,
+        )
+      },
     },
     exports: {
       formatPrompt: (input) =>
@@ -608,6 +639,41 @@ export function createElectronBridge(
           ch.cancelImportSession,
           payload.cancelImportSession,
           response.cancelImportSession,
+          input,
+        ),
+      prepareEncryptedBackup: (input) =>
+        request(
+          ch.prepareEncryptedBackup,
+          payload.prepareEncryptedBackup,
+          response.prepareEncryptedBackup,
+          input,
+        ),
+      savePreparedPlaintextBackup: (input) =>
+        request(
+          ch.savePreparedPlaintextBackup,
+          payload.savePreparedPlaintextBackup,
+          response.savePreparedPlaintextBackup,
+          input,
+        ),
+      savePreparedEncryptedBackup: (input) =>
+        request(
+          ch.savePreparedEncryptedBackup,
+          payload.savePreparedEncryptedBackup,
+          response.savePreparedEncryptedBackup,
+          input,
+        ),
+      validateEncryptedBackupFile: () =>
+        request(
+          ch.validateEncryptedBackupFile,
+          payload.validateEncryptedBackupFile,
+          response.validateEncryptedBackupFile,
+          undefined,
+        ),
+      unlockEncryptedBackup: (input) =>
+        request(
+          ch.unlockEncryptedBackup,
+          payload.unlockEncryptedBackup,
+          response.unlockEncryptedBackup,
           input,
         ),
     },

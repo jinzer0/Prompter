@@ -20,6 +20,7 @@ export default defineConfig({
     "phase18-insights-compiler-rebind-electron-ui.test.ts",
     "phase18-insights-visual-electron-ui.test.ts",
     "phase19-electron-ui.test.ts",
+    "phase20-app-lock-electron-ui.test.ts",
   ],
   timeout: 30_000,
   workers: 1,

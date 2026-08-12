@@ -142,6 +142,11 @@ export function createBackupImportSessionStore(dependencies: BackupImportSession
       requireReadyImportSession(importSessionId)
       terminalizeImportSession(importSessionId, "cancelled")
     },
+    revokeBackupImportSessions(): void {
+      for (const session of readySessions.values()) {
+        terminalizeImportSession(session.id, "cancelled")
+      }
+    },
     consumeImportSessionAfterSuccess(importSessionId: string): void {
       terminalizeImportSession(importSessionId, "consumed")
     },

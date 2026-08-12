@@ -151,6 +151,14 @@ export function createEncryptedBackupImportSessionStore(
       requireReadyEncryptedBackupImportSession(encryptedBackupImportSessionId)
       terminalizeEncryptedBackupImportSession(encryptedBackupImportSessionId, "cancelled")
     },
+    revokeEncryptedBackupImportSessions(): void {
+      for (const session of readySessions.values()) {
+        terminalizeEncryptedBackupImportSession(session.id, "cancelled")
+      }
+      for (const session of claimedSessions.values()) {
+        terminalizeEncryptedBackupImportSession(session.id, "cancelled")
+      }
+    },
     preserveEncryptedBackupImportSessionAfterInvalidPassphrase(
       encryptedBackupImportSessionId: string,
     ): void {

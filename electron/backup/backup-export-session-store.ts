@@ -116,6 +116,11 @@ export function createBackupExportSessionStore(
       requireReadyBackupExportSession(backupExportSessionId)
       terminalizeBackupExportSession(backupExportSessionId, "cancelled")
     },
+    revokeBackupExportSessions(): void {
+      for (const session of readySessions.values()) {
+        terminalizeBackupExportSession(session.id, "cancelled")
+      }
+    },
     expireBackupExportSessions,
     consumeBackupExportSessionAfterSuccess(backupExportSessionId: string): void {
       terminalizeBackupExportSession(backupExportSessionId, "consumed")

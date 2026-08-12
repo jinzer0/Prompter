@@ -17,7 +17,12 @@ const approvedBackupMethods = [
   "exportPromptAssetsBackup",
   "exportPromptTemplatesPack",
   "exportHarnessTemplatesPack",
+  "savePreparedPlaintextBackup",
+  "prepareEncryptedBackup",
+  "savePreparedEncryptedBackup",
   "validateBackupFile",
+  "validateEncryptedBackupFile",
+  "unlockEncryptedBackup",
   "importBackup",
   "cancelImportSession",
 ] as const
@@ -39,10 +44,6 @@ const forbiddenSourceCases = [
   { source: "window.prompter.appEvents.onReady(callback)", pattern: /\bappEvents\b/ },
   { source: "window.prompter.shortcuts.register(input)", pattern: /\bshortcuts\b/ },
   { source: 'settings.set("quick_capture_enabled", true)', pattern: /\bquick_capture_\w*\b/ },
-  {
-    source: "encryptBackupFile(envelope)",
-    pattern: /\b(?:backup\w*encrypt\w*|encrypt\w*backup\w*)/i,
-  },
   { source: "backupScheduler.start()", pattern: /\b(?:backup\w*schedul\w*|schedul\w*backup\w*)/i },
   {
     source: "backgroundBackupJob.run()",
@@ -99,8 +100,11 @@ function extractBackupMethods(source: string): readonly string[] {
   const methods: string[] = []
 
   for (const block of backupBlocks(source)) {
-    for (const property of block.matchAll(/^\s+(?:readonly\s+)?([A-Za-z][A-Za-z0-9]*)\s*:/gm)) {
-      const method = property[1]
+    const properties = [...block.matchAll(/^([ \t]+)(?:readonly\s+)?([A-Za-z][A-Za-z0-9]*)\s*:/gm)]
+    const topLevelIndent = Math.min(...properties.map((property) => property[1]?.length ?? 0))
+    for (const property of properties) {
+      if (property[1]?.length !== topLevelIndent) continue
+      const method = property[2]
       if (method !== undefined) {
         methods.push(method)
       }

@@ -132,7 +132,7 @@ describe("Phase 16 backup import", () => {
         sortDirection: "desc",
       }),
     ).toHaveLength(1)
-    expect(sessions.getImportSession(session.id)?.status).toBe("consumed")
+    expect(sessions.getImportSession(session.id)).toBeNull()
   })
 
   it.each([
@@ -241,7 +241,7 @@ describe("Phase 16 backup import", () => {
 
     // Then: every table including FTS is unchanged and the post-validation session is consumed.
     expect(backupImportCounts(database)).toEqual(before)
-    expect(sessions.getImportSession(session.id)?.status).toBe("consumed")
+    expect(sessions.getImportSession(session.id)).toBeNull()
   })
 
   it("keeps pre-write destination, preview, and malformed-current failures retry-safe", async () => {
@@ -286,5 +286,30 @@ describe("Phase 16 backup import", () => {
     expect(sessions.getImportSession(promptAssetsSession.id)?.status).toBe("ready")
     expect(sessions.getImportSession(fullSession.id)?.status).toBe("ready")
     expect(sessions.getImportSession(malformedSession.id)?.status).toBe("ready")
+  })
+
+  it("does not recheck expiry after a committed import side effect", async () => {
+    // Given: a ready import whose clock advances at the final write checkpoint.
+    const database = await createBackupImportTestDatabase()
+    const clock = { now: 1_000 }
+    const sessions = createBackupImportSessionStore({ now: () => clock.now, createId: randomUUID })
+    const session = createBackupImportSession(sessions, fullImportEnvelope())
+    const service = createBackupImportService({
+      db: database.db,
+      sqlite: database.sqlite,
+      sessions,
+      onWriteCheckpoint(checkpoint) {
+        if (checkpoint === "during_fts_update") {
+          clock.now = session.expiresAt
+        }
+      },
+    })
+
+    // When: the transaction commits after the session reaches its TTL boundary.
+    const result = await service.importBackup(backupImportInput(session.id))
+
+    // Then: committed data returns normally and its terminal payload is released.
+    expect(result).toMatchObject({ backupType: "full", searchIndexStatus: "updated" })
+    expect(sessions.getImportSession(session.id)).toBeNull()
   })
 })

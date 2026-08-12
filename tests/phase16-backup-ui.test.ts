@@ -111,8 +111,29 @@ describe("phase16 backup settings UI contracts", () => {
     expect(markup).toContain("Import adds copies and never overwrites")
   })
 
+  it("offers explicit encrypted full/project export and encrypted import choices", () => {
+    // Given: the backup settings panel has a current project.
+    // When: the passive panel is rendered without starting backup work.
+    const markup = renderToStaticMarkup(
+      createElement(BackupSettingsPanel, {
+        projects: [project],
+        selectedPromptAssetId: promptAsset.id,
+        selectedProjectId: project.id,
+        onImportComplete: async () => undefined,
+        onViewImportedProject: () => undefined,
+      }),
+    )
+
+    // Then: encrypted choices are distinct while Phase16 plaintext targets remain available.
+    expect(markup).toContain("Export encrypted full backup")
+    expect(markup).toContain("Export encrypted project backup")
+    expect(markup).toContain("Open encrypted backup")
+    expect(markup).toContain('data-menu-action-target="backup-export-full"')
+    expect(markup).toContain('data-menu-action-target="backup-import-open"')
+  })
+
   it("routes all scoped export controls through approved backup bridge methods", () => {
-    const hookSource = readFileSync("renderer/src/hooks/use-backup.ts", "utf8")
+    const hookSource = readFileSync("renderer/src/hooks/use-backup-export.ts", "utf8")
 
     expect(hookSource).toContain("window.prompter.backup.exportFullBackup({})")
     expect(hookSource).toContain("window.prompter.backup.exportProjectBackup({ projectId })")
@@ -123,6 +144,11 @@ describe("phase16 backup settings UI contracts", () => {
     )
     expect(hookSource).toContain("window.prompter.backup.exportHarnessTemplatesPack({")
     expect(hookSource).toContain("includeAllUserTemplates: true")
+    expect(hookSource).toContain("window.prompter.backup.savePreparedPlaintextBackup({")
+    expect(hookSource).toContain("preparedBackupSessionId,")
+    expect(hookSource).toContain("privacyConfirmationSessionId,")
+    expect(hookSource).toContain("window.prompter.backup.prepareEncryptedBackup(input)")
+    expect(hookSource).toContain("window.prompter.backup.savePreparedEncryptedBackup({")
     expect(hookSource).not.toContain("filePath")
   })
 

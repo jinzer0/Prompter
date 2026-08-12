@@ -1,9 +1,11 @@
-import { ipcMain } from "electron"
+import { type IpcMainInvokeEvent, ipcMain } from "electron"
 import type { z } from "zod"
 
+import type { AppLockService } from "./app-lock/app-lock-service.js"
 import { BackupExportPrivacyConfirmationRequiredError } from "./backup/backup-export-service.js"
 import type { PersistenceServices } from "./db/services.js"
 import {
+  APP_LOCK_CHANNELS,
   PERSISTENCE_CHANNELS,
   PING_CHANNEL,
   PING_RESPONSE,
@@ -68,6 +70,9 @@ type IpcServices = Omit<
   | "deleteEmptyPromptAssets"
   | "rebuildMaintenanceSearchIndex"
   | "privacyGuard"
+  | "getAppLockMetadata"
+  | "setAppLockMetadata"
+  | "deleteAppLockMetadata"
 > &
   HarnessTemplateContractServices &
   MaintenanceServices &
@@ -666,318 +671,142 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
   }
 }
 
-export function registerIpcHandlers(services: IpcServices): void {
-  const handlers = createPersistenceIpcHandlers(services)
+type PersistenceIpcHandler = (payload: unknown) => unknown
 
-  ipcMain.handle(PING_CHANNEL, () => PING_RESPONSE)
-  ipcMain.handle(PERSISTENCE_CHANNELS.createProject, (_event, payload) =>
-    handlers.createProject(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listProjects, (_event, payload) =>
-    handlers.listProjects(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getProject, (_event, payload) => handlers.getProject(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.updateProject, (_event, payload) =>
-    handlers.updateProject(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.deleteProject, (_event, payload) =>
-    handlers.deleteProject(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptAsset, (_event, payload) =>
-    handlers.createPromptAsset(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptWithInitialVersion, (_event, payload) =>
-    handlers.createPromptWithInitialVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.duplicateAsset, (_event, payload) =>
-    handlers.duplicateAsset(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createDerivedAsset, (_event, payload) =>
-    handlers.createDerivedAsset(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getLineage, (_event, payload) => handlers.getLineage(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.listPromptAssets, (_event, payload) =>
-    handlers.listPromptAssets(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getPromptAsset, (_event, payload) =>
-    handlers.getPromptAsset(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.updatePromptAsset, (_event, payload) =>
-    handlers.updatePromptAsset(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.deletePromptAsset, (_event, payload) =>
-    handlers.deletePromptAsset(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptVersion, (_event, payload) =>
-    handlers.createPromptVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createNextPromptVersion, (_event, payload) =>
-    handlers.createNextPromptVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listPromptVersions, (_event, payload) =>
-    handlers.listPromptVersions(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getPromptVersion, (_event, payload) =>
-    handlers.getPromptVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getCurrentPromptVersion, (_event, payload) =>
-    handlers.getCurrentPromptVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.setCurrentPromptVersion, (_event, payload) =>
-    handlers.setCurrentPromptVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.comparePromptVersions, (_event, payload) =>
-    handlers.comparePromptVersions(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createTag, (_event, payload) => handlers.createTag(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.listTags, (_event, payload) => handlers.listTags(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.updateTag, (_event, payload) => handlers.updateTag(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.deleteTag, (_event, payload) => handlers.deleteTag(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.attachTagToPrompt, (_event, payload) =>
-    handlers.attachTagToPrompt(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.detachTagFromPrompt, (_event, payload) =>
-    handlers.detachTagFromPrompt(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listTagsForPrompt, (_event, payload) =>
-    handlers.listTagsForPrompt(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listTagsWithCounts, (_event, payload) =>
-    handlers.listTagsWithCounts(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createAndAttachTagToPrompt, (_event, payload) =>
-    handlers.createAndAttachTagToPrompt(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.searchPrompts, (_event, payload) =>
-    handlers.searchPrompts(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.rebuildSearchIndex, (_event, payload) =>
-    handlers.rebuildSearchIndex(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.scanMaintenanceLibrary, (_event, payload) =>
-    handlers.scanMaintenanceLibrary(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.prepareMaintenanceAction, (_event, payload) =>
-    handlers.prepareMaintenanceAction(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.executeMaintenanceAction, (_event, payload) =>
-    handlers.executeMaintenanceAction(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.cancelMaintenanceActionSession, (_event, payload) =>
-    handlers.cancelMaintenanceActionSession(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createHarnessTemplate, (_event, payload) =>
-    handlers.createHarnessTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listHarnessTemplates, (_event, payload) =>
-    handlers.listHarnessTemplates(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getHarnessTemplate, (_event, payload) =>
-    handlers.getHarnessTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.updateHarnessTemplate, (_event, payload) =>
-    handlers.updateHarnessTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.deleteHarnessTemplate, (_event, payload) =>
-    handlers.deleteHarnessTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.duplicateHarnessTemplate, (_event, payload) =>
-    handlers.duplicateHarnessTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptTemplate, (_event, payload) =>
-    handlers.createPromptTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listPromptTemplates, (_event, payload) =>
-    handlers.listPromptTemplates(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getPromptTemplate, (_event, payload) =>
-    handlers.getPromptTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.updatePromptTemplate, (_event, payload) =>
-    handlers.updatePromptTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.duplicatePromptTemplate, (_event, payload) =>
-    handlers.duplicatePromptTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.deletePromptTemplate, (_event, payload) =>
-    handlers.deletePromptTemplate(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createPromptTemplateFromVersion, (_event, payload) =>
-    handlers.createPromptTemplateFromVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.createProjectContextProfile, (_event, payload) =>
-    handlers.createProjectContextProfile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listProjectContextProfiles, (_event, payload) =>
-    handlers.listProjectContextProfiles(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getProjectContextProfile, (_event, payload) =>
-    handlers.getProjectContextProfile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getDefaultProjectContextProfile, (_event, payload) =>
-    handlers.getDefaultProjectContextProfile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.updateProjectContextProfile, (_event, payload) =>
-    handlers.updateProjectContextProfile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.deleteProjectContextProfile, (_event, payload) =>
-    handlers.deleteProjectContextProfile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.duplicateProjectContextProfile, (_event, payload) =>
-    handlers.duplicateProjectContextProfile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.setDefaultProjectContextProfile, (_event, payload) =>
-    handlers.setDefaultProjectContextProfile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.buildProjectContextForCompiler, (_event, payload) =>
-    handlers.buildProjectContextForCompiler(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getSetting, (_event, payload) => handlers.getSetting(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.setSetting, (_event, payload) => handlers.setSetting(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.listSettings, (_event, payload) =>
-    handlers.listSettings(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getSettingsDefaults, (_event, payload) =>
-    handlers.getDefaults(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.updateSettingsDefaults, (_event, payload) =>
-    handlers.updateDefaults(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.saveOpenAIKey, (_event, payload) =>
-    handlers.saveOpenAIKey(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.hasOpenAIKey, (_event, payload) =>
-    handlers.hasOpenAIKey(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getOpenAIKeyStatus, (_event, payload) =>
-    handlers.getOpenAIKeyStatus(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.deleteOpenAIKey, (_event, payload) =>
-    handlers.deleteOpenAIKey(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.promptCompilerAnalyze, (_event, payload) =>
-    handlers.promptCompilerAnalyze(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.promptCompilerCompile, (_event, payload) =>
-    handlers.promptCompilerCompile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.formatPromptForExport, (_event, payload) =>
-    handlers.formatPromptForExport(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.savePromptToFile, (_event, payload) =>
-    handlers.savePromptToFile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.copyText, (_event, payload) => handlers.copyText(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.readText, (_event, payload) => handlers.readText(payload))
-  ipcMain.handle(PERSISTENCE_CHANNELS.reviewPromptQualityDraft, (_event, payload) =>
-    handlers.reviewPromptQualityDraft(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.reviewPromptQualityWithLLM, (_event, payload) =>
-    handlers.reviewPromptQualityWithLLM(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.reviewPromptQualityVersion, (_event, payload) =>
-    handlers.reviewPromptQualityVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.savePromptQualityReview, (_event, payload) =>
-    handlers.savePromptQualityReview(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.listPromptQualityReviewsForVersion, (_event, payload) =>
-    handlers.listPromptQualityReviewsForVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getLatestPromptQualityReview, (_event, payload) =>
-    handlers.getLatestPromptQualityReview(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getPromptQualityReview, (_event, payload) =>
-    handlers.getPromptQualityReview(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.applyPromptQualityScoreToVersion, (_event, payload) =>
-    handlers.applyPromptQualityScoreToVersion(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.exportFullBackup, (_event, payload) =>
-    handlers.exportFullBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.exportProjectBackup, (_event, payload) =>
-    handlers.exportProjectBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.exportPromptAssetsBackup, (_event, payload) =>
-    handlers.exportPromptAssetsBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.exportPromptTemplatesPack, (_event, payload) =>
-    handlers.exportPromptTemplatesPack(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.exportHarnessTemplatesPack, (_event, payload) =>
-    handlers.exportHarnessTemplatesPack(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.validateBackupFile, (_event, payload) =>
-    handlers.validateBackupFile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.importBackup, (_event, payload) =>
-    handlers.importBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.cancelImportSession, (_event, payload) =>
-    handlers.cancelImportSession(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.scanSensitiveText, (_event, payload) =>
-    handlers.scanSensitiveText(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.scanDraftPrivacy, (_event, payload) =>
-    handlers.scanDraftPrivacy(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.scanLibraryPrivacy, (_event, payload) =>
-    handlers.scanLibraryPrivacy(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.scanExportContent, (_event, payload) =>
-    handlers.scanExportContent(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getPrivacySettings, (_event, payload) =>
-    handlers.getPrivacySettings(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.updatePrivacySettings, (_event, payload) =>
-    handlers.updatePrivacySettings(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.prepareEncryptedBackup, (_event, payload) =>
-    handlers.prepareEncryptedBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.savePreparedPlaintextBackup, (_event, payload) =>
-    handlers.savePreparedPlaintextBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.savePreparedEncryptedBackup, (_event, payload) =>
-    handlers.savePreparedEncryptedBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.validateEncryptedBackupFile, (_event, payload) =>
-    handlers.validateEncryptedBackupFile(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.unlockEncryptedBackup, (_event, payload) =>
-    handlers.unlockEncryptedBackup(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getDashboardSummary, (_event, payload) =>
-    handlers.getDashboardSummary(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getProjectHealth, (_event, payload) =>
-    handlers.getProjectHealth(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getScenarioDistribution, (_event, payload) =>
-    handlers.getScenarioDistribution(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getTargetAgentDistribution, (_event, payload) =>
-    handlers.getTargetAgentDistribution(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getQualityInsights, (_event, payload) =>
-    handlers.getQualityInsights(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getVersionActivity, (_event, payload) =>
-    handlers.getVersionActivity(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getTagInsights, (_event, payload) =>
-    handlers.getTagInsights(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getTemplateInsights, (_event, payload) =>
-    handlers.getTemplateInsights(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getProjectContextInsights, (_event, payload) =>
-    handlers.getProjectContextInsights(payload),
-  )
-  ipcMain.handle(PERSISTENCE_CHANNELS.getMaintenanceSnapshot, (_event, payload) =>
-    handlers.getMaintenanceSnapshot(payload),
-  )
+export function createPersistenceIpcRegistrationHandlers(services: IpcServices) {
+  const handlers = createPersistenceIpcHandlers(services)
+  return {
+    ...handlers,
+    getSettingsDefaults: handlers.getDefaults,
+    updateSettingsDefaults: handlers.updateDefaults,
+  } satisfies Record<keyof typeof PERSISTENCE_CHANNELS, PersistenceIpcHandler>
+}
+
+export class AppLockedError extends Error {
+  readonly name = "AppLockedError"
+
+  constructor() {
+    super("Prompter is locked")
+  }
+}
+
+function requireUnlocked(appLock: AppLockService): number {
+  if (appLock.getState().locked) {
+    throw new AppLockedError()
+  }
+  return appLock.getStateRevision()
+}
+
+function requireCurrentUnlockEpoch(appLock: AppLockService, epoch: number): void {
+  if (appLock.getState().locked || appLock.getStateRevision() !== epoch) {
+    throw new AppLockedError()
+  }
+}
+
+export function registerIpcHandlers(
+  services: IpcServices,
+  appLock?: AppLockService,
+  onAppLockStateChanged?: () => void,
+  assertTrustedSender: (event: IpcMainInvokeEvent) => void = () => undefined,
+): void {
+  const handlers: Record<string, PersistenceIpcHandler> =
+    createPersistenceIpcRegistrationHandlers(services)
+
+  ipcMain.handle(PING_CHANNEL, (event) => {
+    assertTrustedSender(event)
+    return PING_RESPONSE
+  })
+  for (const [key, channel] of Object.entries(PERSISTENCE_CHANNELS)) {
+    const handler = handlers[key]
+    if (handler === undefined) {
+      throw new Error(`Missing persistence handler: ${key}`)
+    }
+    ipcMain.handle(channel, (event, payload) => {
+      assertTrustedSender(event)
+      if (appLock === undefined) {
+        return handler(payload)
+      }
+      const epoch = requireUnlocked(appLock)
+      const result = handler(payload)
+      if (result instanceof Promise) {
+        return result.then((value) => {
+          requireCurrentUnlockEpoch(appLock, epoch)
+          return value
+        })
+      }
+      requireCurrentUnlockEpoch(appLock, epoch)
+      return result
+    })
+  }
+  if (appLock === undefined) {
+    return
+  }
+  const appLockHandlers = {
+    getState: (_event: IpcMainInvokeEvent, payload: unknown) => {
+      payloadSchemas.appLockGetState.parse(payload)
+      return responseSchemas.appLockGetState.parse(appLock.getState())
+    },
+    setup: async (_event: IpcMainInvokeEvent, payload: unknown) => {
+      const state = responseSchemas.appLockSetup.parse(
+        await appLock.setup(payloadSchemas.appLockSetup.parse(payload)),
+      )
+      onAppLockStateChanged?.()
+      return state
+    },
+    unlock: async (_event: IpcMainInvokeEvent, payload: unknown) => {
+      const unlocked = responseSchemas.appLockUnlock.parse(
+        await appLock.unlock(payloadSchemas.appLockUnlock.parse(payload)),
+      )
+      onAppLockStateChanged?.()
+      return unlocked
+    },
+    lock: (_event: IpcMainInvokeEvent, payload: unknown) => {
+      payloadSchemas.appLockLock.parse(payload)
+      const state = responseSchemas.appLockLock.parse(appLock.lock())
+      onAppLockStateChanged?.()
+      return state
+    },
+    disable: async (_event: IpcMainInvokeEvent, payload: unknown) => {
+      const disabled = responseSchemas.appLockDisable.parse(
+        await appLock.disable(payloadSchemas.appLockDisable.parse(payload)),
+      )
+      onAppLockStateChanged?.()
+      return disabled
+    },
+    changePassphrase: async (_event: IpcMainInvokeEvent, payload: unknown) => {
+      const changed = responseSchemas.appLockChangePassphrase.parse(
+        await appLock.changePassphrase(payloadSchemas.appLockChangePassphrase.parse(payload)),
+      )
+      onAppLockStateChanged?.()
+      return changed
+    },
+    getSettings: (_event: IpcMainInvokeEvent, payload: unknown) => {
+      payloadSchemas.appLockGetSettings.parse(payload)
+      return responseSchemas.appLockGetSettings.parse(appLock.getSettings())
+    },
+    updateSettings: (_event: IpcMainInvokeEvent, payload: unknown) => {
+      const settings = responseSchemas.appLockUpdateSettings.parse(
+        appLock.updateSettings(payloadSchemas.appLockUpdateSettings.parse(payload)),
+      )
+      onAppLockStateChanged?.()
+      return settings
+    },
+  } satisfies Record<
+    keyof typeof APP_LOCK_CHANNELS,
+    (event: IpcMainInvokeEvent, payload: unknown) => unknown
+  >
+  const registrationHandlers: Record<
+    string,
+    (event: IpcMainInvokeEvent, payload: unknown) => unknown
+  > = appLockHandlers
+  for (const [key, channel] of Object.entries(APP_LOCK_CHANNELS)) {
+    const handler = registrationHandlers[key]
+    if (handler === undefined) {
+      throw new Error(`Missing app-lock handler: ${key}`)
+    }
+    ipcMain.handle(channel, (event, payload) => {
+      assertTrustedSender(event)
+      return handler(event, payload)
+    })
+  }
 }

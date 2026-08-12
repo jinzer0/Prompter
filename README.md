@@ -65,6 +65,31 @@ OpenAI API keys are handled only in the Electron main process through safeStorag
 secret storage. The renderer can request only key status and masked values. Raw keys must
 not be exposed through the preload bridge, logs, exports, settings rows, or tests.
 
+## App Lock Security Boundary
+
+Phase 20 adds an optional local app lock for protecting the visible Prompter session. Users
+enable it from Settings by setting a passphrase, then can lock the app manually from Settings,
+`File > Lock Prompter`, or the app-focused `CmdOrCtrl+Shift+L` menu accelerator. This is not an OS global
+shortcut.
+
+When app lock is enabled, Prompter can lock on start and can auto-lock after the configured
+inactivity timeout. Keydown and pointer activity reset the inactivity timer; focus or visibility
+restoration checks the existing deadline and locks immediately if it has elapsed. Locking hides
+sensitive workspace UI and blocks locked-state access to sensitive IPC paths such as prompt library
+data, Prompt Compiler analyze/compile, exports, backups, clipboard reads, project context,
+templates, quality review, privacy, and maintenance actions. Unlocking does not auto-save drafts or
+start analyze, compile, review, export, backup, or maintenance work.
+
+Prompter stores passphrase verification data as a salted hash with KDF metadata in the main
+process data path. The passphrase itself is not stored in plaintext, returned to the renderer, or
+written to logs. There is no passphrase recovery, reset flow, or destructive app-data reset in
+Phase 20. If the passphrase is lost, the app lock cannot be unlocked through Prompter.
+
+The app lock protects the Prompter UI and in-app session access only. It does not encrypt
+`prompter.sqlite` or other SQLite files, and it does not protect against a compromised OS account,
+direct filesystem access, malware, screen capture, screen recording, or an attacker with disk
+access. Full database encryption is not part of Phase 20.
+
 ## MVP Features
 
 - Project creation and project-scoped prompt libraries.
@@ -85,6 +110,8 @@ not be exposed through the preload bridge, logs, exports, settings rows, or test
 - Backup validation, conflict preview, session-based import, and post-import library refresh.
 - Manual Maintenance scans, action previews, confirmation sessions, and selected cleanup actions.
 - macOS app menu and keyboard shortcuts, including quick capture from clipboard.
+- Optional app lock with manual lock, app-focused `CmdOrCtrl+Shift+L`, lock-on-start,
+  activity-based auto-lock, passphrase hashing, locked UI hiding, and sensitive IPC guards.
 - Local read-only Library Insights with project and date filters, dashboard cards,
   library health, quality, activity, tag, template, context, and maintenance snapshots.
 - Insights navigation opens library items without changing Prompt Compiler state unless
@@ -106,6 +133,8 @@ not be exposed through the preload bridge, logs, exports, settings rows, or test
 - `prompt_runs`, `agent_runs`, `execution_results`, `validation_results`, or `run_logs` tables.
 - Cloud sync, accounts, billing, remote server features, vector search, embeddings, plugins, and
   team collaboration.
+- App-lock passphrase recovery, reset, destructive app-data reset, database encryption, OS account
+  protection, malware protection, or screen-capture protection.
 
 ## Packaging Status
 

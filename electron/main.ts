@@ -77,7 +77,7 @@ const promptExportNativeDependencies = {
   writeFile,
   copyText: (text) => clipboard.writeText(text),
   readText: () => clipboard.readText(),
-} satisfies PromptExportNativeDependencies
+} satisfies Omit<PromptExportNativeDependencies, "privacyGuard">
 
 const backupNativeDependencies = {
   showSaveDialog: (options) =>
@@ -91,7 +91,7 @@ const backupNativeDependencies = {
   showOpenDialog: () =>
     dialog.showOpenDialog({
       properties: ["openFile"],
-      filters: [{ name: "Prompter Backup", extensions: ["json"] }],
+      filters: [{ name: "Prompter Backup", extensions: ["json", "enc"] }],
     }),
   readFile: (filePath) => readFile(filePath, "utf8"),
   getFileSize: async (filePath) => (await stat(filePath)).size,
@@ -138,28 +138,36 @@ async function createMainWindow(): Promise<void> {
 
 async function start(): Promise<void> {
   await app.whenReady()
-  database = openMainDatabase()
+  const openedDatabase = openMainDatabase()
+  database = openedDatabase
   const backupNative = createBackupNativeService(backupNativeDependencies)
   const backupSessions = createBackupImportSessionStore({
     now: backupNative.now,
     createId: backupNative.createId,
   })
   registerIpcHandlers({
-    ...database.services,
+    ...openedDatabase.services,
     ...createMaintenanceServices({
-      sqlite: database.sqlite,
+      sqlite: openedDatabase.sqlite,
       confirmAction: confirmMaintenanceAction,
     }),
-    ...createPromptExportNativeService(promptExportNativeDependencies),
-    ...createBackupExportService({ db: database.db, native: backupNative }),
+    ...createPromptExportNativeService({
+      ...promptExportNativeDependencies,
+      privacyGuard: openedDatabase.services.privacyGuard,
+    }),
+    ...createBackupExportService({
+      db: openedDatabase.db,
+      native: backupNative,
+      getWarnBeforeBackup: () => openedDatabase.services.getPrivacySettings().warnBeforeBackup,
+    }),
     ...createBackupValidationService({
-      db: database.db,
+      db: openedDatabase.db,
       native: backupNative,
       sessions: backupSessions,
     }),
     ...createBackupImportService({
-      db: database.db,
-      sqlite: database.sqlite,
+      db: openedDatabase.db,
+      sqlite: openedDatabase.sqlite,
       sessions: backupSessions,
       createId: backupNative.createId,
     }),

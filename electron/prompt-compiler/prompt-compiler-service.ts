@@ -13,6 +13,7 @@ import type {
   PromptCompilerError,
   SettingsDefaults,
 } from "../ipc-types.js"
+import type { PrivacyGuardService } from "../privacy/privacy-guard-service.js"
 import { createOpenAIResponseClient } from "./open-ai-client.js"
 import {
   appendAnalyzeWarnings,
@@ -66,6 +67,7 @@ export type PromptCompilerServiceConfig = {
     readonly profileId: string
   }) => ProjectContextCompilerBuildResult | Promise<ProjectContextCompilerBuildResult>
   readonly createClient?: PromptCompilerClientFactory
+  readonly privacyGuard: PrivacyGuardService
 }
 
 type PromptCompilerResponseSchema =
@@ -176,16 +178,22 @@ export function createPromptCompilerService(
   async function analyze(input: PromptCompilerAnalyzeInput): Promise<PromptCompilerAnalyzeResult> {
     const harness = await resolveHarnessTemplate(config, input.harnessTemplateId)
     const projectContextProfile = await resolveProjectContextProfile(config, input)
+    const userPrompt = buildAnalyzePrompt(
+      input,
+      harness.harnessTemplate?.templateBody,
+      projectContextProfile.context ?? undefined,
+    )
+    config.privacyGuard.assertAuthorized({
+      action: "llm_analyze",
+      payload: userPrompt,
+      privacyConfirmationSessionId: input.privacyConfirmationSessionId,
+    })
     const output = await runCompilerRequest({
       serviceConfig: config,
       schema: promptCompilerAnalyzeOutputSchema,
       schemaName: "prompt_compiler_analyze",
       jsonSchema: analyzeResponseJsonSchema,
-      userPrompt: buildAnalyzePrompt(
-        input,
-        harness.harnessTemplate?.templateBody,
-        projectContextProfile.context ?? undefined,
-      ),
+      userPrompt,
     })
     const parsed = promptCompilerAnalyzeOutputSchema.safeParse(output)
 
@@ -210,16 +218,22 @@ export function createPromptCompilerService(
   async function compile(input: PromptCompilerCompileInput): Promise<PromptCompilerCompileResult> {
     const harness = await resolveHarnessTemplate(config, input.harnessTemplateId)
     const projectContextProfile = await resolveProjectContextProfile(config, input)
+    const userPrompt = buildCompilePrompt(
+      input,
+      harness.harnessTemplate?.templateBody,
+      projectContextProfile.context ?? undefined,
+    )
+    config.privacyGuard.assertAuthorized({
+      action: "llm_compile",
+      payload: userPrompt,
+      privacyConfirmationSessionId: input.privacyConfirmationSessionId,
+    })
     const output = await runCompilerRequest({
       serviceConfig: config,
       schema: promptCompilerCompileOutputSchema,
       schemaName: "prompt_compiler_compile",
       jsonSchema: compileResponseJsonSchema,
-      userPrompt: buildCompilePrompt(
-        input,
-        harness.harnessTemplate?.templateBody,
-        projectContextProfile.context ?? undefined,
-      ),
+      userPrompt,
     })
     const parsed = promptCompilerCompileOutputSchema.safeParse(output)
 

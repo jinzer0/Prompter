@@ -8,6 +8,7 @@ import type {
   SavePromptToFileInput,
   SavePromptToFileResult,
 } from "./ipc-types.js"
+import type { PrivacyGuardService } from "./privacy/privacy-guard-service.js"
 import { formatPromptExport } from "./prompt-export-formatters.js"
 
 type SaveDialogFilter = {
@@ -30,6 +31,7 @@ export type PromptExportNativeDependencies = {
   readonly writeFile: (filePath: string, content: string) => Promise<void>
   readonly copyText: (text: string) => void
   readonly readText: () => string
+  readonly privacyGuard: PrivacyGuardService
 }
 
 export type PromptExportNativeService = ReturnType<typeof createPromptExportNativeService>
@@ -92,6 +94,11 @@ export function createPromptExportNativeService(dependencies: PromptExportNative
     },
     async savePromptToFile(input: SavePromptToFileInput): Promise<SavePromptToFileResult> {
       const result = exportResultForSave(input)
+      dependencies.privacyGuard.assertAuthorized({
+        action: "prompt_export",
+        payload: result.content,
+        privacyConfirmationSessionId: input.privacyConfirmationSessionId,
+      })
       const dialogResult = await dependencies.showSaveDialog({
         defaultPath: result.filename,
         filters: [{ name: "Markdown", extensions: ["md"] }],
@@ -110,6 +117,11 @@ export function createPromptExportNativeService(dependencies: PromptExportNative
       return { cancelled: false, filePath: dialogResult.filePath }
     },
     async copyText(input: CopyTextInput): Promise<CopyTextResult> {
+      dependencies.privacyGuard.assertAuthorized({
+        action: "clipboard_copy",
+        payload: input.text,
+        privacyConfirmationSessionId: input.privacyConfirmationSessionId,
+      })
       dependencies.copyText(input.text)
       return { copied: true }
     },

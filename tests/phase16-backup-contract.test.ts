@@ -418,6 +418,11 @@ describe("Phase 16 backup contracts", () => {
       "validateBackupFile",
       "importBackup",
       "cancelImportSession",
+      "prepareEncryptedBackup",
+      "savePreparedPlaintextBackup",
+      "savePreparedEncryptedBackup",
+      "validateEncryptedBackupFile",
+      "unlockEncryptedBackup",
     ])
     await bridge.backup.exportFullBackup({})
     await bridge.backup.exportProjectBackup({ projectId })

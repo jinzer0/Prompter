@@ -16,6 +16,8 @@ import {
 } from "../electron/backup/backup-native-service"
 import { openPrompterDatabase } from "../electron/db/connection"
 import { backupEnvelopeSchema } from "../electron/ipc-contract"
+import { createPrivacyGuardService } from "../electron/privacy/privacy-guard-service"
+import { privacySettingsSchema } from "../electron/privacy/privacy-schemas"
 import { createPromptExportNativeService } from "../electron/prompt-export-native"
 
 type TestDatabase = ReturnType<typeof openPrompterDatabase>
@@ -127,6 +129,9 @@ describe("Phase 16 backup export", () => {
       writeFile: async () => undefined,
       copyText: () => undefined,
       readText: () => "",
+      privacyGuard: createPrivacyGuardService({
+        getPrivacySettings: () => privacySettingsSchema.parse({}),
+      }),
     })
 
     try {

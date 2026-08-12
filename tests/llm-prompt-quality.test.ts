@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest"
 
+import { createPrivacyGuardService } from "../electron/privacy/privacy-guard-service.js"
+import { privacySettingsSchema } from "../electron/privacy/privacy-schemas.js"
 import { createPromptQualityService } from "../electron/prompt-quality/prompt-quality-service.js"
 import {
   cleanupTestDatabases,
@@ -34,6 +36,9 @@ function createService(
     getPromptAsset: (id) => database.services.getPromptAsset(id),
     getPromptVersion: (id) => database.services.getPromptVersion(id),
     getOpenAIKeyForMainProcessOnly,
+    privacyGuard: createPrivacyGuardService({
+      getPrivacySettings: () => privacySettingsSchema.parse({}),
+    }),
     reviews: promptQualityReviews(database),
   })
 }
@@ -45,7 +50,7 @@ describe("LLM prompt quality review boundary", () => {
 
     try {
       // When: the explicit LLM review boundary is requested.
-      const result = await database.services.reviewPromptQualityWithLLM()
+      const result = await database.services.reviewPromptQualityWithLLM({ snapshot: draftSnapshot })
 
       // Then: the caller receives a safe recoverable response that preserves local review.
       expect(result).toEqual({
@@ -90,7 +95,7 @@ describe("LLM prompt quality review boundary", () => {
       const service = createService(database, async () => rawAPIKey)
 
       // When: the explicit LLM review boundary is requested.
-      const result = await service.reviewPromptQualityWithLLM()
+      const result = await service.reviewPromptQualityWithLLM({ snapshot: draftSnapshot })
 
       // Then: the placeholder remains recoverable and never exposes the raw key.
       expect(result).toEqual({
@@ -115,7 +120,7 @@ describe("LLM prompt quality review boundary", () => {
       })
 
       // When: the explicit LLM review boundary reads the unavailable key store.
-      const result = await service.reviewPromptQualityWithLLM()
+      const result = await service.reviewPromptQualityWithLLM({ snapshot: draftSnapshot })
 
       // Then: the recoverable result excludes the key-store error detail.
       expect(result).toEqual({

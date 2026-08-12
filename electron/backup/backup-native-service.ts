@@ -33,6 +33,7 @@ export type BackupNativeDependencies = {
 type BackupSaveInput = {
   readonly content: string
   readonly defaultFilename: string
+  readonly format?: "encrypted"
 }
 
 type BackupSaveResult = { readonly cancelled: true } | { readonly cancelled: false }
@@ -66,7 +67,10 @@ export function createBackupNativeService(dependencies: BackupNativeDependencies
     async saveBackup(input: BackupSaveInput): Promise<BackupSaveResult> {
       const dialogResult = await dependencies.showSaveDialog({
         defaultPath: input.defaultFilename,
-        filters: [{ name: "Prompter Backup", extensions: ["json"] }],
+        filters:
+          input.format === "encrypted"
+            ? [{ name: "Prompter Encrypted Backup", extensions: ["enc"] }]
+            : [{ name: "Prompter Backup", extensions: ["json"] }],
       })
       if (dialogResult.canceled) {
         return { cancelled: true }

@@ -79,9 +79,10 @@ All spacing derives from a base of `4px`.
 - Shell columns: `210px` sidebar, fluid prompt library with `320px` minimum, `460px` compiler.
 - Library is the canonical desktop workspace: sidebar, prompt library, and prompt compiler stay as
   the primary three-panel rule.
-- Insights is the intentional workspace exception. It keeps the sidebar visible and lets the
-  dashboard span the library and compiler columns. Hidden Library and Compiler panels stay mounted
-  as a workspace group and restore when the user returns to Library.
+- Insights and Privacy Center are the two intentional workspace exceptions. Each keeps the sidebar
+  visible and spans the library and compiler columns. Hidden Library and Compiler panels stay
+  mounted as one workspace group and restore with their selections and compiler draft when the user
+  returns to Library.
 - App minimum content width: `1040px`; narrower windows intentionally scroll horizontally so all
   required panels remain accessible.
 - Breakpoints follow Tailwind defaults; desktop smoke targets `900x720` and `1280x800`.
@@ -89,8 +90,8 @@ All spacing derives from a base of `4px`.
 ### Rules
 
 - Use CSS variables or Tailwind tokens derived from this scale.
-- Outside the Insights workspace swap, no Library panel can hide at desktop widths. Preserve the
-  visible and accessible three-panel Library structure.
+- Outside the Insights and Privacy Center workspace swaps, no Library panel can hide at desktop
+  widths. Preserve the visible and accessible three-panel Library structure.
 
 ## 5. Components
 
@@ -188,6 +189,30 @@ All spacing derives from a base of `4px`.
   panel rules.
 - **Accessibility**: landmark or labelled region when appropriate.
 
+### Alert Dialog
+
+- **Structure**: native modal `dialog` top layer containing the local `Card` composition.
+- **Variants**: confirmation-required warning only; masked finding details remain visible in the
+  dialog body.
+- **Spacing**: `--space-4` outer inset with standard card header, content, and action cluster gaps.
+- **States**: initial focus lands on the safe cancel action; Escape matches cancel; focus returns to
+  the invoking control after close.
+- **Accessibility**: labelled and described `alertdialog` semantics with `aria-modal="true"`.
+- **Motion**: none.
+
+### Privacy Finding List
+
+- **Structure**: severity-count badges followed by entity groups; each group contains the existing
+  masked finding cards with field, recommendation, and an optional navigation action.
+- **Spacing**: group stacks use `--space-3`; finding cards retain standard card padding and compact
+  metadata gaps from `--space-2`.
+- **States**: idle explains that no scan has run; scanning uses a polite status; ready shows counts,
+  grouped masked findings, warnings, and the false-positive caveat; error offers an explicit retry.
+  A disabled manual scan remains visibly discoverable and explains which privacy setting enables it.
+- **Accessibility**: counts are visible text, groups use semantic headings, scan status is announced,
+  and navigation moves focus to a stable existing manager or detail without activating its actions.
+- **Motion**: none.
+
 ## 6. Motion & Interaction
 
 | Type | Duration | Easing | Usage |
@@ -198,6 +223,9 @@ All spacing derives from a base of `4px`.
 - Animate colors, opacity, and transform only.
 - Respect native keyboard focus; do not remove outlines without replacement.
 - No decorative idle motion in the initial shell.
+- Privacy Center navigation and scans are deliberate button actions. Opening the workspace, loading
+  settings, returning to Library, or following a finding never starts a scan, mutation, review, LLM
+  request, maintenance action, or automatic redaction.
 
 ## 7. Depth & Surface
 

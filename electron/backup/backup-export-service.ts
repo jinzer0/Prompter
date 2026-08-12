@@ -1,7 +1,6 @@
 import type { AppDatabase } from "../db/repositories/common.js"
 import {
   backupEnvelopeSchema,
-  backupExportResultSchema,
   exportFullBackupInputSchema,
   exportHarnessTemplatesPackInputSchema,
   exportProjectBackupInputSchema,
@@ -28,6 +27,13 @@ import {
   selectedProjectExists,
 } from "./backup-export-collectors.js"
 import type { BackupNativeService } from "./backup-native-service.js"
+import {
+  type BackupSecureExportServiceDependencies,
+  createBackupSecureExportService,
+} from "./backup-secure-export-service.js"
+import { prepareEncryptedBackupInputSchema } from "./encrypted-backup-schemas.js"
+
+export { BackupExportPrivacyConfirmationRequiredError } from "./backup-secure-export-service.js"
 
 const defaultFilenames = {
   full: "prompter-library.prompter-backup.json",
@@ -45,7 +51,10 @@ export class BackupExportSelectionError extends Error {
   }
 }
 
-type BackupExportServiceDependencies = {
+type BackupExportServiceDependencies = Pick<
+  BackupSecureExportServiceDependencies,
+  Exclude<keyof BackupSecureExportServiceDependencies, "native" | "plaintextFilenames">
+> & {
   readonly db: AppDatabase
   readonly native: BackupNativeService
 }
@@ -121,29 +130,33 @@ function envelope(
   return backupEnvelopeSchema.parse(draft)
 }
 
-async function saveEnvelope(
-  backup: BackupEnvelope,
-  native: BackupNativeService,
-): Promise<BackupExportResult> {
-  const saved = await native.saveBackup({
-    defaultFilename: defaultFilenames[backup.backupType],
-    content: JSON.stringify(backup, null, 2),
-  })
-  return backupExportResultSchema.parse({
-    cancelled: saved.cancelled,
-    backupType: backup.backupType,
-    itemCounts: backup.metadata.itemCounts,
-    message: saved.cancelled ? "Backup export cancelled" : "Backup exported",
-  })
-}
-
 export function createBackupExportService(dependencies: BackupExportServiceDependencies) {
+  const secure = createBackupSecureExportService({
+    ...dependencies,
+    plaintextFilenames: defaultFilenames,
+  })
+
+  function prepareEncryptedBackup(input: unknown) {
+    const parsed = prepareEncryptedBackupInputSchema.parse(input)
+    const backup =
+      parsed.backupType === "full"
+        ? envelope("full", collectFullBackupData(dependencies.db), dependencies.native)
+        : envelope(
+            "project",
+            collectProjectBackupData(dependencies.db, parsed.projectId),
+            dependencies.native,
+          )
+    if (backup.backupType === "project" && !selectedProjectExists(backup.data)) {
+      throw new BackupExportSelectionError("project")
+    }
+    return secure.prepareEncryptedBackup(backup)
+  }
+
   return {
     async exportFullBackup(input: ExportFullBackupInput): Promise<BackupExportResult> {
       exportFullBackupInputSchema.parse(input)
-      return saveEnvelope(
+      return secure.savePlaintextBackup(
         envelope("full", collectFullBackupData(dependencies.db), dependencies.native),
-        dependencies.native,
       )
     },
     async exportProjectBackup(input: ExportProjectBackupInput): Promise<BackupExportResult> {
@@ -152,7 +165,7 @@ export function createBackupExportService(dependencies: BackupExportServiceDepen
       if (!selectedProjectExists(data)) {
         throw new BackupExportSelectionError("project")
       }
-      return saveEnvelope(envelope("project", data, dependencies.native), dependencies.native)
+      return secure.savePlaintextBackup(envelope("project", data, dependencies.native))
     },
     async exportPromptAssetsBackup(
       input: ExportPromptAssetsBackupInput,
@@ -160,7 +173,7 @@ export function createBackupExportService(dependencies: BackupExportServiceDepen
       const parsed = exportPromptAssetsBackupInputSchema.parse(input)
       const data = collectPromptAssetsBackupData(dependencies.db, parsed.promptAssetIds)
       assertSelectionCount(parsed.promptAssetIds, data.promptAssets.length, "prompt asset")
-      return saveEnvelope(envelope("prompt_assets", data, dependencies.native), dependencies.native)
+      return secure.savePlaintextBackup(envelope("prompt_assets", data, dependencies.native))
     },
     async exportPromptTemplatesPack(
       input: ExportPromptTemplatesPackInput,
@@ -177,10 +190,7 @@ export function createBackupExportService(dependencies: BackupExportServiceDepen
       if (data.promptTemplates.length === 0) {
         throw new BackupExportSelectionError("prompt template")
       }
-      return saveEnvelope(
-        envelope("prompt_templates", data, dependencies.native),
-        dependencies.native,
-      )
+      return secure.savePlaintextBackup(envelope("prompt_templates", data, dependencies.native))
     },
     async exportHarnessTemplatesPack(
       input: ExportHarnessTemplatesPackInput,
@@ -197,10 +207,10 @@ export function createBackupExportService(dependencies: BackupExportServiceDepen
       if (data.harnessTemplates.length === 0) {
         throw new BackupExportSelectionError("harness template")
       }
-      return saveEnvelope(
-        envelope("harness_templates", data, dependencies.native),
-        dependencies.native,
-      )
+      return secure.savePlaintextBackup(envelope("harness_templates", data, dependencies.native))
     },
+    prepareEncryptedBackup,
+    savePreparedEncryptedBackup: secure.savePreparedEncryptedBackup,
+    savePreparedPlaintextBackup: secure.savePreparedPlaintextBackup,
   }
 }

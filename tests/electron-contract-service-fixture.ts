@@ -32,6 +32,10 @@ export function createFailingServices(onServiceCall: () => void) {
     onServiceCall()
     throw new Error("maintenance service should not be called")
   }
+  const privacyFailure = (): never => {
+    onServiceCall()
+    throw new Error("privacy service should not be called")
+  }
 
   return {
     createProject: () => {
@@ -139,6 +143,14 @@ export function createFailingServices(onServiceCall: () => void) {
     listSettings: () => [],
     getDefaults: () => settingsDefaultsFixture,
     updateDefaults: () => settingsDefaultsFixture,
+    getPrivacySettings: privacyFailure,
+    updatePrivacySettings: privacyFailure,
+    privacy: {
+      scanText: privacyFailure,
+      scanDraft: privacyFailure,
+      scanLibrary: privacyFailure,
+      scanExportContent: privacyFailure,
+    },
     ...createUnavailableOpenAIKeyStore(),
     async promptCompilerAnalyze() {
       onServiceCall()
@@ -177,7 +189,12 @@ export function createFailingServices(onServiceCall: () => void) {
     exportPromptAssetsBackup: backupFailure,
     exportPromptTemplatesPack: backupFailure,
     exportHarnessTemplatesPack: backupFailure,
+    prepareEncryptedBackup: backupFailure,
+    savePreparedPlaintextBackup: backupFailure,
+    savePreparedEncryptedBackup: backupFailure,
     validateBackupFile: backupFailure,
+    validateEncryptedBackupFile: backupFailure,
+    unlockEncryptedBackup: backupFailure,
     importBackup: backupFailure,
     cancelImportSession: backupFailure,
     getDashboardSummary: maintenanceFailure,

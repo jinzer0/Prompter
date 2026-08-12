@@ -477,6 +477,7 @@ describe("Electron shell contract", () => {
       "promptTemplates",
       "search",
       "maintenance",
+      "privacy",
       "insights",
       "tags",
       "harnessTemplates",
@@ -597,6 +598,11 @@ describe("Electron shell contract", () => {
       "validateBackupFile",
       "importBackup",
       "cancelImportSession",
+      "prepareEncryptedBackup",
+      "savePreparedPlaintextBackup",
+      "savePreparedEncryptedBackup",
+      "validateEncryptedBackupFile",
+      "unlockEncryptedBackup",
     ])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()
@@ -1726,7 +1732,7 @@ describe("Electron shell contract", () => {
     await expect(bridge.promptQuality.reviewDraft(draftInput)).resolves.toEqual(
       draftPromptQualityReviewResponse,
     )
-    await expect(bridge.promptQuality.reviewWithLLM()).resolves.toEqual(
+    await expect(bridge.promptQuality.reviewWithLLM(promptQualitySnapshot)).resolves.toEqual(
       unavailableLLMReviewResponse,
     )
     await expect(bridge.promptQuality.reviewVersion(versionInput)).resolves.toEqual(
@@ -1757,7 +1763,7 @@ describe("Electron shell contract", () => {
 
     expect(calls).toEqual([
       { channel: "prompter:prompt-quality:review-draft", payload: draftInput },
-      { channel: "prompter:prompt-quality:review-llm", payload: undefined },
+      { channel: "prompter:prompt-quality:review-llm", payload: promptQualitySnapshot },
       { channel: "prompter:prompt-quality:review-version", payload: versionInput },
       {
         channel: "prompter:prompt-quality:save-review",

@@ -7,6 +7,8 @@ import type {
   PromptCompilerCompileOutput,
   SettingsDefaults,
 } from "../electron/ipc-types"
+import { createPrivacyGuardService } from "../electron/privacy/privacy-guard-service"
+import { privacySettingsSchema } from "../electron/privacy/privacy-schemas"
 import {
   createPromptCompilerService,
   type PromptCompilerLLMClient,
@@ -143,6 +145,9 @@ function createFakeService(config: FakeServiceConfig) {
         projectContextProfileResolution(null, [missingProfileWarning])
       )
     },
+    privacyGuard: createPrivacyGuardService({
+      getPrivacySettings: () => privacySettingsSchema.parse({}),
+    }),
   }
   const service = createPromptCompilerService(serviceConfig)
 

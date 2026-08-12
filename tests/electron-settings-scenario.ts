@@ -115,7 +115,11 @@ export async function runSettingsScenario(testInfo: TestInfo): Promise<void> {
     await expect(
       firstRun.page.getByRole("status").filter({ hasText: "Backup imported" }),
     ).toBeVisible()
-
+    expect(await firstRun.page.evaluate(() => window.prompter.appLock.getState())).toMatchObject({
+      enabled: false,
+      locked: false,
+    })
+    await expect(firstRun.page.locator('[data-testid="app-shell"]')).toBeVisible()
     await firstRun.page.getByRole("textbox", { name: "Default model" }).fill("gpt-4.1-mini")
     await firstRun.page
       .getByRole("combobox", { name: "Default target agent" })

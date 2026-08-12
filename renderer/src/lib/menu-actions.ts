@@ -20,7 +20,11 @@ function focusMenuTarget(target: string): void {
   element?.scrollIntoView({ block: "nearest" })
 }
 
-export function handleMenuAction(action: MenuAction): void {
+type MenuActionHandlers = {
+  readonly refreshAppLock?: () => void
+}
+
+export function handleMenuAction(action: MenuAction, handlers: MenuActionHandlers = {}): void {
   switch (action) {
     case "newPrompt":
       clickMenuTarget("new-prompt")
@@ -57,6 +61,9 @@ export function handleMenuAction(action: MenuAction): void {
       return
     case "openLibraryMaintenance":
       focusMenuTarget("settings-maintenance")
+      return
+    case "lockPrompter":
+      handlers.refreshAppLock?.()
       return
     case "closeActivePanel":
       document.activeElement instanceof HTMLElement && document.activeElement.blur()

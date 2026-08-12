@@ -13,6 +13,7 @@ type ApplicationMenuTemplateConfig = {
   readonly isDevelopment: boolean
   readonly isMac: boolean
   readonly sendAction: (action: MenuAction) => void
+  readonly locked?: boolean
 }
 
 const editMenuItems = [
@@ -35,6 +36,7 @@ export function createApplicationMenuTemplate({
   isDevelopment,
   isMac,
   sendAction,
+  locked = false,
 }: ApplicationMenuTemplateConfig): MenuItemConstructorOptions[] {
   const appMenu: MenuItemConstructorOptions[] = isMac
     ? [
@@ -46,6 +48,7 @@ export function createApplicationMenuTemplate({
             {
               label: "Settings...",
               accelerator: "CmdOrCtrl+,",
+              enabled: !locked,
               click: () => sendAction("openSettings"),
             },
             { type: "separator" },
@@ -61,7 +64,11 @@ export function createApplicationMenuTemplate({
 
   const viewSubmenu: MenuItemConstructorOptions[] = []
   if (isDevelopment) {
-    viewSubmenu.push({ role: "reload" }, { role: "toggleDevTools" }, { type: "separator" })
+    viewSubmenu.push(
+      { role: "reload", enabled: !locked },
+      { role: "toggleDevTools", enabled: !locked },
+      { type: "separator" },
+    )
   }
   viewSubmenu.push(...zoomMenuItems)
 
@@ -76,37 +83,51 @@ export function createApplicationMenuTemplate({
       label: "File",
       submenu: [
         {
+          label: "Lock Prompter",
+          accelerator: "CmdOrCtrl+Shift+L",
+          enabled: !locked,
+          click: () => sendAction("lockPrompter"),
+        },
+        { type: "separator" },
+        {
           label: "New Prompt",
           accelerator: "CmdOrCtrl+N",
+          enabled: !locked,
           click: () => sendAction("newPrompt"),
         },
         {
           label: "New Project",
           accelerator: "CmdOrCtrl+Shift+N",
+          enabled: !locked,
           click: () => sendAction("newProject"),
         },
         {
           label: "Quick Capture from Clipboard",
           accelerator: "CmdOrCtrl+Shift+V",
+          enabled: !locked,
           click: () => sendAction("quickCaptureFromClipboard"),
         },
         { type: "separator" },
         {
           label: "Save Prompt",
           accelerator: "CmdOrCtrl+S",
+          enabled: !locked,
           click: () => sendAction("savePrompt"),
         },
         {
           label: "Export Prompt",
+          enabled: !locked,
           click: () => sendAction("exportPrompt"),
         },
         { type: "separator" },
         {
           label: "Export Full Backup...",
+          enabled: !locked,
           click: () => sendAction("exportFullBackup"),
         },
         {
           label: "Import Backup...",
+          enabled: !locked,
           click: () => sendAction("importBackup"),
         },
         { type: "separator" },
@@ -116,16 +137,18 @@ export function createApplicationMenuTemplate({
     {
       label: "Edit",
       submenu: [
-        ...editMenuItems,
+        ...editMenuItems.map((item) => ({ ...item, enabled: !locked })),
         { type: "separator" },
         {
           label: "Search",
           accelerator: "CmdOrCtrl+F",
+          enabled: !locked,
           click: () => sendAction("focusSearch"),
         },
         {
           label: "Copy Compiled Prompt",
           accelerator: "CmdOrCtrl+Shift+C",
+          enabled: !locked,
           click: () => sendAction("copyCompiledPrompt"),
         },
         {
@@ -141,10 +164,12 @@ export function createApplicationMenuTemplate({
       submenu: [
         {
           label: "Library Insights",
+          enabled: !locked,
           click: () => sendAction("openLibraryInsights"),
         },
         {
           label: "Library Maintenance",
+          enabled: !locked,
           click: () => sendAction("openLibraryMaintenance"),
         },
       ],

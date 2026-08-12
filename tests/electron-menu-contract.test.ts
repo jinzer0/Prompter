@@ -21,6 +21,17 @@ function findMenuItem(items: readonly MenuItem[], label: string): MenuItem {
   throw new TypeError(`Menu item not found: ${label}`)
 }
 
+function findMenuRole(items: readonly MenuItem[], role: string): MenuItem {
+  for (const item of items) {
+    if (item.role === role) return item
+    if (Array.isArray(item.submenu)) {
+      const nested = item.submenu.find((entry) => entry.role === role)
+      if (nested !== undefined) return nested
+    }
+  }
+  throw new TypeError(`Menu role not found: ${role}`)
+}
+
 function clickMenuItem(item: MenuItem): void {
   if (item.click === undefined) throw new TypeError(`Menu item has no click: ${item.label}`)
   Reflect.apply(item.click, undefined, [])
@@ -54,5 +65,35 @@ describe("Electron menu contract", () => {
     expect(actions).toEqual(["openLibraryInsights"])
     expect(rendererSource).toContain('case "openLibraryInsights"')
     expect(rendererSource).toContain('clickMenuTarget("library-insights")')
+  })
+
+  it("uses the existing menu channel for focused lock and disables sensitive actions while locked", () => {
+    // Given: menu templates for an unlocked and locked Prompter window.
+    const actions: string[] = []
+    const unlocked = createApplicationMenuTemplate({
+      isDevelopment: true,
+      isMac: true,
+      sendAction: (action) => actions.push(action),
+    })
+    const locked = createApplicationMenuTemplate({
+      isDevelopment: true,
+      isMac: true,
+      locked: true,
+      sendAction: (action) => actions.push(action),
+    })
+
+    // When: the focused lock menu item is invoked.
+    const lockItem = findMenuItem(unlocked, "Lock Prompter")
+    clickMenuItem(lockItem)
+
+    // Then: it sends only the existing typed event and sensitive menu entries are unavailable.
+    expect(lockItem.accelerator).toBe("CmdOrCtrl+Shift+L")
+    expect(actions).toEqual(["lockPrompter"])
+    expect(findMenuItem(locked, "Save Prompt").enabled).toBe(false)
+    expect(findMenuItem(locked, "Copy Compiled Prompt").enabled).toBe(false)
+    expect(findMenuItem(locked, "Export Full Backup...").enabled).toBe(false)
+    expect(findMenuItem(locked, "Settings...").enabled).toBe(false)
+    expect(findMenuRole(locked, "reload").enabled).toBe(false)
+    expect(findMenuRole(locked, "toggleDevTools").enabled).toBe(false)
   })
 })

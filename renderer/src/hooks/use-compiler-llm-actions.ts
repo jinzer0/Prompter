@@ -1,11 +1,21 @@
-import { useCallback, useState } from "react"
+import { useCallback, useRef, useState } from "react"
 
-import type { Project, PromptCompilerAnalyzeOutput } from "../../../electron/ipc-types"
+import type {
+  Project,
+  PromptCompilerAnalyzeInput,
+  PromptCompilerAnalyzeOutput,
+  PromptCompilerCompileInput,
+} from "../../../electron/ipc-types"
 import {
   COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE,
   type CompilerProjectBinding,
   compilerProjectActionIsAllowed,
 } from "../lib/compiler-project-binding"
+import {
+  compilerResponseNeedsConfirmation,
+  confirmedAnalyzeRequest,
+  confirmedCompileRequest,
+} from "../lib/prompt-compiler/compiler-privacy-confirmation"
 import {
   analyzeInput,
   type ClarificationAnswersById,
@@ -18,6 +28,9 @@ import {
   resolveRevisionedResponse,
 } from "../lib/prompt-compiler/output-revision"
 import type { CompiledPromptResult, PromptCompilerInput } from "../lib/prompt-compiler/types"
+import { usePrivacyWarning } from "./use-privacy-warning"
+
+export { confirmedAnalyzeRequest, confirmedCompileRequest }
 
 type UseCompilerLlmActionsConfig = {
   readonly binding: CompilerProjectBinding
@@ -40,35 +53,59 @@ export function useCompilerLlmActions({
   const [answers, setAnswers] = useState<ClarificationAnswersById>({})
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isCompilingLLM, setIsCompilingLLM] = useState(false)
+  const privacyWarning = usePrivacyWarning()
+  const bindingRef = useRef({ binding, projectId: selectedProject?.id ?? null })
+  bindingRef.current = { binding, projectId: selectedProject?.id ?? null }
 
   const clearDerivedState = useCallback((): void => {
     setAnalysis(null)
     setAnswers({})
   }, [])
 
-  async function analyzeWithLLM(): Promise<void> {
-    if (!compilerProjectActionIsAllowed(binding, selectedProject?.id ?? null, "analyze")) {
+  function retryIsAllowed(requestedRevision: number, action: "analyze" | "compile_llm"): boolean {
+    const currentBinding = bindingRef.current
+    if (!compilerProjectActionIsAllowed(currentBinding.binding, currentBinding.projectId, action)) {
       setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
-      return
+      return false
     }
-
-    if (draft.originalInput.trim().length === 0) {
-      setMessage("Original request is required")
-      return
+    if (!outputRevisionGate.isCurrent(requestedRevision)) {
+      setMessage("Draft changed; privacy-confirmed request was not sent.")
+      return false
     }
+    return true
+  }
 
-    const requestedRevision = outputRevisionGate.current()
+  async function performAnalyze(
+    request: PromptCompilerAnalyzeInput,
+    requestedRevision: number,
+    acceptsConfirmation: boolean,
+  ): Promise<void> {
+    if (!retryIsAllowed(requestedRevision, "analyze")) return
     setIsAnalyzing(true)
     setMessage(null)
 
     try {
       const result = await resolveRevisionedResponse(
-        window.prompter.promptCompiler.analyze(analyzeInput(draft, selectedProject)),
+        window.prompter.promptCompiler.analyze(request),
         requestedRevision,
         outputRevisionGate,
       )
 
-      if (result === null) {
+      if (result === null) return
+      if (compilerResponseNeedsConfirmation(result)) {
+        if (!acceptsConfirmation) {
+          setMessage("Privacy confirmation could not authorize prompt analysis.")
+          return
+        }
+        privacyWarning.open({
+          scanResult: result.scanResult,
+          retry: () =>
+            performAnalyze(
+              confirmedAnalyzeRequest(request, result.privacyConfirmationSessionId),
+              requestedRevision,
+              false,
+            ),
+        })
         return
       }
       if (!result.ok) {
@@ -99,38 +136,37 @@ export function useCompilerLlmActions({
     }
   }
 
-  async function compileWithLLM(): Promise<void> {
-    if (!compilerProjectActionIsAllowed(binding, selectedProject?.id ?? null, "compile_llm")) {
-      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
-      return
-    }
-
-    if (draft.originalInput.trim().length === 0) {
-      setMessage("Original request is required")
-      return
-    }
-
-    const missingQuestion = missingRequiredQuestion(analysis, answers)
-
-    if (missingQuestion !== null) {
-      setMessage(`Answer required: ${missingQuestion.question}`)
-      return
-    }
-
-    const requestedRevision = outputRevisionGate.current()
+  async function performCompile(
+    request: PromptCompilerCompileInput,
+    requestedRevision: number,
+    acceptsConfirmation: boolean,
+  ): Promise<void> {
+    if (!retryIsAllowed(requestedRevision, "compile_llm")) return
     setIsCompilingLLM(true)
     setMessage(null)
 
     try {
       const result = await resolveRevisionedResponse(
-        window.prompter.promptCompiler.compile(
-          compileInput(draft, selectedProject, analysis, answers),
-        ),
+        window.prompter.promptCompiler.compile(request),
         requestedRevision,
         outputRevisionGate,
       )
 
-      if (result === null) {
+      if (result === null) return
+      if (compilerResponseNeedsConfirmation(result)) {
+        if (!acceptsConfirmation) {
+          setMessage("Privacy confirmation could not authorize prompt compilation.")
+          return
+        }
+        privacyWarning.open({
+          scanResult: result.scanResult,
+          retry: () =>
+            performCompile(
+              confirmedCompileRequest(request, result.privacyConfirmationSessionId),
+              requestedRevision,
+              false,
+            ),
+        })
         return
       }
       if (!result.ok) {
@@ -138,7 +174,7 @@ export function useCompilerLlmActions({
         return
       }
 
-      onCompiled(compiledFromLLM(result.value, draft.originalInput))
+      onCompiled(compiledFromLLM(result.value, request.originalInput))
       setMessage("LLM compiled prompt is ready to review.")
     } catch (error) {
       if (!(error instanceof Error)) {
@@ -150,6 +186,39 @@ export function useCompilerLlmActions({
     } finally {
       setIsCompilingLLM(false)
     }
+  }
+
+  async function analyzeWithLLM(): Promise<void> {
+    if (!compilerProjectActionIsAllowed(binding, selectedProject?.id ?? null, "analyze")) {
+      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
+      return
+    }
+    if (draft.originalInput.trim().length === 0) {
+      setMessage("Original request is required")
+      return
+    }
+    await performAnalyze(analyzeInput(draft, selectedProject), outputRevisionGate.current(), true)
+  }
+
+  async function compileWithLLM(): Promise<void> {
+    if (!compilerProjectActionIsAllowed(binding, selectedProject?.id ?? null, "compile_llm")) {
+      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
+      return
+    }
+    if (draft.originalInput.trim().length === 0) {
+      setMessage("Original request is required")
+      return
+    }
+    const missingQuestion = missingRequiredQuestion(analysis, answers)
+    if (missingQuestion !== null) {
+      setMessage(`Answer required: ${missingQuestion.question}`)
+      return
+    }
+    await performCompile(
+      compileInput(draft, selectedProject, analysis, answers),
+      outputRevisionGate.current(),
+      true,
+    )
   }
 
   function setAnswer(questionId: string, answer: string): void {
@@ -164,6 +233,7 @@ export function useCompilerLlmActions({
     compileWithLLM,
     isAnalyzing,
     isCompilingLLM,
+    privacyWarning,
     setAnswer,
   }
 }

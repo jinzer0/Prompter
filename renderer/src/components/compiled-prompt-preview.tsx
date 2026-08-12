@@ -19,6 +19,7 @@ export function CompiledPromptPreview({
         compiled_prompt preview
       </h3>
       <Textarea
+        data-privacy-field="compiledPrompt"
         readOnly={!canEditOutput}
         aria-describedby={canEditOutput ? undefined : guardDescriptionId}
         aria-label="Generated prompt preview"

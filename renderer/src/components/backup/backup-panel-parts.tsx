@@ -1,10 +1,6 @@
 import { useId } from "react"
-import type {
-  BackupImportResult,
-  BackupItemCounts,
-  BackupValidationPreview,
-  Project,
-} from "../../../../electron/ipc-types"
+import type { BackupImportResult, BackupItemCounts, Project } from "../../../../electron/ipc-types"
+import { assertNever, type BackupValidationView } from "../../hooks/backup-state"
 import { Button } from "../ui/button"
 import { Select } from "../ui/select"
 
@@ -22,7 +18,7 @@ const countLabels = {
 
 const countKeys = Object.keys(countLabels) as readonly (keyof BackupItemCounts)[]
 
-export function backupTypeLabel(type: BackupValidationPreview["backupType"]): string {
+export function backupTypeLabel(type: BackupValidationView["backupType"]): string {
   switch (type) {
     case "full":
       return "Full library backup"
@@ -34,6 +30,8 @@ export function backupTypeLabel(type: BackupValidationPreview["backupType"]): st
       return "Prompt template pack"
     case "harness_templates":
       return "Harness template pack"
+    default:
+      return assertNever(type)
   }
 }
 
@@ -50,7 +48,7 @@ export function CountGrid({ counts }: { readonly counts: BackupItemCounts }) {
   )
 }
 
-export function BackupLedger({ preview }: { readonly preview: BackupValidationPreview }) {
+export function BackupLedger({ preview }: { readonly preview: BackupValidationView }) {
   return (
     <div className="space-y-2">
       <p className="text-[12px] font-medium text-muted-strong">Import preview ledger</p>

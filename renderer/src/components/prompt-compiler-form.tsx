@@ -31,6 +31,7 @@ export function PromptCompilerForm({
         onChange={(event) => onChange({ ...draft, title: event.currentTarget.value })}
       />
       <Textarea
+        data-privacy-field="originalInput"
         aria-label="Original request"
         placeholder="Original request"
         ref={originalRequestRef}
@@ -66,36 +67,42 @@ export function PromptCompilerForm({
         </Select>
       </div>
       <Textarea
+        data-privacy-field="projectContext"
         aria-label="Project context"
         placeholder="Project context"
         value={draft.projectContext ?? ""}
         onChange={(event) => onChange({ ...draft, projectContext: event.currentTarget.value })}
       />
       <Input
+        data-privacy-field="techStack"
         aria-label="Compiler stack"
         placeholder="Tech stack"
         value={draft.techStack ?? ""}
         onChange={(event) => onChange({ ...draft, techStack: event.currentTarget.value })}
       />
       <Textarea
+        data-privacy-field="constraints"
         aria-label="Constraints"
         placeholder="Constraints"
         value={draft.constraints ?? ""}
         onChange={(event) => onChange({ ...draft, constraints: event.currentTarget.value })}
       />
       <Textarea
+        data-privacy-field="acceptanceCriteria"
         aria-label="Acceptance criteria"
         placeholder="Acceptance criteria"
         value={draft.acceptanceCriteria ?? ""}
         onChange={(event) => onChange({ ...draft, acceptanceCriteria: event.currentTarget.value })}
       />
       <Textarea
+        data-privacy-field="validationCommands"
         aria-label="Validation commands"
         placeholder="Validation commands"
         value={draft.validationCommands ?? ""}
         onChange={(event) => onChange({ ...draft, validationCommands: event.currentTarget.value })}
       />
       <Textarea
+        data-privacy-field="additionalNotes"
         aria-label="Additional notes"
         placeholder="Additional notes"
         value={draft.additionalNotes ?? ""}

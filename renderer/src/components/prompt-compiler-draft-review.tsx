@@ -6,6 +6,7 @@ import {
   type DraftPromptQualityReviewStatus,
   draftPromptQualityReviewStatus,
 } from "../lib/prompt-quality-draft-review"
+import { PrivacyWarningDialog } from "./privacy/privacy-warning-dialog"
 import { PromptQualityLLMReviewAffordance } from "./quality/prompt-quality-llm-review-affordance"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
@@ -200,6 +201,12 @@ export function PromptCompilerDraftReview({
             )}
           </div>
         )}
+        <PrivacyWarningDialog
+          confirmLabel="Send to OpenAI"
+          onCancel={quality.privacyWarning.cancel}
+          onConfirm={quality.privacyWarning.confirm}
+          state={quality.privacyWarning.state}
+        />
       </CardContent>
     </Card>
   )

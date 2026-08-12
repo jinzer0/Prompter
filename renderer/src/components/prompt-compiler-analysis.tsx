@@ -89,6 +89,7 @@ export function PromptCompilerAnalysis({
                   <InlineList label="options" items={question.options} />
                 )}
                 <Textarea
+                  data-privacy-field={`clarificationAnswer:${question.id}`}
                   aria-label={`Answer for ${question.id}`}
                   className="min-h-24"
                   value={answers[question.id] ?? ""}

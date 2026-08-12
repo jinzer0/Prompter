@@ -11,6 +11,7 @@ import type {
 export const BACKUP_IMPORT_SESSION_TTL_MS = 15 * 60 * 1_000
 
 type ImportSessionStatus = "ready" | "cancelled" | "consumed" | "expired"
+type TerminalImportSessionStatus = Exclude<ImportSessionStatus, "ready">
 
 export type BackupResolutionPlan = {
   readonly itemCounts: BackupItemCounts
@@ -67,31 +68,41 @@ export class BackupImportSessionStateError extends Error {
 }
 
 export function createBackupImportSessionStore(dependencies: BackupImportSessionStoreDependencies) {
-  const sessions = new Map<string, BackupImportSession>()
+  const readySessions = new Map<string, BackupImportSession>()
+  const terminalStatuses = new Map<string, TerminalImportSessionStatus>()
 
   function cleanupExpiredSessions(): void {
     const now = dependencies.now()
-    for (const session of sessions.values()) {
-      if (session.status === "ready" && session.expiresAt <= now) {
-        session.status = "expired"
+    for (const session of readySessions.values()) {
+      if (session.expiresAt <= now) {
+        terminalizeImportSession(session.id, "expired")
       }
     }
   }
 
-  function requireReadyImportSession(importSessionId: string): BackupImportSession {
-    cleanupExpiredSessions()
-    const session = sessions.get(importSessionId)
-    if (session === undefined) {
-      throw new BackupImportSessionNotFoundError(importSessionId)
+  function terminalizeImportSession(
+    importSessionId: string,
+    status: TerminalImportSessionStatus,
+  ): void {
+    const session = readySessions.get(importSessionId)
+    if (session !== undefined) {
+      session.status = status
     }
-    if (session.status !== "ready") {
-      throw new BackupImportSessionStateError(importSessionId, session.status)
-    }
-    return session
+    readySessions.delete(importSessionId)
+    terminalStatuses.set(importSessionId, status)
   }
 
-  function consumeImportSession(importSessionId: string): void {
-    requireReadyImportSession(importSessionId).status = "consumed"
+  function requireReadyImportSession(importSessionId: string): BackupImportSession {
+    cleanupExpiredSessions()
+    const session = readySessions.get(importSessionId)
+    if (session !== undefined) {
+      return session
+    }
+    const status = terminalStatuses.get(importSessionId)
+    if (status === undefined) {
+      throw new BackupImportSessionNotFoundError(importSessionId)
+    }
+    throw new BackupImportSessionStateError(importSessionId, status)
   }
 
   return {
@@ -119,18 +130,24 @@ export function createBackupImportSessionStore(dependencies: BackupImportSession
         preview,
         status: "ready" as const,
       }
-      sessions.set(id, session)
+      readySessions.set(id, session)
       return session
     },
     getImportSession(importSessionId: string): BackupImportSession | null {
-      return sessions.get(importSessionId) ?? null
+      cleanupExpiredSessions()
+      return readySessions.get(importSessionId) ?? null
     },
     requireReadyImportSession,
     cancelImportSession(importSessionId: string): void {
-      requireReadyImportSession(importSessionId).status = "cancelled"
+      requireReadyImportSession(importSessionId)
+      terminalizeImportSession(importSessionId, "cancelled")
     },
-    consumeImportSessionAfterSuccess: consumeImportSession,
-    consumeImportSessionAfterFailure: consumeImportSession,
+    consumeImportSessionAfterSuccess(importSessionId: string): void {
+      terminalizeImportSession(importSessionId, "consumed")
+    },
+    consumeImportSessionAfterFailure(importSessionId: string): void {
+      terminalizeImportSession(importSessionId, "consumed")
+    },
   }
 }
 

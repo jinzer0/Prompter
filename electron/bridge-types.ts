@@ -1,5 +1,4 @@
 import type { z } from "zod"
-
 import type {
   cancelMaintenanceActionSessionInputSchema,
   executeMaintenanceActionInputSchema,
@@ -9,6 +8,12 @@ import type {
   preparedMaintenanceActionSchema,
   prepareMaintenanceActionInputSchema,
 } from "./ipc-contract.js"
+import type {
+  EncryptedBackupImportBridge as EncryptedBackupImportContractBridge,
+  PreparedBackupBridge as PreparedBackupContractBridge,
+  PreparedEncryptedBackupBridge as PreparedEncryptedBackupContractBridge,
+  PrivacyBridge as PrivacyContractBridge,
+} from "./ipc-types.js"
 
 export type { ElectronBridge } from "./ipc-types.js"
 
@@ -26,3 +31,8 @@ export type MaintenanceBridge = {
     input: z.input<typeof cancelMaintenanceActionSessionInputSchema>,
   ) => Promise<void>
 }
+
+export type PrivacyBridge = PrivacyContractBridge
+export type PreparedEncryptedBackupBridge = PreparedEncryptedBackupContractBridge
+export type PreparedBackupBridge = PreparedBackupContractBridge
+export type EncryptedBackupImportBridge = EncryptedBackupImportContractBridge

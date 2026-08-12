@@ -308,9 +308,21 @@ export const PERSISTENCE_CHANNELS = {
   getMaintenanceSnapshot: "prompter:insights:get-maintenance-snapshot",
 } as const
 
+export const APP_LOCK_CHANNELS = {
+  getState: "prompter:app-lock:get-state",
+  setup: "prompter:app-lock:setup",
+  unlock: "prompter:app-lock:unlock",
+  lock: "prompter:app-lock:lock",
+  disable: "prompter:app-lock:disable",
+  changePassphrase: "prompter:app-lock:change-passphrase",
+  getSettings: "prompter:app-lock:get-settings",
+  updateSettings: "prompter:app-lock:update-settings",
+} as const
+
 export type PingResponse = typeof PING_RESPONSE
 export type PersistenceChannel = (typeof PERSISTENCE_CHANNELS)[keyof typeof PERSISTENCE_CHANNELS]
-export type IpcChannel = typeof PING_CHANNEL | PersistenceChannel
+export type AppLockChannel = (typeof APP_LOCK_CHANNELS)[keyof typeof APP_LOCK_CHANNELS]
+export type IpcChannel = typeof PING_CHANNEL | PersistenceChannel | AppLockChannel
 
 const idSchema = z.string().uuid()
 const keySchema = z.string().trim().min(1)
@@ -413,7 +425,11 @@ const clarificationPolicyValueSchema = z.union([
 
 export function settingKeyIsPublic(key: string): boolean {
   const normalizedKey = key.toLowerCase().replace(/[^a-z0-9]/g, "")
-  return !normalizedKey.includes("openai") && !normalizedKey.includes("apikey")
+  return (
+    !normalizedKey.includes("openai") &&
+    !normalizedKey.includes("apikey") &&
+    !normalizedKey.startsWith("applock")
+  )
 }
 
 export const projectSchema = z.object({
@@ -1248,6 +1264,62 @@ export const settingSchema = z.object({
   value: z.string(),
   updatedAt: timestampSchema,
 })
+const appLockPassphraseSchema = z
+  .string()
+  .min(8)
+  .max(1_024)
+  .refine((value) => value.trim().length > 0, "Passphrase must not be blank")
+export const appLockStateSchema = z
+  .object({
+    enabled: z.boolean(),
+    locked: z.boolean(),
+    lockOnStart: z.boolean(),
+    timeoutMinutes: z.number().int().min(1).max(240),
+    lastUnlockedAt: timestampSchema.nullable(),
+  })
+  .strict()
+export const appLockSettingsSchema = z
+  .object({
+    enabled: z.boolean(),
+    lockOnStart: z.boolean(),
+    timeoutMinutes: z.number().int().min(1).max(240),
+    requireForExport: z.boolean(),
+    requireForBackup: z.boolean(),
+    requireForLlm: z.boolean(),
+  })
+  .strict()
+export const setupAppLockInputSchema = z
+  .object({
+    passphrase: appLockPassphraseSchema,
+    confirmation: appLockPassphraseSchema,
+    lockOnStart: z.boolean().optional().default(false),
+    timeoutMinutes: z.number().int().min(1).max(240).optional().default(15),
+    requireForExport: z.boolean().optional().default(true),
+    requireForBackup: z.boolean().optional().default(true),
+    requireForLlm: z.boolean().optional().default(true),
+  })
+  .strict()
+  .refine((input) => input.passphrase === input.confirmation, {
+    path: ["confirmation"],
+    message: "Passphrase confirmation must match",
+  })
+export const unlockAppInputSchema = z.object({ passphrase: appLockPassphraseSchema }).strict()
+export const disableAppLockInputSchema = z.object({ passphrase: appLockPassphraseSchema }).strict()
+export const changeAppLockPassphraseInputSchema = z
+  .object({
+    currentPassphrase: appLockPassphraseSchema,
+    newPassphrase: appLockPassphraseSchema,
+    confirmation: appLockPassphraseSchema,
+  })
+  .strict()
+  .refine((input) => input.newPassphrase === input.confirmation, {
+    path: ["confirmation"],
+    message: "Passphrase confirmation must match",
+  })
+export const updateAppLockSettingsInputSchema = appLockSettingsSchema
+  .omit({ enabled: true })
+  .partial()
+  .strict()
 export const settingsDefaultsSchema = z.object({
   defaultModel: z.string().trim().min(1),
   defaultTargetAgent: targetAgentSchema,
@@ -2126,6 +2198,14 @@ export const payloadSchemas = {
   getTemplateInsights: insightsFilterInputSchema,
   getProjectContextInsights: insightsFilterInputSchema,
   getMaintenanceSnapshot: insightsFilterInputSchema,
+  appLockGetState: noPayloadSchema,
+  appLockSetup: setupAppLockInputSchema,
+  appLockUnlock: unlockAppInputSchema,
+  appLockLock: noPayloadSchema,
+  appLockDisable: disableAppLockInputSchema,
+  appLockChangePassphrase: changeAppLockPassphraseInputSchema,
+  appLockGetSettings: noPayloadSchema,
+  appLockUpdateSettings: updateAppLockSettingsInputSchema,
 } as const
 
 export const responseSchemas = {
@@ -2239,6 +2319,14 @@ export const responseSchemas = {
   getTemplateInsights: templateInsightsSchema,
   getProjectContextInsights: projectContextInsightsSchema,
   getMaintenanceSnapshot: maintenanceSnapshotSchema,
+  appLockGetState: appLockStateSchema,
+  appLockSetup: appLockStateSchema,
+  appLockUnlock: z.boolean(),
+  appLockLock: appLockStateSchema,
+  appLockDisable: z.boolean(),
+  appLockChangePassphrase: z.boolean(),
+  appLockGetSettings: appLockSettingsSchema,
+  appLockUpdateSettings: appLockSettingsSchema.nullable(),
 } as const
 
 export type ProjectContextProfile = z.infer<typeof projectContextProfileSchema>

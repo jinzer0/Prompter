@@ -1,6 +1,8 @@
 import { z } from "zod"
 
 import type {
+  appLockSettingsSchema,
+  appLockStateSchema,
   applyPromptQualityScoreToVersionInputSchema,
   applyPromptQualityScoreToVersionResultSchema,
   backupConflictSchema,
@@ -28,6 +30,7 @@ import type {
   cancelImportSessionInputSchema,
   cancelImportSessionResultSchema,
   cancelMaintenanceActionSessionInputSchema,
+  changeAppLockPassphraseInputSchema,
   clipboardReadTextResultSchema,
   comparePromptVersionsInputSchema,
   comparePromptVersionsResultSchema,
@@ -51,6 +54,7 @@ import type {
   dashboardSummarySchema,
   deletePromptTemplateResultSchema,
   deleteResultSchema,
+  disableAppLockInputSchema,
   duplicatePromptAssetInputSchema,
   duplicatePromptAssetResultSchema,
   encryptedBackupEnvelopeSchema,
@@ -155,6 +159,7 @@ import type {
   sensitiveScanResultSchema,
   settingSchema,
   settingsDefaultsSchema,
+  setupAppLockInputSchema,
   tagInsightsSchema,
   tagLinkSchema,
   tagSchema,
@@ -163,7 +168,9 @@ import type {
   targetAgentDistributionInsightSchema,
   targetAgentDistributionInsightsSchema,
   templateInsightsSchema,
+  unlockAppInputSchema,
   unlockEncryptedBackupInputSchema,
+  updateAppLockSettingsInputSchema,
   updateDefaultsInputSchema,
   updateHarnessTemplateInputSchema,
   updatePrivacySettingsInputSchema,
@@ -193,6 +200,7 @@ export const MENU_ACTIONS = [
   "openSettings",
   "openLibraryInsights",
   "openLibraryMaintenance",
+  "lockPrompter",
   "closeActivePanel",
 ] as const
 
@@ -246,6 +254,13 @@ export type PromptTemplateListResult = z.infer<typeof promptTemplateListResultSc
 export type DeletePromptTemplateResult = z.infer<typeof deletePromptTemplateResultSchema>
 export type Setting = z.infer<typeof settingSchema>
 export type SettingsDefaults = z.infer<typeof settingsDefaultsSchema>
+export type AppLockState = z.infer<typeof appLockStateSchema>
+export type AppLockSettings = z.infer<typeof appLockSettingsSchema>
+export type SetupAppLockInput = z.input<typeof setupAppLockInputSchema>
+export type UnlockAppInput = z.input<typeof unlockAppInputSchema>
+export type DisableAppLockInput = z.input<typeof disableAppLockInputSchema>
+export type ChangeAppLockPassphraseInput = z.input<typeof changeAppLockPassphraseInputSchema>
+export type UpdateAppLockSettingsInput = z.input<typeof updateAppLockSettingsInputSchema>
 export type OpenAIKeyStatus = z.infer<typeof openAIKeyStatusSchema>
 export type ExportFormat = z.infer<typeof exportFormatSchema>
 export type ExportPromptInput = z.output<typeof exportPromptInputSchema>
@@ -683,5 +698,15 @@ export type ElectronBridge = {
     readonly unlockEncryptedBackup: (
       input: UnlockEncryptedBackupInput,
     ) => Promise<EncryptedBackupUnlockValidationResult>
+  }
+  readonly appLock: {
+    readonly getState: () => Promise<AppLockState>
+    readonly setup: (input: SetupAppLockInput) => Promise<AppLockState>
+    readonly unlock: (input: UnlockAppInput) => Promise<boolean>
+    readonly lock: () => Promise<AppLockState>
+    readonly disable: (input: DisableAppLockInput) => Promise<boolean>
+    readonly changePassphrase: (input: ChangeAppLockPassphraseInput) => Promise<boolean>
+    readonly getSettings: () => Promise<AppLockSettings>
+    readonly updateSettings: (input: UpdateAppLockSettingsInput) => Promise<AppLockSettings | null>
   }
 }

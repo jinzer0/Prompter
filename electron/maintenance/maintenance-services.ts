@@ -1,12 +1,16 @@
 import type Database from "better-sqlite3"
 
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import {
   createMaintenanceActionService,
   type MaintenanceActionConfirmationDecision,
   type MaintenanceActionConfirmationRequest,
   type MaintenanceActionService,
 } from "./maintenance-action-service.js"
-import { createMaintenanceActionSessionStore } from "./maintenance-action-session-store.js"
+import {
+  createMaintenanceActionSessionStore,
+  type MaintenanceActionSessionStore,
+} from "./maintenance-action-session-store.js"
 import { createMaintenanceScanService, type MaintenanceScanService } from "./scan-service.js"
 
 export type MaintenanceServices = MaintenanceScanService &
@@ -17,12 +21,14 @@ type MaintenanceServiceDependencies = {
   readonly confirmAction: (
     request: MaintenanceActionConfirmationRequest,
   ) => Promise<MaintenanceActionConfirmationDecision>
+  readonly sessions?: MaintenanceActionSessionStore
+  readonly appLockGuard?: AppLockGuard
 }
 
 export function createMaintenanceServices(
   dependencies: MaintenanceServiceDependencies,
 ): MaintenanceServices {
-  const sessions = createMaintenanceActionSessionStore()
+  const sessions = dependencies.sessions ?? createMaintenanceActionSessionStore()
 
   return {
     ...createMaintenanceScanService(dependencies.sqlite),
@@ -30,6 +36,9 @@ export function createMaintenanceServices(
       sqlite: dependencies.sqlite,
       sessions,
       confirmAction: dependencies.confirmAction,
+      ...(dependencies.appLockGuard === undefined
+        ? {}
+        : { appLockGuard: dependencies.appLockGuard }),
     }),
   }
 }

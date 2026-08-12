@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3"
 
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import {
   cancelMaintenanceActionSessionInputSchema,
   executeMaintenanceActionInputSchema,
@@ -44,6 +45,7 @@ type MaintenanceActionServiceDependencies = {
   readonly confirmAction: (
     request: MaintenanceActionConfirmationRequest,
   ) => Promise<MaintenanceActionConfirmationDecision>
+  readonly appLockGuard?: AppLockGuard
 }
 
 const resultMessageByStatus = {
@@ -142,6 +144,7 @@ export function createMaintenanceActionService(dependencies: MaintenanceActionSe
       })
     },
     async executeAction(input: ExecuteMaintenanceActionInput): Promise<MaintenanceActionResult> {
+      const epoch = dependencies.appLockGuard?.capture()
       const parsedInput = executeMaintenanceActionInputSchema.parse(input)
       let session: MaintenanceActionSession
       try {
@@ -165,11 +168,14 @@ export function createMaintenanceActionService(dependencies: MaintenanceActionSe
           warnings: session.warningLedger,
           consequences: session.consequenceLedger,
         })
+        if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
         if (decision === "cancelled") {
           dependencies.sessions.preserveActionSessionAfterConfirmationCancel(session.id)
           return sessionResult(session, "confirmation_cancelled", 0)
         }
 
+        if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
+        dependencies.sessions.requireReadyActionSession(session.id)
         executeTrustedPlan(repository, session.executionPlan)
         dependencies.sessions.consumeActionSessionAfterSuccess(session.id)
         return sessionResult(session, "succeeded", changedCount(session.executionPlan))

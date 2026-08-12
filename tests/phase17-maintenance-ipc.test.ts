@@ -93,10 +93,9 @@ describe("Phase 17 maintenance IPC wiring", () => {
         Object.entries(PERSISTENCE_CHANNELS).find(([, candidate]) => candidate === channel)?.[0],
     )
 
-    // Then: ipcMain.handle registrations exist for Maintenance and legacy search rebuild.
+    // Then: the central persistence registry owns every Maintenance registration.
     expect(channelKeys).not.toContain(undefined)
-    for (const channelKey of channelKeys) {
-      expect(source).toContain(`ipcMain.handle(PERSISTENCE_CHANNELS.${channelKey}`)
-    }
+    expect(source).toContain("Object.entries(PERSISTENCE_CHANNELS)")
+    expect(source).toContain("ipcMain.handle(channel")
   })
 })

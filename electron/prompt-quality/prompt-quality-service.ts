@@ -1,3 +1,4 @@
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import { PersistenceNotFoundError } from "../db/errors.js"
 import type { PromptQualityReviewRepository } from "../db/repositories/prompt-quality-reviews.js"
 import type {
@@ -20,6 +21,7 @@ export type PromptQualityServiceConfig = {
   readonly getOpenAIKeyForMainProcessOnly: () => Promise<string | null>
   readonly privacyGuard: PrivacyGuardService
   readonly reviews: PromptQualityReviewRepository
+  readonly appLockGuard?: AppLockGuard
 }
 
 export type PromptQualityLLMReviewInput = {
@@ -66,6 +68,7 @@ export function createPromptQualityService(
       return reviewLocalPromptQuality({ snapshot, createdAt: Date.now() })
     },
     async reviewPromptQualityWithLLM(input) {
+      const epoch = config.appLockGuard?.capture()
       if (input === undefined) {
         return {
           ok: false,
@@ -81,21 +84,9 @@ export function createPromptQualityService(
         privacyConfirmationSessionId: input.privacyConfirmationSessionId,
       })
 
+      let apiKey: string | null
       try {
-        const apiKey = await config.getOpenAIKeyForMainProcessOnly()
-
-        return apiKey === null
-          ? {
-              ok: false,
-              code: "missing_openai_key",
-              message:
-                "Add an OpenAI API key in Settings before using LLM prompt review. Local review remains available.",
-            }
-          : {
-              ok: false,
-              code: "llm_review_unavailable",
-              message: "LLM prompt review is not available yet. Use local review instead.",
-            }
+        apiKey = await config.getOpenAIKeyForMainProcessOnly()
       } catch (error) {
         if (!(error instanceof Error)) {
           throw error
@@ -107,6 +98,20 @@ export function createPromptQualityService(
           message: "LLM prompt review is not available yet. Use local review instead.",
         }
       }
+
+      if (epoch !== undefined) config.appLockGuard?.check(epoch)
+      return apiKey === null
+        ? {
+            ok: false,
+            code: "missing_openai_key",
+            message:
+              "Add an OpenAI API key in Settings before using LLM prompt review. Local review remains available.",
+          }
+        : {
+            ok: false,
+            code: "llm_review_unavailable",
+            message: "LLM prompt review is not available yet. Use local review instead.",
+          }
     },
     reviewPromptQualityVersion(promptVersionId) {
       const version = config.getPromptVersion(promptVersionId)

@@ -1,3 +1,4 @@
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import type {
   HarnessTemplate,
   PrivacySettings,
@@ -6,6 +7,7 @@ import type {
   PromptVersion,
   SettingsDefaults,
 } from "../ipc-types.js"
+import type { PrivacyConfirmationSessionStore } from "../privacy/privacy-confirmation-session-store.js"
 import {
   createPrivacyGuardService,
   type PrivacyGuardService,
@@ -35,6 +37,8 @@ type LLMServicesConfig = {
   readonly getPromptVersion: (id: string) => PromptVersion | null
   readonly promptCompilerClientFactory?: PromptCompilerClientFactory
   readonly reviews: PromptQualityReviewRepository
+  readonly privacyConfirmationSessions?: PrivacyConfirmationSessionStore
+  readonly appLockGuard?: AppLockGuard
 }
 
 export type LLMServices = PromptCompilerService &
@@ -45,6 +49,9 @@ export type LLMServices = PromptCompilerService &
 export function createLLMServices(config: LLMServicesConfig): LLMServices {
   const privacyGuard = createPrivacyGuardService({
     getPrivacySettings: config.getPrivacySettings,
+    ...(config.privacyConfirmationSessions === undefined
+      ? {}
+      : { sessions: config.privacyConfirmationSessions }),
   })
   const promptQuality = createPromptQualityService({
     getPromptAsset: config.getPromptAsset,
@@ -52,6 +59,7 @@ export function createLLMServices(config: LLMServicesConfig): LLMServices {
     getOpenAIKeyForMainProcessOnly: config.getOpenAIKeyForMainProcessOnly,
     privacyGuard,
     reviews: config.reviews,
+    ...(config.appLockGuard === undefined ? {} : { appLockGuard: config.appLockGuard }),
   })
   const promptCompilerConfig: PromptCompilerServiceConfig =
     config.promptCompilerClientFactory === undefined
@@ -61,6 +69,7 @@ export function createLLMServices(config: LLMServicesConfig): LLMServices {
           getHarnessTemplate: config.getHarnessTemplate,
           getProjectContextProfileForCompiler: config.getProjectContextProfileForCompiler,
           privacyGuard,
+          ...(config.appLockGuard === undefined ? {} : { appLockGuard: config.appLockGuard }),
         }
       : {
           getDefaults: config.getDefaults,
@@ -69,6 +78,7 @@ export function createLLMServices(config: LLMServicesConfig): LLMServices {
           getProjectContextProfileForCompiler: config.getProjectContextProfileForCompiler,
           createClient: config.promptCompilerClientFactory,
           privacyGuard,
+          ...(config.appLockGuard === undefined ? {} : { appLockGuard: config.appLockGuard }),
         }
 
   return {

@@ -1,4 +1,9 @@
 import {
+  type AppLockEpoch,
+  type AppLockGuard,
+  AppLockOperationInvalidatedError,
+} from "../app-lock/app-lock-guard.js"
+import {
   promptCompilerAnalyzeOutputSchema,
   promptCompilerCompileOutputSchema,
   promptCompilerErrorSchema,
@@ -68,6 +73,7 @@ export type PromptCompilerServiceConfig = {
   }) => ProjectContextCompilerBuildResult | Promise<ProjectContextCompilerBuildResult>
   readonly createClient?: PromptCompilerClientFactory
   readonly privacyGuard: PrivacyGuardService
+  readonly appLockGuard?: AppLockGuard
 }
 
 type PromptCompilerResponseSchema =
@@ -79,6 +85,7 @@ type PromptCompilerRunConfig = {
   readonly schemaName: PromptCompilerSchemaName
   readonly jsonSchema: Record<string, unknown>
   readonly userPrompt: string
+  readonly epoch?: AppLockEpoch
 }
 
 function compilerError(code: PromptCompilerError["code"], message: string): PromptCompilerError {
@@ -129,6 +136,8 @@ async function runCompilerRequest(
 ): Promise<unknown | PromptCompilerError> {
   const apiKey = await loadAPIKey(config.serviceConfig)
 
+  if (config.epoch !== undefined) config.serviceConfig.appLockGuard?.check(config.epoch)
+
   if (typeof apiKey !== "string") {
     return apiKey
   }
@@ -137,6 +146,7 @@ async function runCompilerRequest(
   const defaults = config.serviceConfig.getDefaults()
 
   try {
+    if (config.epoch !== undefined) config.serviceConfig.appLockGuard?.check(config.epoch)
     const rawText = await createClient(apiKey).createStructuredResponse({
       model: defaults.defaultModel,
       systemPrompt: promptCompilerSystemPrompt,
@@ -144,6 +154,7 @@ async function runCompilerRequest(
       schemaName: config.schemaName,
       jsonSchema: config.jsonSchema,
     })
+    if (config.epoch !== undefined) config.serviceConfig.appLockGuard?.check(config.epoch)
     const parsed = parseModelOutput(rawText)
 
     if (parsed === null) {
@@ -161,6 +172,9 @@ async function runCompilerRequest(
           "The model response did not match the prompt compiler schema. Try compiling again.",
         )
   } catch (error) {
+    if (error instanceof AppLockOperationInvalidatedError) {
+      throw error
+    }
     if (!(error instanceof Error)) {
       throw error
     }
@@ -176,8 +190,11 @@ export function createPromptCompilerService(
   config: PromptCompilerServiceConfig,
 ): PromptCompilerService {
   async function analyze(input: PromptCompilerAnalyzeInput): Promise<PromptCompilerAnalyzeResult> {
+    const epoch = config.appLockGuard?.capture()
     const harness = await resolveHarnessTemplate(config, input.harnessTemplateId)
+    if (epoch !== undefined) config.appLockGuard?.check(epoch)
     const projectContextProfile = await resolveProjectContextProfile(config, input)
+    if (epoch !== undefined) config.appLockGuard?.check(epoch)
     const userPrompt = buildAnalyzePrompt(
       input,
       harness.harnessTemplate?.templateBody,
@@ -194,6 +211,7 @@ export function createPromptCompilerService(
       schemaName: "prompt_compiler_analyze",
       jsonSchema: analyzeResponseJsonSchema,
       userPrompt,
+      ...(epoch === undefined ? {} : { epoch }),
     })
     const parsed = promptCompilerAnalyzeOutputSchema.safeParse(output)
 
@@ -216,8 +234,11 @@ export function createPromptCompilerService(
   }
 
   async function compile(input: PromptCompilerCompileInput): Promise<PromptCompilerCompileResult> {
+    const epoch = config.appLockGuard?.capture()
     const harness = await resolveHarnessTemplate(config, input.harnessTemplateId)
+    if (epoch !== undefined) config.appLockGuard?.check(epoch)
     const projectContextProfile = await resolveProjectContextProfile(config, input)
+    if (epoch !== undefined) config.appLockGuard?.check(epoch)
     const userPrompt = buildCompilePrompt(
       input,
       harness.harnessTemplate?.templateBody,
@@ -234,6 +255,7 @@ export function createPromptCompilerService(
       schemaName: "prompt_compiler_compile",
       jsonSchema: compileResponseJsonSchema,
       userPrompt,
+      ...(epoch === undefined ? {} : { epoch }),
     })
     const parsed = promptCompilerCompileOutputSchema.safeParse(output)
 

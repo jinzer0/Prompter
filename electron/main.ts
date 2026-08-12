@@ -1,45 +1,62 @@
-import { createHash, randomUUID } from "node:crypto"
-import { readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { app, BrowserWindow, clipboard, dialog, Menu, safeStorage } from "electron"
+import { pathToFileURL } from "node:url"
+import { app, BrowserWindow, Menu, safeStorage, type WebContents } from "electron"
 
+import { AppLockOperationInvalidatedError } from "./app-lock/app-lock-guard.js"
+import { createAppLockService } from "./app-lock/app-lock-service.js"
+import { createAppLockSessionRevoker } from "./app-lock/app-lock-session-revoker.js"
 import { createApplicationMenuTemplate, MENU_ACTION_CHANNEL } from "./app-menu.js"
 import { createBackupExportService } from "./backup/backup-export-service.js"
+import { createBackupExportSessionStore } from "./backup/backup-export-session-store.js"
 import { createBackupImportService } from "./backup/backup-import-service.js"
-import {
-  type BackupNativeDependencies,
-  createBackupNativeService,
-} from "./backup/backup-native-service.js"
+import { createBackupNativeService } from "./backup/backup-native-service.js"
 import { createBackupImportSessionStore } from "./backup/backup-session-store.js"
 import { createBackupValidationService } from "./backup/backup-validation-service.js"
+import { createEncryptedBackupImportSessionStore } from "./backup/encrypted-backup-import-session-store.js"
 import { openPrompterDatabase, type PrompterDatabase } from "./db/connection.js"
 import { registerIpcHandlers } from "./ipc-handlers.js"
-import type {
-  MaintenanceActionConfirmationDecision,
-  MaintenanceActionConfirmationRequest,
-} from "./maintenance/maintenance-action-service.js"
-import { createMaintenanceServices } from "./maintenance/maintenance-services.js"
-import { createTestPromptCompilerClientFactory } from "./prompt-compiler/test-client.js"
+import { createTrustedIpcSenderAssertion } from "./ipc-trusted-sender.js"
 import {
-  createPromptExportNativeService,
-  type PromptExportNativeDependencies,
-} from "./prompt-export-native.js"
+  backupNativeDependencies,
+  confirmMaintenanceAction,
+  promptExportNativeDependencies,
+} from "./main-native-dependencies.js"
+import { secureMainWindowNavigation } from "./main-window-security.js"
+import { createMaintenanceActionSessionStore } from "./maintenance/maintenance-action-session-store.js"
+import { createMaintenanceServices } from "./maintenance/maintenance-services.js"
+import { createPrivacyConfirmationSessionStore } from "./privacy/privacy-confirmation-session-store.js"
+import { createTestPromptCompilerClientFactory } from "./prompt-compiler/test-client.js"
+import { createPromptExportNativeService } from "./prompt-export-native.js"
+import { canonicalizeRendererUrl } from "./renderer-url.js"
 import { createOpenAIKeyStore } from "./secrets/open-ai-key-store.js"
 import { createWindowOptions } from "./window-options.js"
 
 const electronDirectory = join(app.getAppPath(), "dist-electron")
 const preloadPath = join(electronDirectory, "preload.cjs")
+const productionRendererUrl = canonicalizeRendererUrl(
+  pathToFileURL(join(electronDirectory, "../dist/renderer/index.html")).toString(),
+)
 const {
   PROMPTER_USER_DATA_DIR: prompterUserDataDirectory,
   VITE_DEV_SERVER_URL: rendererDevServerUrl,
 } = process.env
+const rendererUrl =
+  rendererDevServerUrl === undefined || rendererDevServerUrl.length === 0
+    ? productionRendererUrl
+    : canonicalizeRendererUrl(rendererDevServerUrl)
 let database: PrompterDatabase | undefined
 
 if (prompterUserDataDirectory !== undefined && prompterUserDataDirectory.length > 0) {
   app.setPath("userData", prompterUserDataDirectory)
 }
 
-function openMainDatabase(): PrompterDatabase {
+function openMainDatabase(
+  privacyConfirmationSessions: ReturnType<typeof createPrivacyConfirmationSessionStore>,
+  appLockGuard: {
+    readonly capture: () => { readonly revision: number }
+    readonly check: (epoch: { readonly revision: number }) => void
+  },
+): PrompterDatabase {
   const promptCompilerClientFactory = createTestPromptCompilerClientFactory(process.env)
 
   return openPrompterDatabase({
@@ -50,133 +67,148 @@ function openMainDatabase(): PrompterDatabase {
       secretFilePath: join(app.getPath("userData"), "secrets", "open-ai-key.json"),
     }),
     ...(promptCompilerClientFactory === undefined ? {} : { promptCompilerClientFactory }),
+    privacyConfirmationSessions,
+    appLockGuard,
   })
 }
 
-function installApplicationMenu(window: BrowserWindow): void {
+function installApplicationMenu(
+  window: BrowserWindow,
+  appLock: ReturnType<typeof createAppLockService>,
+): void {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate(
       createApplicationMenuTemplate({
-        isDevelopment: rendererDevServerUrl !== undefined && rendererDevServerUrl.length > 0,
+        isDevelopment: rendererUrl !== productionRendererUrl,
         isMac: process.platform === "darwin",
-        sendAction: (action) => window.webContents.send(MENU_ACTION_CHANNEL, action),
+        locked: appLock.getState().locked,
+        sendAction: (action) => {
+          if (action === "lockPrompter") {
+            appLock.lock()
+            installApplicationMenu(window, appLock)
+          }
+          window.webContents.send(MENU_ACTION_CHANNEL, action)
+        },
       }),
     ),
   )
 }
 
-const promptExportNativeDependencies = {
-  showSaveDialog: (options) =>
-    dialog.showSaveDialog({
-      defaultPath: options.defaultPath,
-      filters: options.filters.map((filter) => ({
-        name: filter.name,
-        extensions: [...filter.extensions],
-      })),
-    }),
-  writeFile,
-  copyText: (text) => clipboard.writeText(text),
-  readText: () => clipboard.readText(),
-} satisfies Omit<PromptExportNativeDependencies, "privacyGuard">
-
-const backupNativeDependencies = {
-  showSaveDialog: (options) =>
-    dialog.showSaveDialog({
-      defaultPath: options.defaultPath,
-      filters: options.filters.map((filter) => ({
-        name: filter.name,
-        extensions: [...filter.extensions],
-      })),
-    }),
-  showOpenDialog: () =>
-    dialog.showOpenDialog({
-      properties: ["openFile"],
-      filters: [{ name: "Prompter Backup", extensions: ["json", "enc"] }],
-    }),
-  readFile: (filePath) => readFile(filePath, "utf8"),
-  getFileSize: async (filePath) => (await stat(filePath)).size,
-  writeFile,
-  now: Date.now,
-  createId: randomUUID,
-  hashText: (text) => createHash("sha256").update(text).digest("hex"),
-  getAppVersion: () => app.getVersion(),
-} satisfies BackupNativeDependencies
-
-async function confirmMaintenanceAction(
-  request: MaintenanceActionConfirmationRequest,
-): Promise<MaintenanceActionConfirmationDecision> {
-  const detail = [
-    ...request.affectedDisplayNames,
-    ...request.warnings,
-    ...request.consequences,
-  ].join("\n")
-  const result = await dialog.showMessageBox({
-    type: "warning",
-    title: request.preview.title,
-    message: request.preview.description,
-    detail,
-    buttons: ["Cancel", "Continue"],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true,
-  })
-
-  return result.response === 1 ? "confirmed" : "cancelled"
+function createMainWindow(appLock: ReturnType<typeof createAppLockService>): BrowserWindow {
+  const window = new BrowserWindow(createWindowOptions(preloadPath))
+  installApplicationMenu(window, appLock)
+  secureMainWindowNavigation(window.webContents, rendererUrl)
+  return window
 }
 
-async function createMainWindow(): Promise<void> {
-  const window = new BrowserWindow(createWindowOptions(preloadPath))
-  installApplicationMenu(window)
-
-  if (rendererDevServerUrl === undefined || rendererDevServerUrl.length === 0) {
+async function loadMainWindow(window: BrowserWindow): Promise<void> {
+  if (rendererUrl === productionRendererUrl) {
     await window.loadFile(join(electronDirectory, "../dist/renderer/index.html"))
     return
   }
 
-  await window.loadURL(rendererDevServerUrl)
+  await window.loadURL(rendererUrl)
 }
 
 async function start(): Promise<void> {
   await app.whenReady()
-  const openedDatabase = openMainDatabase()
+  const privacySessions = createPrivacyConfirmationSessionStore()
+  const maintenanceSessions = createMaintenanceActionSessionStore()
+  const backupExportSessions = createBackupExportSessionStore()
+  const encryptedBackupImportSessions = createEncryptedBackupImportSessionStore()
+  let appLock: ReturnType<typeof createAppLockService> | null = null
+  const appLockGuard = {
+    capture: () => {
+      if (appLock === null || appLock.getState().locked) {
+        throw new AppLockOperationInvalidatedError()
+      }
+      return { revision: appLock.getStateRevision() }
+    },
+    check: (epoch: { readonly revision: number }) => {
+      if (
+        appLock === null ||
+        appLock.getState().locked ||
+        appLock.getStateRevision() !== epoch.revision
+      ) {
+        throw new AppLockOperationInvalidatedError()
+      }
+    },
+  }
+  const openedDatabase = openMainDatabase(privacySessions, appLockGuard)
   database = openedDatabase
-  const backupNative = createBackupNativeService(backupNativeDependencies)
+  const backupNative = createBackupNativeService(backupNativeDependencies, appLockGuard)
   const backupSessions = createBackupImportSessionStore({
     now: backupNative.now,
     createId: backupNative.createId,
   })
-  registerIpcHandlers({
-    ...openedDatabase.services,
-    ...createMaintenanceServices({
-      sqlite: openedDatabase.sqlite,
-      confirmAction: confirmMaintenanceAction,
-    }),
-    ...createPromptExportNativeService({
-      ...promptExportNativeDependencies,
-      privacyGuard: openedDatabase.services.privacyGuard,
-    }),
-    ...createBackupExportService({
-      db: openedDatabase.db,
-      native: backupNative,
-      getWarnBeforeBackup: () => openedDatabase.services.getPrivacySettings().warnBeforeBackup,
-    }),
-    ...createBackupValidationService({
-      db: openedDatabase.db,
-      native: backupNative,
-      sessions: backupSessions,
-    }),
-    ...createBackupImportService({
-      db: openedDatabase.db,
-      sqlite: openedDatabase.sqlite,
-      sessions: backupSessions,
-      createId: backupNative.createId,
-    }),
+  const activeAppLock = createAppLockService({
+    metadataStore: openedDatabase.services,
+    revokeSensitiveSessions: createAppLockSessionRevoker({
+      privacyConfirmationSessions: privacySessions,
+      maintenanceActionSessions: maintenanceSessions,
+      backupExportSessions,
+      backupImportSessions: backupSessions,
+      encryptedBackupImportSessions,
+    }).revokeSensitiveSessions,
   })
-  await createMainWindow()
+  appLock = activeAppLock
+  const mainWindow = createMainWindow(activeAppLock)
+  const trustedWebContents: WebContents[] = [mainWindow.webContents]
+  registerIpcHandlers(
+    {
+      ...openedDatabase.services,
+      ...createMaintenanceServices({
+        sqlite: openedDatabase.sqlite,
+        confirmAction: confirmMaintenanceAction,
+        sessions: maintenanceSessions,
+        appLockGuard,
+      }),
+      ...createPromptExportNativeService({
+        ...promptExportNativeDependencies,
+        privacyGuard: openedDatabase.services.privacyGuard,
+        appLockGuard,
+      }),
+      ...createBackupExportService({
+        db: openedDatabase.db,
+        native: backupNative,
+        exportSessions: backupExportSessions,
+        privacyConfirmationSessions: privacySessions,
+        getWarnBeforeBackup: () => openedDatabase.services.getPrivacySettings().warnBeforeBackup,
+        appLockGuard,
+      }),
+      ...createBackupValidationService({
+        db: openedDatabase.db,
+        native: backupNative,
+        sessions: backupSessions,
+        encryptedImportSessions: encryptedBackupImportSessions,
+        appLockGuard,
+      }),
+      ...createBackupImportService({
+        db: openedDatabase.db,
+        sqlite: openedDatabase.sqlite,
+        sessions: backupSessions,
+        createId: backupNative.createId,
+        appLockGuard,
+      }),
+    },
+    activeAppLock,
+    () => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        installApplicationMenu(window, activeAppLock)
+      }
+    },
+    createTrustedIpcSenderAssertion({
+      getTrustedWebContents: () => trustedWebContents,
+      trustedUrl: rendererUrl,
+    }),
+  )
+  await loadMainWindow(mainWindow)
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-      void createMainWindow()
+      const window = createMainWindow(activeAppLock)
+      trustedWebContents.push(window.webContents)
+      void loadMainWindow(window)
     }
   })
 }

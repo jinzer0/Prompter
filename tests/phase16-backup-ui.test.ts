@@ -212,11 +212,15 @@ describe("phase16 backup settings UI contracts", () => {
 
   it("keeps backup import refresh isolated from compiler draft and review state", () => {
     const appSource = readFileSync("renderer/src/app.tsx", "utf8")
-    const refreshStart = appSource.indexOf("async function refreshAfterBackupImport")
-    const refreshEnd = appSource.indexOf("useEffect", refreshStart)
-    const refreshBody = appSource.slice(refreshStart, refreshEnd)
+    const appShellSource = readFileSync("renderer/src/components/shell/app-shell.tsx", "utf8")
+    const refreshStart = appShellSource.indexOf("async function refreshAfterBackupImport")
+    const refreshEnd = appShellSource.indexOf("useEffect", refreshStart)
+    const refreshBody = appShellSource.slice(refreshStart, refreshEnd)
 
     expect(refreshStart).toBeGreaterThan(-1)
+    expect(appSource).toContain(
+      "<AppShell compilerMemory={compilerMemory} onAppLockStateChange={appLock.refresh} />",
+    )
     expect(refreshBody).toContain("reloadProjects({ preserveSelection: true })")
     expect(refreshBody).toContain("reloadAssets({ preserveSelection: true })")
     expect(refreshBody).not.toContain("setDraft")

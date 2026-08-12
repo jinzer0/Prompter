@@ -180,7 +180,7 @@ describe("Phase 18 Insights compiler preservation", () => {
     // Given: the complete owned production path from Insights navigation to compiler selection UI.
     const [navigation, app, panel, contextHook, selection, selector] = await Promise.all([
       readFile("renderer/src/hooks/use-insights-workspace-navigation.ts", "utf8"),
-      readFile("renderer/src/app.tsx", "utf8"),
+      readFile("renderer/src/components/shell/app-shell.tsx", "utf8"),
       readFile("renderer/src/components/prompt-compiler-panel.tsx", "utf8"),
       readFile("renderer/src/hooks/use-compiler-project-context.ts", "utf8"),
       readFile("renderer/src/lib/project-context-profile-selection.ts", "utf8"),

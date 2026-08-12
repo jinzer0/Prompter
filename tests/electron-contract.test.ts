@@ -368,6 +368,7 @@ describe("Electron shell contract", () => {
       "openSettings",
       "openLibraryInsights",
       "openLibraryMaintenance",
+      "lockPrompter",
       "closeActivePanel",
     ])
     expect(menuActionSchema.parse("focusSearch")).toBe("focusSearch")
@@ -407,6 +408,7 @@ describe("Electron shell contract", () => {
     expect(findMenuItem(template, "Settings...").accelerator).toBe("CmdOrCtrl+,")
     expect(findMenuItem(template, "Export Full Backup...").label).toBe("Export Full Backup...")
     expect(findMenuItem(template, "Import Backup...").label).toBe("Import Backup...")
+    expect(findMenuItem(template, "Lock Prompter").accelerator).toBe("CmdOrCtrl+Shift+L")
     expect(findMenuItem(template, "Library Maintenance").accelerator).toBeUndefined()
 
     clickMenuItem(findMenuItem(template, "New Prompt"))
@@ -417,6 +419,7 @@ describe("Electron shell contract", () => {
     clickMenuItem(findMenuItem(template, "Search"))
     clickMenuItem(findMenuItem(template, "Copy Compiled Prompt"))
     clickMenuItem(findMenuItem(template, "Library Maintenance"))
+    clickMenuItem(findMenuItem(template, "Lock Prompter"))
     clickMenuItem(findMenuItem(template, "Close Active Panel"))
 
     expect(actions).toEqual([
@@ -428,6 +431,7 @@ describe("Electron shell contract", () => {
       "focusSearch",
       "copyCompiledPrompt",
       "openLibraryMaintenance",
+      "lockPrompter",
       "closeActivePanel",
     ])
     expect(() => findMenuItem(template, "Toggle Developer Tools")).toThrow()
@@ -488,6 +492,7 @@ describe("Electron shell contract", () => {
       "exports",
       "clipboard",
       "backup",
+      "appLock",
     ])
     expect(Object.keys(bridge)).not.toContain("appEvents")
     expect(Object.keys(bridge)).not.toContain("shortcuts")
@@ -603,6 +608,16 @@ describe("Electron shell contract", () => {
       "savePreparedEncryptedBackup",
       "validateEncryptedBackupFile",
       "unlockEncryptedBackup",
+    ])
+    expect(Object.keys(bridge.appLock)).toEqual([
+      "getState",
+      "setup",
+      "unlock",
+      "lock",
+      "disable",
+      "changePassphrase",
+      "getSettings",
+      "updateSettings",
     ])
     await expect(bridge.projects.list()).resolves.toEqual([])
     await expect(bridge.settings.get("missing")).resolves.toBeNull()

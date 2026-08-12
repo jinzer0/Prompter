@@ -1,6 +1,7 @@
 import type { z } from "zod"
 
 import {
+  APP_LOCK_CHANNELS,
   type IpcChannel,
   PERSISTENCE_CHANNELS,
   PING_CHANNEL,
@@ -674,6 +675,44 @@ export function createElectronBridge(
           ch.unlockEncryptedBackup,
           payload.unlockEncryptedBackup,
           response.unlockEncryptedBackup,
+          input,
+        ),
+    },
+    appLock: {
+      getState: () =>
+        request(
+          APP_LOCK_CHANNELS.getState,
+          payload.appLockGetState,
+          response.appLockGetState,
+          undefined,
+        ),
+      setup: (input) =>
+        request(APP_LOCK_CHANNELS.setup, payload.appLockSetup, response.appLockSetup, input),
+      unlock: (input) =>
+        request(APP_LOCK_CHANNELS.unlock, payload.appLockUnlock, response.appLockUnlock, input),
+      lock: () =>
+        request(APP_LOCK_CHANNELS.lock, payload.appLockLock, response.appLockLock, undefined),
+      disable: (input) =>
+        request(APP_LOCK_CHANNELS.disable, payload.appLockDisable, response.appLockDisable, input),
+      changePassphrase: (input) =>
+        request(
+          APP_LOCK_CHANNELS.changePassphrase,
+          payload.appLockChangePassphrase,
+          response.appLockChangePassphrase,
+          input,
+        ),
+      getSettings: () =>
+        request(
+          APP_LOCK_CHANNELS.getSettings,
+          payload.appLockGetSettings,
+          response.appLockGetSettings,
+          undefined,
+        ),
+      updateSettings: (input) =>
+        request(
+          APP_LOCK_CHANNELS.updateSettings,
+          payload.appLockUpdateSettings,
+          response.appLockUpdateSettings,
           input,
         ),
     },

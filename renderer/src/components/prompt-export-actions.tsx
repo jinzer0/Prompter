@@ -1,7 +1,7 @@
 import { useId, useState } from "react"
 
 import type { ExportFormat } from "../../../electron/ipc-types"
-import { COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE } from "../lib/compiler-project-binding"
+import { usePromptExportDestinations } from "../hooks/use-prompt-export-destinations"
 import {
   type PromptExportBase,
   type PromptExportChoice,
@@ -9,6 +9,7 @@ import {
   promptExportChoiceLabels,
   promptExportOptions,
 } from "../lib/prompt-export"
+import { PrivacyWarningDialog } from "./privacy/privacy-warning-dialog"
 import { Button } from "./ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 import { Select } from "./ui/select"
@@ -42,10 +43,20 @@ export function PromptExportActions({
   const [selectedFormat, setSelectedFormat] = useState<PromptExportChoice>("raw")
   const [message, setMessage] = useState<string | null>(null)
   const [previewContent, setPreviewContent] = useState<string | null>(null)
-  const [isWorking, setIsWorking] = useState(false)
+  const [isPreviewing, setIsPreviewing] = useState(false)
   const formatSelectId = useId()
   const hasContent = rawContent.trim().length > 0
   const selectedLabel = promptExportChoiceLabels[selectedFormat]
+  const destinations = usePromptExportDestinations({
+    canSaveToFile,
+    setMessage,
+    snapshot: {
+      exportBase,
+      format: selectedFormat,
+      label: selectedLabel,
+      rawContent,
+    },
+  })
 
   async function formattedContent(): Promise<string | null> {
     if (!hasContent) {
@@ -71,7 +82,7 @@ export function PromptExportActions({
   }
 
   async function previewExport(): Promise<void> {
-    setIsWorking(true)
+    setIsPreviewing(true)
     setMessage(null)
 
     try {
@@ -83,133 +94,88 @@ export function PromptExportActions({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Export preview could not be prepared.")
     } finally {
-      setIsWorking(false)
+      setIsPreviewing(false)
     }
   }
 
-  async function copyExport(): Promise<void> {
-    setIsWorking(true)
-    setMessage(null)
-
-    try {
-      const content = await formattedContent()
-      if (content !== null) {
-        await window.prompter.clipboard.copyText({ text: content })
-        setMessage(`Copied ${selectedLabel}.`)
-      }
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Export could not be copied.")
-    } finally {
-      setIsWorking(false)
-    }
-  }
-
-  async function saveExport(): Promise<void> {
-    if (!canSaveToFile) {
-      setMessage(COMPILER_PROJECT_REBIND_REQUIRED_MESSAGE)
-      return
-    }
-
-    setIsWorking(true)
-    setMessage(null)
-
-    try {
-      if (!hasContent) {
-        setMessage("No content to export.")
-        return
-      }
-
-      const result = isExportFormat(selectedFormat)
-        ? exportBase === null
-          ? null
-          : await window.prompter.exports.savePromptToFile({
-              ...exportBase,
-              compiledPrompt: rawContent,
-              format: selectedFormat,
-            })
-        : await window.prompter.exports.savePromptToFile({
-            content: rawContent,
-            format: "markdown",
-          })
-
-      if (result === null) {
-        setMessage("No content to export.")
-        return
-      }
-
-      setMessage(result.cancelled ? "Save cancelled." : `Saved ${selectedLabel}.`)
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Export could not be saved.")
-    } finally {
-      setIsWorking(false)
-    }
-  }
+  const destinationIsBusy =
+    isPreviewing || destinations.isWorking || destinations.isConfirmationPending
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>
-          Choose a format, preview it, then copy or save through Prompter.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <label className="grid gap-2" htmlFor={formatSelectId}>
-          <span className="font-mono text-[11px] text-muted">format</span>
-          <Select
-            aria-label={formatLabel}
-            id={formatSelectId}
-            value={selectedFormat}
-            onChange={(event) =>
-              setSelectedFormat(parsePromptExportChoice(event.currentTarget.value))
-            }
-          >
-            {promptExportOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={!hasContent || isWorking}
-            onClick={previewExport}
-          >
-            Preview export
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={!hasContent || isWorking}
-            onClick={copyExport}
-          >
-            {copyButtonLabel}
-          </Button>
-          <Button
-            aria-describedby={canSaveToFile ? undefined : (saveDisabledDescriptionId ?? undefined)}
-            data-menu-action-target="save-compiled-export"
-            type="button"
-            variant="ghost"
-            disabled={!canSaveToFile || !hasContent || isWorking}
-            onClick={saveExport}
-          >
-            {saveButtonLabel}
-          </Button>
-        </div>
-        {message !== null && <p className="text-[12px] text-muted-strong">{message}</p>}
-        {previewContent !== null && (
-          <Textarea
-            readOnly
-            aria-label={`${title} formatted export preview`}
-            className="min-h-32"
-            value={previewContent}
-            variant="preview"
-          />
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>
+            Choose a format, preview it, then copy or save through Prompter.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <label className="grid gap-2" htmlFor={formatSelectId}>
+            <span className="font-mono text-[11px] text-muted">format</span>
+            <Select
+              aria-label={formatLabel}
+              id={formatSelectId}
+              value={selectedFormat}
+              onChange={(event) =>
+                setSelectedFormat(parsePromptExportChoice(event.currentTarget.value))
+              }
+            >
+              {promptExportOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!hasContent || destinationIsBusy}
+              onClick={previewExport}
+            >
+              Preview export
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!hasContent || destinationIsBusy}
+              onClick={destinations.copyExport}
+            >
+              {copyButtonLabel}
+            </Button>
+            <Button
+              aria-describedby={
+                canSaveToFile ? undefined : (saveDisabledDescriptionId ?? undefined)
+              }
+              data-menu-action-target="save-compiled-export"
+              type="button"
+              variant="ghost"
+              disabled={!canSaveToFile || !hasContent || destinationIsBusy}
+              onClick={destinations.saveExport}
+            >
+              {saveButtonLabel}
+            </Button>
+          </div>
+          {message !== null && <p className="text-[12px] text-muted-strong">{message}</p>}
+          {previewContent !== null && (
+            <Textarea
+              readOnly
+              aria-label={`${title} formatted export preview`}
+              className="min-h-32"
+              value={previewContent}
+              variant="preview"
+            />
+          )}
+        </CardContent>
+      </Card>
+      <PrivacyWarningDialog
+        confirmLabel={destinations.confirmationLabel}
+        state={destinations.privacyWarningState}
+        onCancel={destinations.cancelPrivacyWarning}
+        onConfirm={destinations.confirmPrivacyWarning}
+      />
+    </>
   )
 }

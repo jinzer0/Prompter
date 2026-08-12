@@ -8,6 +8,7 @@ import { COMPILER_PROJECT_REBIND_DESCRIPTION_ID } from "../lib/compiler-project-
 import { buildDerivedPromptDraft, duplicatePromptInput } from "../lib/prompt-derivation"
 import { CompilerProjectBindingNotice } from "./compiler-project-binding-notice"
 import { HarnessTemplateSelector } from "./harness-template-selector"
+import { PrivacyWarningDialog } from "./privacy/privacy-warning-dialog"
 import { ProjectContextProfileSelector } from "./project-context-profile-selector"
 import { PromptCompilerActions } from "./prompt-compiler-actions"
 import { PromptCompilerClipboardImportCard } from "./prompt-compiler-clipboard-import-card"
@@ -119,30 +120,34 @@ export function PromptCompilerPanel({
           originalRequestRef={originalRequestRef}
           onChange={compiler.setDraft}
         />
-        <HarnessTemplateSelector
-          error={harnessTemplates.error}
-          scenario={compiler.draft.scenario}
-          selectedTemplateId={compiler.draft.harnessTemplateId ?? null}
-          status={harnessTemplates.status}
-          targetAgent={compiler.draft.targetAgent}
-          templates={availableTemplates}
-          onChange={compiler.setHarnessTemplateId}
-        />
-        <ProjectContextProfileSelector
-          error={projectContext.error}
-          includeProjectContextProfile={projectContext.includeProjectContextProfile}
-          isSelectedProfileUnavailable={projectContext.isSelectedProfileUnavailable}
-          preview={projectContext.preview}
-          previewError={projectContext.previewError}
-          previewStatus={projectContext.previewStatus}
-          profiles={projectContext.profiles}
-          projectName={selectedProject?.name ?? null}
-          selectedProfileId={projectContext.selectedProfileId}
-          status={projectContext.status}
-          onIncludeChange={projectContext.setIncludeProjectContextProfile}
-          onManageProfiles={() => document.getElementById("context-profiles-heading")?.focus()}
-          onSelectProfile={projectContext.selectProfile}
-        />
+        <div data-privacy-field="harnessTemplate" tabIndex={-1}>
+          <HarnessTemplateSelector
+            error={harnessTemplates.error}
+            scenario={compiler.draft.scenario}
+            selectedTemplateId={compiler.draft.harnessTemplateId ?? null}
+            status={harnessTemplates.status}
+            targetAgent={compiler.draft.targetAgent}
+            templates={availableTemplates}
+            onChange={compiler.setHarnessTemplateId}
+          />
+        </div>
+        <div data-privacy-field="projectContextProfile" tabIndex={-1}>
+          <ProjectContextProfileSelector
+            error={projectContext.error}
+            includeProjectContextProfile={projectContext.includeProjectContextProfile}
+            isSelectedProfileUnavailable={projectContext.isSelectedProfileUnavailable}
+            preview={projectContext.preview}
+            previewError={projectContext.previewError}
+            previewStatus={projectContext.previewStatus}
+            profiles={projectContext.profiles}
+            projectName={selectedProject?.name ?? null}
+            selectedProfileId={projectContext.selectedProfileId}
+            status={projectContext.status}
+            onIncludeChange={projectContext.setIncludeProjectContextProfile}
+            onManageProfiles={() => document.getElementById("context-profiles-heading")?.focus()}
+            onSelectProfile={projectContext.selectProfile}
+          />
+        </div>
         {selectedProject !== null && (
           <CompilerProjectBindingNotice
             binding={compiler.projectBinding}
@@ -194,6 +199,7 @@ export function PromptCompilerPanel({
             projectContext.previewStatus === "ready" ? projectContext.preview : null
           }
           promptTemplates={promptTemplates}
+          selectedHarnessTemplate={selectedTemplate}
           selectedProject={selectedProject}
         />
 
@@ -219,6 +225,12 @@ export function PromptCompilerPanel({
           onSetCurrentVersion={setCurrentVersion}
         />
       </div>
+      <PrivacyWarningDialog
+        confirmLabel="Send to OpenAI"
+        onCancel={compiler.privacyWarning.cancel}
+        onConfirm={compiler.privacyWarning.confirm}
+        state={compiler.privacyWarning.state}
+      />
     </Panel>
   )
 }

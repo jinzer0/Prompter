@@ -188,6 +188,14 @@ function createPhase9Services(onServiceCall: () => void) {
     listSettings: () => [],
     getDefaults: () => phase9Defaults,
     updateDefaults: () => phase9Defaults,
+    getPrivacySettings: maintenanceFailure,
+    updatePrivacySettings: maintenanceFailure,
+    privacy: {
+      scanText: maintenanceFailure,
+      scanDraft: maintenanceFailure,
+      scanLibrary: maintenanceFailure,
+      scanExportContent: maintenanceFailure,
+    },
     async saveOpenAIKey() {
       onServiceCall()
       return phase9SecretStatus
@@ -244,7 +252,12 @@ function createPhase9Services(onServiceCall: () => void) {
     exportPromptAssetsBackup: backupFailure,
     exportPromptTemplatesPack: backupFailure,
     exportHarnessTemplatesPack: backupFailure,
+    prepareEncryptedBackup: backupFailure,
+    savePreparedPlaintextBackup: backupFailure,
+    savePreparedEncryptedBackup: backupFailure,
     validateBackupFile: backupFailure,
+    validateEncryptedBackupFile: backupFailure,
+    unlockEncryptedBackup: backupFailure,
     importBackup: backupFailure,
     cancelImportSession: backupFailure,
     getDashboardSummary: maintenanceFailure,

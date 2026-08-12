@@ -1,5 +1,64 @@
 import { z } from "zod"
 
+import {
+  createEncryptedBackupUnlockValidationResultSchema,
+  preparedEncryptedBackupPreviewSchema,
+  prepareEncryptedBackupInputSchema,
+  savePreparedEncryptedBackupInputSchema,
+  savePreparedEncryptedBackupResultSchema,
+  unlockEncryptedBackupInputSchema,
+  validateEncryptedBackupFileInputSchema,
+  validateEncryptedBackupResultSchema,
+} from "./backup/encrypted-backup-schemas.js"
+import {
+  privacyConfirmationRequiredSchema,
+  privacySettingsSchema,
+  scanDraftPrivacyInputSchema,
+  scanExportContentInputSchema,
+  scanLibraryPrivacyInputSchema,
+  scanSensitiveTextInputSchema,
+  sensitiveScanResultSchema,
+  updatePrivacySettingsInputSchema,
+} from "./privacy/privacy-schemas.js"
+
+export {
+  ENCRYPTED_BACKUP_EXTENSION,
+  ENCRYPTED_BACKUP_TYPES,
+  encryptedBackupEnvelopeSchema,
+  encryptedBackupMetadataSchema,
+  encryptedBackupTypeSchema,
+  encryptionMetadataSchema,
+  exportEncryptedBackupInputSchema,
+  preparedEncryptedBackupPreviewSchema,
+  prepareEncryptedBackupInputSchema,
+  savePreparedEncryptedBackupInputSchema,
+  savePreparedEncryptedBackupResultSchema,
+  unlockEncryptedBackupInputSchema,
+  validateEncryptedBackupFileInputSchema,
+  validateEncryptedBackupResultSchema,
+} from "./backup/encrypted-backup-schemas.js"
+export {
+  privacyConfirmationCancelledSchema,
+  privacyConfirmationRequiredSchema,
+  privacyConfirmationResultSchema,
+  privacySettingsSchema,
+  SENSITIVE_FINDING_CATEGORIES,
+  SENSITIVE_FINDING_SEVERITIES,
+  SENSITIVE_SCAN_SOURCES,
+  scanDraftPrivacyInputSchema,
+  scanExportContentInputSchema,
+  scanLibraryPrivacyInputSchema,
+  scanSensitiveTextInputSchema,
+  sensitiveFindingCategorySchema,
+  sensitiveFindingConfidenceSchema,
+  sensitiveFindingLocationSchema,
+  sensitiveFindingSchema,
+  sensitiveFindingSeveritySchema,
+  sensitiveScanResultSchema,
+  sensitiveScanSourceSchema,
+  updatePrivacySettingsInputSchema,
+} from "./privacy/privacy-schemas.js"
+
 // allow: SIZE_OK - central IPC boundary contract for channels, payloads, and response schemas.
 export const PING_CHANNEL = "prompter:ping" as const
 export const PING_RESPONSE = "pong" as const
@@ -223,9 +282,20 @@ export const PERSISTENCE_CHANNELS = {
   exportPromptAssetsBackup: "prompter:backup:export-prompt-assets",
   exportPromptTemplatesPack: "prompter:backup:export-prompt-templates",
   exportHarnessTemplatesPack: "prompter:backup:export-harness-templates",
+  savePreparedPlaintextBackup: "prompter:backup:save-prepared-plaintext",
   validateBackupFile: "prompter:backup:validate-file",
   importBackup: "prompter:backup:import",
   cancelImportSession: "prompter:backup:cancel-import-session",
+  scanSensitiveText: "prompter:privacy:scan-text",
+  scanDraftPrivacy: "prompter:privacy:scan-draft",
+  scanLibraryPrivacy: "prompter:privacy:scan-library",
+  scanExportContent: "prompter:privacy:scan-export-content",
+  getPrivacySettings: "prompter:privacy:settings:get",
+  updatePrivacySettings: "prompter:privacy:settings:update",
+  prepareEncryptedBackup: "prompter:backup:encrypted:prepare",
+  savePreparedEncryptedBackup: "prompter:backup:encrypted:save-prepared",
+  validateEncryptedBackupFile: "prompter:backup:encrypted:validate-file",
+  unlockEncryptedBackup: "prompter:backup:encrypted:unlock",
   getDashboardSummary: "prompter:insights:get-dashboard-summary",
   getProjectHealth: "prompter:insights:get-project-health",
   getScenarioDistribution: "prompter:insights:get-scenario-distribution",
@@ -534,11 +604,23 @@ export const promptQualityReviewResultSchema = z.object({
   createdAt: timestampSchema,
   improvedPromptDraft: z.string().nullable(),
 })
-export const promptQualityLLMReviewResultSchema = z.object({
-  ok: z.literal(false),
-  code: promptQualityLLMReviewCodeSchema,
-  message: requiredTextSchema,
-})
+export const promptQualityLLMReviewResultSchema = z
+  .object({
+    ok: z.literal(false),
+    code: promptQualityLLMReviewCodeSchema,
+    message: requiredTextSchema,
+  })
+  .strict()
+export const promptQualityLLMReviewPrivacyConfirmationSchema =
+  privacyConfirmationRequiredSchema.extend({
+    ok: z.literal(false),
+    code: z.literal("llm_review_unavailable"),
+    message: z.literal("Privacy confirmation is required."),
+  })
+export const promptQualityLLMReviewResponseSchema = z.union([
+  promptQualityLLMReviewResultSchema,
+  promptQualityLLMReviewPrivacyConfirmationSchema,
+])
 
 export const tagSchema = z.object({ id: idSchema, name: nameSchema, createdAt: timestampSchema })
 export const tagWithCountSchema = tagSchema.extend({ promptCount: z.number().int().nonnegative() })
@@ -1107,10 +1189,44 @@ export const backupExportResultSchema = z
   })
   .strict()
 
+export const backupPrivacyConfirmationRequiredSchema = z
+  .object({
+    status: z.literal("confirmation_required"),
+    plaintext: z.boolean(),
+    preparedBackupSessionId: idSchema,
+    privacyConfirmationSessionId: idSchema,
+    scanResult: sensitiveScanResultSchema,
+    cancelled: z.literal(true),
+    backupType: backupTypeSchema,
+    itemCounts: backupItemCountsSchema,
+    message: backupLabelSchema,
+  })
+  .strict()
+export const plaintextBackupPrivacyConfirmationRequiredSchema =
+  backupPrivacyConfirmationRequiredSchema.extend({ plaintext: z.literal(true) }).strict()
+export const encryptedBackupPrivacyConfirmationRequiredSchema =
+  backupPrivacyConfirmationRequiredSchema.extend({ plaintext: z.literal(false) }).strict()
+export const plaintextBackupExportResponseSchema = z.union([
+  backupExportResultSchema,
+  plaintextBackupPrivacyConfirmationRequiredSchema,
+])
+export const savePreparedEncryptedBackupResponseSchema = z.union([
+  savePreparedEncryptedBackupResultSchema,
+  encryptedBackupPrivacyConfirmationRequiredSchema,
+])
+export const preparedPlaintextBackupInputSchema = z
+  .object({
+    preparedBackupSessionId: idSchema,
+    privacyConfirmationSessionId: idSchema.optional(),
+  })
+  .strict()
+
 export const backupValidationResultSchema = z.discriminatedUnion("cancelled", [
   z.object({ cancelled: z.literal(true) }).strict(),
   z.object({ cancelled: z.literal(false), preview: backupValidationPreviewSchema }).strict(),
 ])
+export const encryptedBackupUnlockValidationResultSchema =
+  createEncryptedBackupUnlockValidationResultSchema(backupValidationPreviewSchema)
 
 export const backupImportResultSchema = z
   .object({
@@ -1176,6 +1292,7 @@ export const exportPromptInputSchema = z.object({
   createdAt: timestampSchema.nullable().optional(),
   updatedAt: timestampSchema.nullable().optional(),
   format: exportFormatSchema,
+  privacyConfirmationSessionId: idSchema.optional(),
 })
 const safeExportFilenameSchema = z
   .string()
@@ -1189,12 +1306,16 @@ const directSavePromptToFileInputSchema = z.object({
   content: requiredTextSchema,
   format: exportFormatSchema,
   filename: safeExportFilenameSchema.optional(),
+  privacyConfirmationSessionId: idSchema.optional(),
 })
 export const savePromptToFileInputSchema = z.union([
   exportPromptInputSchema.extend({ filename: safeExportFilenameSchema.optional() }),
   directSavePromptToFileInputSchema,
 ])
-export const copyTextInputSchema = z.object({ text: requiredTextSchema })
+export const copyTextInputSchema = z.object({
+  text: requiredTextSchema,
+  privacyConfirmationSessionId: idSchema.optional(),
+})
 export const clipboardReadTextResultSchema = z.object({
   text: z.string(),
   isEmpty: z.boolean(),
@@ -1207,10 +1328,18 @@ export const exportPromptResultSchema = z.object({
   mimeType: z.literal("text/markdown"),
 })
 export const savePromptToFileResultSchema = z.union([
-  z.object({ cancelled: z.literal(true) }),
-  z.object({ cancelled: z.literal(false), filePath: z.string().trim().min(1) }),
+  z.object({ cancelled: z.literal(true) }).strict(),
+  z.object({ cancelled: z.literal(false), filePath: z.string().trim().min(1) }).strict(),
 ])
-export const copyTextResultSchema = z.object({ copied: z.literal(true) })
+export const copyTextResultSchema = z.object({ copied: z.literal(true) }).strict()
+export const savePromptToFileResponseSchema = z.union([
+  savePromptToFileResultSchema,
+  privacyConfirmationRequiredSchema.extend({ cancelled: z.literal(true) }),
+])
+export const copyTextResponseSchema = z.union([
+  copyTextResultSchema,
+  privacyConfirmationRequiredSchema.extend({ copied: z.literal(true) }),
+])
 export const promptCompilerAnalyzeOutputSchema = z.object({
   detectedScenario: scenarioSchema,
   detectedTargetAgent: targetAgentSchema,
@@ -1240,10 +1369,17 @@ export const promptCompilerCompileOutputSchema = z.object({
   qualityScore: z.number().int().min(0).max(100),
   warnings: z.array(z.string().trim().min(1)),
 })
-export const promptCompilerErrorSchema = z.object({
+export const promptCompilerErrorSchema = z
+  .object({
+    ok: z.literal(false),
+    code: promptCompilerErrorCodeSchema,
+    message: z.string().trim().min(1),
+  })
+  .strict()
+export const promptCompilerPrivacyConfirmationSchema = privacyConfirmationRequiredSchema.extend({
   ok: z.literal(false),
-  code: promptCompilerErrorCodeSchema,
-  message: z.string().trim().min(1),
+  code: z.literal("openai_request_failed"),
+  message: z.literal("Privacy confirmation is required."),
 })
 export const promptCompilerAnalyzeResultSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), value: promptCompilerAnalyzeOutputSchema }),
@@ -1252,6 +1388,14 @@ export const promptCompilerAnalyzeResultSchema = z.discriminatedUnion("ok", [
 export const promptCompilerCompileResultSchema = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), value: promptCompilerCompileOutputSchema }),
   promptCompilerErrorSchema,
+])
+export const promptCompilerAnalyzeResponseSchema = z.union([
+  promptCompilerAnalyzeResultSchema,
+  promptCompilerPrivacyConfirmationSchema,
+])
+export const promptCompilerCompileResponseSchema = z.union([
+  promptCompilerCompileResultSchema,
+  promptCompilerPrivacyConfirmationSchema,
 ])
 export const deleteResultSchema = z.object({ id: idSchema })
 export const idPayloadSchema = z.object({ id: idSchema })
@@ -1522,6 +1666,7 @@ const promptCompilerBaseInputSchema = z.object({
   harnessTemplateId: idSchema.nullable().optional(),
   projectContextProfileId: idSchema.nullable().optional(),
   includeProjectContextProfile: z.boolean().optional(),
+  privacyConfirmationSessionId: idSchema.optional(),
 })
 export const promptCompilerAnalyzeInputSchema = promptCompilerBaseInputSchema.superRefine(
   validatePromptCompilerProjectContext,
@@ -1562,11 +1707,15 @@ export const comparePromptVersionsInputSchema = z.object({
 })
 export const reviewPromptQualityDraftInputSchema = promptQualityReviewSnapshotSchema.extend({
   reviewMode: promptQualityReviewModeSchema,
+  privacyConfirmationSessionId: idSchema.optional(),
 })
-export const reviewPromptQualityWithLLMInputSchema = noPayloadSchema
+export const reviewPromptQualityWithLLMInputSchema = promptQualityReviewSnapshotSchema
+  .extend({ privacyConfirmationSessionId: idSchema.optional() })
+  .strict()
 export const reviewPromptQualityVersionInputSchema = z.object({
   promptVersionId: idSchema,
   reviewMode: promptQualityReviewModeSchema,
+  privacyConfirmationSessionId: idSchema.optional(),
 })
 export const savePromptQualityReviewInputSchema = z.object({
   promptVersionId: idSchema,
@@ -1590,15 +1739,23 @@ export const applyPromptQualityScoreToVersionResultSchema = z.object({
 })
 export const keyPayloadSchema = z.object({ key: keySchema })
 
-export const exportFullBackupInputSchema = z.object({}).strict()
-export const exportProjectBackupInputSchema = z.object({ projectId: idSchema }).strict()
+export const exportFullBackupInputSchema = z
+  .object({ privacyConfirmationSessionId: idSchema.optional() })
+  .strict()
+export const exportProjectBackupInputSchema = z
+  .object({ projectId: idSchema, privacyConfirmationSessionId: idSchema.optional() })
+  .strict()
 export const exportPromptAssetsBackupInputSchema = z
-  .object({ promptAssetIds: z.array(idSchema).min(1).max(BACKUP_ROW_MAX_ITEMS) })
+  .object({
+    promptAssetIds: z.array(idSchema).min(1).max(BACKUP_ROW_MAX_ITEMS),
+    privacyConfirmationSessionId: idSchema.optional(),
+  })
   .strict()
 export const exportPromptTemplatesPackInputSchema = z
   .object({
     promptTemplateIds: z.array(idSchema).min(1).max(BACKUP_ROW_MAX_ITEMS).optional(),
     includeAll: z.literal(true).optional(),
+    privacyConfirmationSessionId: idSchema.optional(),
   })
   .strict()
   .refine(
@@ -1609,6 +1766,7 @@ export const exportHarnessTemplatesPackInputSchema = z
   .object({
     harnessTemplateIds: z.array(idSchema).min(1).max(BACKUP_ROW_MAX_ITEMS).optional(),
     includeAllUserTemplates: z.literal(true).optional(),
+    privacyConfirmationSessionId: idSchema.optional(),
   })
   .strict()
   .refine(
@@ -1944,9 +2102,20 @@ export const payloadSchemas = {
   exportPromptAssetsBackup: exportPromptAssetsBackupInputSchema,
   exportPromptTemplatesPack: exportPromptTemplatesPackInputSchema,
   exportHarnessTemplatesPack: exportHarnessTemplatesPackInputSchema,
+  savePreparedPlaintextBackup: preparedPlaintextBackupInputSchema,
   validateBackupFile: validateBackupFileInputSchema,
   importBackup: importBackupInputSchema,
   cancelImportSession: cancelImportSessionInputSchema,
+  scanSensitiveText: scanSensitiveTextInputSchema,
+  scanDraftPrivacy: scanDraftPrivacyInputSchema,
+  scanLibraryPrivacy: scanLibraryPrivacyInputSchema,
+  scanExportContent: scanExportContentInputSchema,
+  getPrivacySettings: noPayloadSchema,
+  updatePrivacySettings: updatePrivacySettingsInputSchema,
+  prepareEncryptedBackup: prepareEncryptedBackupInputSchema,
+  savePreparedEncryptedBackup: savePreparedEncryptedBackupInputSchema,
+  validateEncryptedBackupFile: validateEncryptedBackupFileInputSchema,
+  unlockEncryptedBackup: unlockEncryptedBackupInputSchema,
   getDashboardSummary: insightsFilterInputSchema,
   getProjectHealth: insightsFilterInputSchema,
   getScenarioDistribution: insightsFilterInputSchema,
@@ -2027,28 +2196,39 @@ export const responseSchemas = {
   hasOpenAIKey: z.boolean(),
   getOpenAIKeyStatus: openAIKeyStatusSchema,
   deleteOpenAIKey: openAIKeyStatusSchema,
-  promptCompilerAnalyze: promptCompilerAnalyzeResultSchema,
-  promptCompilerCompile: promptCompilerCompileResultSchema,
+  promptCompilerAnalyze: promptCompilerAnalyzeResponseSchema,
+  promptCompilerCompile: promptCompilerCompileResponseSchema,
   formatPromptForExport: exportPromptResultSchema,
-  savePromptToFile: savePromptToFileResultSchema,
-  copyText: copyTextResultSchema,
+  savePromptToFile: savePromptToFileResponseSchema,
+  copyText: copyTextResponseSchema,
   readText: clipboardReadTextResultSchema,
   reviewPromptQualityDraft: promptQualityReviewResultSchema,
-  reviewPromptQualityWithLLM: promptQualityLLMReviewResultSchema,
+  reviewPromptQualityWithLLM: promptQualityLLMReviewResponseSchema,
   reviewPromptQualityVersion: promptQualityReviewResultSchema,
   savePromptQualityReview: promptQualityReviewResultSchema,
   listPromptQualityReviewsForVersion: z.array(promptQualityReviewResultSchema),
   getLatestPromptQualityReview: promptQualityReviewResultSchema.nullable(),
   getPromptQualityReview: promptQualityReviewResultSchema.nullable(),
   applyPromptQualityScoreToVersion: applyPromptQualityScoreToVersionResultSchema,
-  exportFullBackup: backupExportResultSchema,
-  exportProjectBackup: backupExportResultSchema,
-  exportPromptAssetsBackup: backupExportResultSchema,
-  exportPromptTemplatesPack: backupExportResultSchema,
-  exportHarnessTemplatesPack: backupExportResultSchema,
+  exportFullBackup: plaintextBackupExportResponseSchema,
+  exportProjectBackup: plaintextBackupExportResponseSchema,
+  exportPromptAssetsBackup: plaintextBackupExportResponseSchema,
+  exportPromptTemplatesPack: plaintextBackupExportResponseSchema,
+  exportHarnessTemplatesPack: plaintextBackupExportResponseSchema,
+  savePreparedPlaintextBackup: plaintextBackupExportResponseSchema,
   validateBackupFile: backupValidationResultSchema,
   importBackup: backupImportResultSchema,
   cancelImportSession: cancelImportSessionResultSchema,
+  scanSensitiveText: sensitiveScanResultSchema,
+  scanDraftPrivacy: sensitiveScanResultSchema,
+  scanLibraryPrivacy: sensitiveScanResultSchema,
+  scanExportContent: sensitiveScanResultSchema,
+  getPrivacySettings: privacySettingsSchema,
+  updatePrivacySettings: privacySettingsSchema,
+  prepareEncryptedBackup: preparedEncryptedBackupPreviewSchema,
+  savePreparedEncryptedBackup: savePreparedEncryptedBackupResponseSchema,
+  validateEncryptedBackupFile: validateEncryptedBackupResultSchema,
+  unlockEncryptedBackup: encryptedBackupUnlockValidationResultSchema,
   getDashboardSummary: dashboardSummarySchema,
   getProjectHealth: projectHealthInsightsSchema,
   getScenarioDistribution: scenarioDistributionInsightsSchema,

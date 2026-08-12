@@ -1,5 +1,7 @@
 import { ipcMain } from "electron"
+import type { z } from "zod"
 
+import { BackupExportPrivacyConfirmationRequiredError } from "./backup/backup-export-service.js"
 import type { PersistenceServices } from "./db/services.js"
 import {
   PERSISTENCE_CHANNELS,
@@ -18,10 +20,15 @@ import type {
   HarnessTemplate,
   ImportBackupInput,
   ListHarnessTemplatesInput,
+  PreparedPlaintextBackupInput,
+  PrepareEncryptedBackupInput,
   PromptSearchResultItem,
+  SavePreparedEncryptedBackupInput,
   SearchPromptsResponse,
+  UnlockEncryptedBackupInput,
 } from "./ipc-types.js"
 import type { MaintenanceServices } from "./maintenance/maintenance-services.js"
+import { PrivacyConfirmationRequiredError } from "./privacy/privacy-guard-service.js"
 import type { PromptExportNativeService } from "./prompt-export-native.js"
 
 // allow: SIZE_OK - central IPC handler registry mirrors the typed channel contract.
@@ -36,7 +43,14 @@ type BackupContractServices = {
   readonly exportPromptAssetsBackup: (input: ExportPromptAssetsBackupInput) => Promise<unknown>
   readonly exportPromptTemplatesPack: (input: ExportPromptTemplatesPackInput) => Promise<unknown>
   readonly exportHarnessTemplatesPack: (input: ExportHarnessTemplatesPackInput) => Promise<unknown>
+  readonly prepareEncryptedBackup: (input: PrepareEncryptedBackupInput) => unknown
+  readonly savePreparedPlaintextBackup: (input: PreparedPlaintextBackupInput) => Promise<unknown>
+  readonly savePreparedEncryptedBackup: (
+    input: SavePreparedEncryptedBackupInput,
+  ) => Promise<unknown>
   readonly validateBackupFile: () => Promise<unknown>
+  readonly validateEncryptedBackupFile: () => Promise<unknown>
+  readonly unlockEncryptedBackup: (input: UnlockEncryptedBackupInput) => Promise<unknown>
   readonly importBackup: (input: ImportBackupInput) => Promise<unknown>
   readonly cancelImportSession: (input: CancelImportSessionInput) => Promise<unknown>
 }
@@ -53,6 +67,7 @@ type IpcServices = Omit<
   | "repairCurrentVersions"
   | "deleteEmptyPromptAssets"
   | "rebuildMaintenanceSearchIndex"
+  | "privacyGuard"
 > &
   HarnessTemplateContractServices &
   MaintenanceServices &
@@ -97,6 +112,72 @@ function searchResult(
   const items = hits.map(searchResultItem)
 
   return { items, total: hits.length }
+}
+
+type ProtectedResponseKind =
+  | "compiler"
+  | "quality"
+  | "save_prompt"
+  | "copy"
+  | "plaintext_backup"
+  | "encrypted_backup"
+
+async function protectedResponse<TSchema extends z.ZodType>(
+  responseSchema: TSchema,
+  operation: () => Promise<unknown>,
+  kind: ProtectedResponseKind,
+): Promise<z.output<TSchema>> {
+  try {
+    return responseSchema.parse(await operation())
+  } catch (error) {
+    if (error instanceof PrivacyConfirmationRequiredError) {
+      const confirmation = {
+        status: "confirmation_required" as const,
+        privacyConfirmationSessionId: error.privacyConfirmationSessionId,
+        scanResult: error.scanResult,
+      }
+      switch (kind) {
+        case "compiler":
+          return responseSchema.parse({
+            ...confirmation,
+            ok: false,
+            code: "openai_request_failed",
+            message: error.message,
+          })
+        case "quality":
+          return responseSchema.parse({
+            ...confirmation,
+            ok: false,
+            code: "llm_review_unavailable",
+            message: error.message,
+          })
+        case "save_prompt":
+          return responseSchema.parse({ ...confirmation, cancelled: true })
+        case "copy":
+          return responseSchema.parse({ ...confirmation, copied: true })
+        case "plaintext_backup":
+        case "encrypted_backup":
+          throw error
+      }
+    }
+    if (error instanceof BackupExportPrivacyConfirmationRequiredError) {
+      if (kind === "plaintext_backup" || kind === "encrypted_backup") {
+        return responseSchema.parse({
+          status: "confirmation_required",
+          plaintext: error.plaintext,
+          preparedBackupSessionId: error.preparedBackupSessionId,
+          privacyConfirmationSessionId: error.privacyConfirmationSessionId,
+          scanResult: error.scanResult,
+          cancelled: true,
+          backupType: error.backupType,
+          itemCounts: error.itemCounts,
+          message: error.message,
+        })
+      }
+      throw error
+    }
+    throw error
+  }
 }
 
 export function createPersistenceIpcHandlers(services: IpcServices) {
@@ -334,15 +415,36 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
       payloadSchemas.deleteOpenAIKey.parse(payload)
       return services.deleteOpenAIKey()
     },
-    promptCompilerAnalyze: (payload: unknown) =>
-      services.promptCompilerAnalyze(payloadSchemas.promptCompilerAnalyze.parse(payload)),
-    promptCompilerCompile: (payload: unknown) =>
-      services.promptCompilerCompile(payloadSchemas.promptCompilerCompile.parse(payload)),
+    promptCompilerAnalyze: (payload: unknown) => {
+      const parsed = payloadSchemas.promptCompilerAnalyze.parse(payload)
+      return protectedResponse(
+        responseSchemas.promptCompilerAnalyze,
+        () => services.promptCompilerAnalyze(parsed),
+        "compiler",
+      )
+    },
+    promptCompilerCompile: (payload: unknown) => {
+      const parsed = payloadSchemas.promptCompilerCompile.parse(payload)
+      return protectedResponse(
+        responseSchemas.promptCompilerCompile,
+        () => services.promptCompilerCompile(parsed),
+        "compiler",
+      )
+    },
     formatPromptForExport: (payload: unknown) =>
       services.formatPromptForExport(payloadSchemas.formatPromptForExport.parse(payload)),
-    savePromptToFile: (payload: unknown) =>
-      services.savePromptToFile(payloadSchemas.savePromptToFile.parse(payload)),
-    copyText: (payload: unknown) => services.copyText(payloadSchemas.copyText.parse(payload)),
+    savePromptToFile: (payload: unknown) => {
+      const parsed = payloadSchemas.savePromptToFile.parse(payload)
+      return protectedResponse(
+        responseSchemas.savePromptToFile,
+        () => services.savePromptToFile(parsed),
+        "save_prompt",
+      )
+    },
+    copyText: (payload: unknown) => {
+      const parsed = payloadSchemas.copyText.parse(payload)
+      return protectedResponse(responseSchemas.copyText, () => services.copyText(parsed), "copy")
+    },
     readText: (payload: unknown) => {
       payloadSchemas.readText.parse(payload)
       return services.readText()
@@ -352,9 +454,17 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
         services.reviewPromptQualityDraft(payloadSchemas.reviewPromptQualityDraft.parse(payload)),
       ),
     async reviewPromptQualityWithLLM(payload: unknown) {
-      payloadSchemas.reviewPromptQualityWithLLM.parse(payload)
-      return responseSchemas.reviewPromptQualityWithLLM.parse(
-        await services.reviewPromptQualityWithLLM(),
+      const parsed = payloadSchemas.reviewPromptQualityWithLLM.parse(payload)
+      return protectedResponse(
+        responseSchemas.reviewPromptQualityWithLLM,
+        () =>
+          services.reviewPromptQualityWithLLM({
+            snapshot: parsed,
+            ...(parsed.privacyConfirmationSessionId === undefined
+              ? {}
+              : { privacyConfirmationSessionId: parsed.privacyConfirmationSessionId }),
+          }),
+        "quality",
       )
     },
     reviewPromptQualityVersion: (payload: unknown) => {
@@ -391,40 +501,114 @@ export function createPersistenceIpcHandlers(services: IpcServices) {
       ),
     exportFullBackup: (payload: unknown) => {
       const parsed = payloadSchemas.exportFullBackup.parse(payload)
-      return services
-        .exportFullBackup(parsed)
-        .then((result) => responseSchemas.exportFullBackup.parse(result))
+      return protectedResponse(
+        responseSchemas.exportFullBackup,
+        () => services.exportFullBackup(parsed),
+        "plaintext_backup",
+      )
     },
     exportProjectBackup: (payload: unknown) => {
       const parsed = payloadSchemas.exportProjectBackup.parse(payload)
-      return services
-        .exportProjectBackup(parsed)
-        .then((result) => responseSchemas.exportProjectBackup.parse(result))
+      return protectedResponse(
+        responseSchemas.exportProjectBackup,
+        () => services.exportProjectBackup(parsed),
+        "plaintext_backup",
+      )
     },
     exportPromptAssetsBackup: (payload: unknown) => {
       const parsed = payloadSchemas.exportPromptAssetsBackup.parse(payload)
-      return services
-        .exportPromptAssetsBackup(parsed)
-        .then((result) => responseSchemas.exportPromptAssetsBackup.parse(result))
+      return protectedResponse(
+        responseSchemas.exportPromptAssetsBackup,
+        () => services.exportPromptAssetsBackup(parsed),
+        "plaintext_backup",
+      )
     },
     exportPromptTemplatesPack: (payload: unknown) => {
       const parsed = payloadSchemas.exportPromptTemplatesPack.parse(payload)
-      return services
-        .exportPromptTemplatesPack(parsed)
-        .then((result) => responseSchemas.exportPromptTemplatesPack.parse(result))
+      return protectedResponse(
+        responseSchemas.exportPromptTemplatesPack,
+        () => services.exportPromptTemplatesPack(parsed),
+        "plaintext_backup",
+      )
     },
     exportHarnessTemplatesPack: (payload: unknown) => {
       const parsed = payloadSchemas.exportHarnessTemplatesPack.parse(payload)
-      return services
-        .exportHarnessTemplatesPack(parsed)
-        .then((result) => responseSchemas.exportHarnessTemplatesPack.parse(result))
+      return protectedResponse(
+        responseSchemas.exportHarnessTemplatesPack,
+        () => services.exportHarnessTemplatesPack(parsed),
+        "plaintext_backup",
+      )
     },
+    savePreparedPlaintextBackup: (payload: unknown) => {
+      const parsed = payloadSchemas.savePreparedPlaintextBackup.parse(payload)
+      const input: PreparedPlaintextBackupInput =
+        parsed.privacyConfirmationSessionId === undefined
+          ? { preparedBackupSessionId: parsed.preparedBackupSessionId }
+          : {
+              preparedBackupSessionId: parsed.preparedBackupSessionId,
+              privacyConfirmationSessionId: parsed.privacyConfirmationSessionId,
+            }
+      return protectedResponse(
+        responseSchemas.savePreparedPlaintextBackup,
+        () => services.savePreparedPlaintextBackup(input),
+        "plaintext_backup",
+      )
+    },
+    prepareEncryptedBackup: (payload: unknown) =>
+      responseSchemas.prepareEncryptedBackup.parse(
+        services.prepareEncryptedBackup(payloadSchemas.prepareEncryptedBackup.parse(payload)),
+      ),
+    savePreparedEncryptedBackup: (payload: unknown) =>
+      protectedResponse(
+        responseSchemas.savePreparedEncryptedBackup,
+        () =>
+          services.savePreparedEncryptedBackup(
+            payloadSchemas.savePreparedEncryptedBackup.parse(payload),
+          ),
+        "encrypted_backup",
+      ),
     validateBackupFile: (payload: unknown) => {
       payloadSchemas.validateBackupFile.parse(payload)
       return services
         .validateBackupFile()
         .then((result) => responseSchemas.validateBackupFile.parse(result))
     },
+    validateEncryptedBackupFile: (payload: unknown) => {
+      payloadSchemas.validateEncryptedBackupFile.parse(payload)
+      return services
+        .validateEncryptedBackupFile()
+        .then((result) => responseSchemas.validateEncryptedBackupFile.parse(result))
+    },
+    unlockEncryptedBackup: (payload: unknown) => {
+      const parsed = payloadSchemas.unlockEncryptedBackup.parse(payload)
+      return services
+        .unlockEncryptedBackup(parsed)
+        .then((result) => responseSchemas.unlockEncryptedBackup.parse(result))
+    },
+    scanSensitiveText: (payload: unknown) =>
+      responseSchemas.scanSensitiveText.parse(
+        services.privacy.scanText(payloadSchemas.scanSensitiveText.parse(payload)),
+      ),
+    scanDraftPrivacy: (payload: unknown) =>
+      responseSchemas.scanDraftPrivacy.parse(
+        services.privacy.scanDraft(payloadSchemas.scanDraftPrivacy.parse(payload)),
+      ),
+    scanLibraryPrivacy: (payload: unknown) =>
+      responseSchemas.scanLibraryPrivacy.parse(
+        services.privacy.scanLibrary(payloadSchemas.scanLibraryPrivacy.parse(payload)),
+      ),
+    scanExportContent: (payload: unknown) =>
+      responseSchemas.scanExportContent.parse(
+        services.privacy.scanExportContent(payloadSchemas.scanExportContent.parse(payload)),
+      ),
+    getPrivacySettings: (payload: unknown) => {
+      payloadSchemas.getPrivacySettings.parse(payload)
+      return responseSchemas.getPrivacySettings.parse(services.getPrivacySettings())
+    },
+    updatePrivacySettings: (payload: unknown) =>
+      responseSchemas.updatePrivacySettings.parse(
+        services.updatePrivacySettings(payloadSchemas.updatePrivacySettings.parse(payload)),
+      ),
     importBackup: (payload: unknown) => {
       const parsed = payloadSchemas.importBackup.parse(payload)
       return services
@@ -732,6 +916,39 @@ export function registerIpcHandlers(services: IpcServices): void {
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.cancelImportSession, (_event, payload) =>
     handlers.cancelImportSession(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.scanSensitiveText, (_event, payload) =>
+    handlers.scanSensitiveText(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.scanDraftPrivacy, (_event, payload) =>
+    handlers.scanDraftPrivacy(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.scanLibraryPrivacy, (_event, payload) =>
+    handlers.scanLibraryPrivacy(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.scanExportContent, (_event, payload) =>
+    handlers.scanExportContent(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.getPrivacySettings, (_event, payload) =>
+    handlers.getPrivacySettings(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.updatePrivacySettings, (_event, payload) =>
+    handlers.updatePrivacySettings(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.prepareEncryptedBackup, (_event, payload) =>
+    handlers.prepareEncryptedBackup(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.savePreparedPlaintextBackup, (_event, payload) =>
+    handlers.savePreparedPlaintextBackup(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.savePreparedEncryptedBackup, (_event, payload) =>
+    handlers.savePreparedEncryptedBackup(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.validateEncryptedBackupFile, (_event, payload) =>
+    handlers.validateEncryptedBackupFile(payload),
+  )
+  ipcMain.handle(PERSISTENCE_CHANNELS.unlockEncryptedBackup, (_event, payload) =>
+    handlers.unlockEncryptedBackup(payload),
   )
   ipcMain.handle(PERSISTENCE_CHANNELS.getDashboardSummary, (_event, payload) =>
     handlers.getDashboardSummary(payload),

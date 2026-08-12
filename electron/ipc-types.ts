@@ -12,6 +12,7 @@ import type {
   backupImportStrategySchema,
   backupItemCountsSchema,
   backupMetadataSchema,
+  backupPrivacyConfirmationRequiredSchema,
   backupProjectContextProfileSchema,
   backupProjectSchema,
   backupPromptAssetSchema,
@@ -31,6 +32,7 @@ import type {
   comparePromptVersionsInputSchema,
   comparePromptVersionsResultSchema,
   copyTextInputSchema,
+  copyTextResponseSchema,
   copyTextResultSchema,
   createDerivedPromptAssetInputSchema,
   createDerivedPromptAssetResultSchema,
@@ -51,7 +53,10 @@ import type {
   deleteResultSchema,
   duplicatePromptAssetInputSchema,
   duplicatePromptAssetResultSchema,
+  encryptedBackupEnvelopeSchema,
+  encryptedBackupUnlockValidationResultSchema,
   executeMaintenanceActionInputSchema,
+  exportEncryptedBackupInputSchema,
   exportFormatSchema,
   exportFullBackupInputSchema,
   exportHarnessTemplatesPackInputSchema,
@@ -84,8 +89,13 @@ import type {
   openAIKeyStatusSchema,
   PingResponse,
   payloadSchemas,
+  plaintextBackupExportResponseSchema,
+  preparedEncryptedBackupPreviewSchema,
   preparedMaintenanceActionSchema,
+  prepareEncryptedBackupInputSchema,
   prepareMaintenanceActionInputSchema,
+  privacyConfirmationResultSchema,
+  privacySettingsSchema,
   projectContextCompilerBuildResultSchema,
   projectContextInsightsSchema,
   projectContextProfileSchema,
@@ -97,15 +107,18 @@ import type {
   promptAssetSchema,
   promptCompilerAnalyzeInputSchema,
   promptCompilerAnalyzeOutputSchema,
+  promptCompilerAnalyzeResponseSchema,
   promptCompilerAnalyzeResultSchema,
   promptCompilerCompileInputSchema,
   promptCompilerCompileOutputSchema,
+  promptCompilerCompileResponseSchema,
   promptCompilerCompileResultSchema,
   promptCompilerErrorSchema,
   promptDerivationTypeSchema,
   promptLineageSchema,
   promptLineageSummarySchema,
   promptQualityGradeSchema,
+  promptQualityLLMReviewResponseSchema,
   promptQualityLLMReviewResultSchema,
   promptQualityReviewModeSchema,
   promptQualityReviewResultSchema,
@@ -122,13 +135,24 @@ import type {
   qualityScoreBucketSchema,
   reviewPromptQualityDraftInputSchema,
   reviewPromptQualityVersionInputSchema,
+  reviewPromptQualityWithLLMInputSchema,
   saveOpenAIKeyInputSchema,
+  savePreparedEncryptedBackupInputSchema,
+  savePreparedEncryptedBackupResponseSchema,
+  savePreparedEncryptedBackupResultSchema,
   savePromptQualityReviewInputSchema,
   savePromptToFileInputSchema,
+  savePromptToFileResponseSchema,
   savePromptToFileResultSchema,
+  scanDraftPrivacyInputSchema,
+  scanExportContentInputSchema,
+  scanLibraryPrivacyInputSchema,
+  scanSensitiveTextInputSchema,
   scenarioDistributionInsightSchema,
   scenarioDistributionInsightsSchema,
   scenarioTagFrequencyInsightSchema,
+  sensitiveFindingSchema,
+  sensitiveScanResultSchema,
   settingSchema,
   settingsDefaultsSchema,
   tagInsightsSchema,
@@ -139,13 +163,16 @@ import type {
   targetAgentDistributionInsightSchema,
   targetAgentDistributionInsightsSchema,
   templateInsightsSchema,
+  unlockEncryptedBackupInputSchema,
   updateDefaultsInputSchema,
   updateHarnessTemplateInputSchema,
+  updatePrivacySettingsInputSchema,
   updateProjectContextProfileInputSchema,
   updateProjectInputSchema,
   updatePromptAssetInputSchema,
   updatePromptTemplateInputSchema,
   updateTagInputSchema,
+  validateEncryptedBackupResultSchema,
   versionActivityInsightsSchema,
   versionedPromptInsightSchema,
 } from "./ipc-contract.js"
@@ -174,6 +201,11 @@ export type MenuAction = z.infer<typeof menuActionSchema>
 
 type Input<TSchema extends z.ZodType> = z.input<TSchema>
 type BackupOperation<TInput, TResult> = (input: TInput) => Promise<TResult>
+type ReadonlyDeep<T> = T extends readonly (infer TItem)[]
+  ? readonly ReadonlyDeep<TItem>[]
+  : T extends object
+    ? { readonly [TKey in keyof T]: ReadonlyDeep<T[TKey]> }
+    : T
 
 export type Project = z.infer<typeof projectSchema>
 export type ProjectContextProfile = z.infer<typeof projectContextProfileSchema>
@@ -221,8 +253,10 @@ export type ExportPromptResult = z.infer<typeof exportPromptResultSchema>
 export type FormatPromptForExportInput = z.output<typeof formatPromptForExportInputSchema>
 export type SavePromptToFileInput = z.output<typeof savePromptToFileInputSchema>
 export type SavePromptToFileResult = z.infer<typeof savePromptToFileResultSchema>
+export type SavePromptToFileResponse = z.infer<typeof savePromptToFileResponseSchema>
 export type CopyTextInput = z.output<typeof copyTextInputSchema>
 export type CopyTextResult = z.infer<typeof copyTextResultSchema>
+export type CopyTextResponse = z.infer<typeof copyTextResponseSchema>
 export type ClipboardReadTextResult = z.infer<typeof clipboardReadTextResultSchema>
 export type PromptCompilerAnalyzeInput = z.output<typeof promptCompilerAnalyzeInputSchema>
 export type PromptCompilerCompileInput = z.output<typeof promptCompilerCompileInputSchema>
@@ -231,12 +265,16 @@ export type PromptCompilerCompileOutput = z.infer<typeof promptCompilerCompileOu
 export type PromptCompilerError = z.infer<typeof promptCompilerErrorSchema>
 export type PromptCompilerAnalyzeResult = z.input<typeof promptCompilerAnalyzeResultSchema>
 export type PromptCompilerCompileResult = z.infer<typeof promptCompilerCompileResultSchema>
+export type PromptCompilerAnalyzeResponse = z.infer<typeof promptCompilerAnalyzeResponseSchema>
+export type PromptCompilerCompileResponse = z.infer<typeof promptCompilerCompileResponseSchema>
 export type PromptQualityReviewMode = z.infer<typeof promptQualityReviewModeSchema>
 export type PromptQualityGrade = z.infer<typeof promptQualityGradeSchema>
 export type PromptQualityReviewSnapshot = z.infer<typeof promptQualityReviewSnapshotSchema>
 export type PromptQualityReviewResult = z.infer<typeof promptQualityReviewResultSchema>
 export type PromptQualityLLMReviewResult = z.infer<typeof promptQualityLLMReviewResultSchema>
+export type PromptQualityLLMReviewResponse = z.infer<typeof promptQualityLLMReviewResponseSchema>
 export type ReviewPromptQualityDraftInput = z.input<typeof reviewPromptQualityDraftInputSchema>
+export type ReviewPromptQualityWithLLMInput = z.input<typeof reviewPromptQualityWithLLMInputSchema>
 export type ReviewPromptQualityVersionInput = z.input<typeof reviewPromptQualityVersionInputSchema>
 export type SavePromptQualityReviewInput = z.output<typeof savePromptQualityReviewInputSchema>
 export type ListPromptQualityReviewsForVersionInput = z.input<
@@ -294,6 +332,10 @@ export type BackupConflict = z.infer<typeof backupConflictSchema>
 export type BackupConsequence = z.infer<typeof backupConsequenceSchema>
 export type BackupValidationPreview = z.infer<typeof backupValidationPreviewSchema>
 export type BackupExportResult = z.infer<typeof backupExportResultSchema>
+export type BackupPrivacyConfirmationRequired = z.infer<
+  typeof backupPrivacyConfirmationRequiredSchema
+>
+export type PlaintextBackupExportResponse = z.infer<typeof plaintextBackupExportResponseSchema>
 export type BackupValidationResult = z.infer<typeof backupValidationResultSchema>
 export type BackupImportStrategy = z.infer<typeof backupImportStrategySchema>
 export type BackupImportResult = z.infer<typeof backupImportResultSchema>
@@ -305,6 +347,78 @@ export type ExportPromptTemplatesPackInput = z.output<typeof exportPromptTemplat
 export type ExportHarnessTemplatesPackInput = z.output<typeof exportHarnessTemplatesPackInputSchema>
 export type ImportBackupInput = z.output<typeof importBackupInputSchema>
 export type CancelImportSessionInput = z.output<typeof cancelImportSessionInputSchema>
+export type SensitiveFinding = ReadonlyDeep<z.output<typeof sensitiveFindingSchema>>
+export type SensitiveScanResult = ReadonlyDeep<z.output<typeof sensitiveScanResultSchema>>
+export type ScanSensitiveTextInput = ReadonlyDeep<z.input<typeof scanSensitiveTextInputSchema>>
+export type ScanDraftPrivacyInput = ReadonlyDeep<z.input<typeof scanDraftPrivacyInputSchema>>
+export type ScanLibraryPrivacyInput = ReadonlyDeep<z.input<typeof scanLibraryPrivacyInputSchema>>
+export type ScanExportContentInput = ReadonlyDeep<z.input<typeof scanExportContentInputSchema>>
+export type PrivacySettings = ReadonlyDeep<z.output<typeof privacySettingsSchema>>
+export type UpdatePrivacySettingsInput = ReadonlyDeep<
+  z.input<typeof updatePrivacySettingsInputSchema>
+>
+export type PrivacyConfirmationResult = ReadonlyDeep<
+  z.output<typeof privacyConfirmationResultSchema>
+>
+export type EncryptedBackupEnvelope = ReadonlyDeep<z.output<typeof encryptedBackupEnvelopeSchema>>
+export type ExportEncryptedBackupInput = ReadonlyDeep<
+  z.input<typeof exportEncryptedBackupInputSchema>
+>
+export type PrepareEncryptedBackupInput = ReadonlyDeep<
+  z.input<typeof prepareEncryptedBackupInputSchema>
+>
+export type PreparedEncryptedBackupPreview = ReadonlyDeep<
+  z.output<typeof preparedEncryptedBackupPreviewSchema>
+>
+export type SavePreparedEncryptedBackupInput = ReadonlyDeep<
+  z.input<typeof savePreparedEncryptedBackupInputSchema>
+>
+export type SavePreparedEncryptedBackupResult = ReadonlyDeep<
+  z.output<typeof savePreparedEncryptedBackupResultSchema>
+>
+export type SavePreparedEncryptedBackupResponse = ReadonlyDeep<
+  z.output<typeof savePreparedEncryptedBackupResponseSchema>
+>
+export type PreparedPlaintextBackupInput = {
+  readonly preparedBackupSessionId: string
+  readonly privacyConfirmationSessionId?: string
+}
+export type ValidateEncryptedBackupResult = ReadonlyDeep<
+  z.output<typeof validateEncryptedBackupResultSchema>
+>
+export type UnlockEncryptedBackupInput = ReadonlyDeep<
+  z.input<typeof unlockEncryptedBackupInputSchema>
+>
+export type EncryptedBackupUnlockValidationResult = ReadonlyDeep<
+  z.output<typeof encryptedBackupUnlockValidationResultSchema>
+>
+export type PrivacyBridge = {
+  readonly scanText: (input: ScanSensitiveTextInput) => Promise<SensitiveScanResult>
+  readonly scanDraft: (input: ScanDraftPrivacyInput) => Promise<SensitiveScanResult>
+  readonly scanLibrary: (input: ScanLibraryPrivacyInput) => Promise<SensitiveScanResult>
+  readonly scanExportContent: (input: ScanExportContentInput) => Promise<SensitiveScanResult>
+  readonly getSettings: () => Promise<PrivacySettings>
+  readonly updateSettings: (input: UpdatePrivacySettingsInput) => Promise<PrivacySettings>
+}
+export type PreparedEncryptedBackupBridge = {
+  readonly prepareEncryptedBackup: (
+    input: PrepareEncryptedBackupInput,
+  ) => Promise<PreparedEncryptedBackupPreview>
+  readonly savePreparedEncryptedBackup: (
+    input: SavePreparedEncryptedBackupInput,
+  ) => Promise<SavePreparedEncryptedBackupResult>
+}
+export type PreparedBackupBridge = PreparedEncryptedBackupBridge & {
+  readonly savePreparedPlaintextBackup: (
+    input: PreparedPlaintextBackupInput,
+  ) => Promise<PlaintextBackupExportResponse>
+}
+export type EncryptedBackupImportBridge = {
+  readonly validateEncryptedBackupFile: () => Promise<ValidateEncryptedBackupResult>
+  readonly unlockEncryptedBackup: (
+    input: UnlockEncryptedBackupInput,
+  ) => Promise<EncryptedBackupUnlockValidationResult>
+}
 export type InsightsDateRange = z.infer<typeof insightsDateRangeSchema>
 export type InsightsFilterInput = z.output<typeof insightsFilterInputSchema>
 export type DashboardSummary = z.infer<typeof dashboardSummarySchema>
@@ -460,6 +574,7 @@ export type ElectronBridge = {
     readonly rebuildIndex: () => Promise<{ readonly rebuilt: true }>
   }
   readonly maintenance: MaintenanceBridge
+  readonly privacy: PrivacyBridge
   readonly insights: InsightsBridge
   readonly tags: {
     readonly create: (input: CreateTagInput) => Promise<Tag>
@@ -499,8 +614,8 @@ export type ElectronBridge = {
     readonly deleteOpenAIKey: () => Promise<OpenAIKeyStatus>
   }
   readonly promptCompiler: {
-    readonly analyze: (input: PromptCompilerAnalyzeInput) => Promise<PromptCompilerAnalyzeResult>
-    readonly compile: (input: PromptCompilerCompileInput) => Promise<PromptCompilerCompileResult>
+    readonly analyze: (input: PromptCompilerAnalyzeInput) => Promise<PromptCompilerAnalyzeResponse>
+    readonly compile: (input: PromptCompilerCompileInput) => Promise<PromptCompilerCompileResponse>
   }
   readonly promptQuality: {
     readonly reviewDraft: (
@@ -522,7 +637,9 @@ export type ElectronBridge = {
     readonly applyScoreToVersion: (
       input: ApplyPromptQualityScoreToVersionInput,
     ) => Promise<ApplyPromptQualityScoreToVersionResult>
-    readonly reviewWithLLM: () => Promise<PromptQualityLLMReviewResult>
+    readonly reviewWithLLM: (
+      input?: ReviewPromptQualityWithLLMInput,
+    ) => Promise<PromptQualityLLMReviewResponse>
   }
   readonly exports: {
     readonly formatPrompt: (input: FormatPromptForExportInput) => Promise<ExportPromptResult>
@@ -553,5 +670,18 @@ export type ElectronBridge = {
       CancelImportSessionInput,
       CancelImportSessionResult
     >
+    readonly prepareEncryptedBackup: (
+      input: PrepareEncryptedBackupInput,
+    ) => Promise<PreparedEncryptedBackupPreview>
+    readonly savePreparedPlaintextBackup: (
+      input: PreparedPlaintextBackupInput,
+    ) => Promise<PlaintextBackupExportResponse>
+    readonly savePreparedEncryptedBackup: (
+      input: SavePreparedEncryptedBackupInput,
+    ) => Promise<SavePreparedEncryptedBackupResponse>
+    readonly validateEncryptedBackupFile: () => Promise<ValidateEncryptedBackupResult>
+    readonly unlockEncryptedBackup: (
+      input: UnlockEncryptedBackupInput,
+    ) => Promise<EncryptedBackupUnlockValidationResult>
   }
 }

@@ -27,6 +27,7 @@ export function SettingsPanel({
     <section
       className="space-y-3"
       aria-labelledby="settings-heading"
+      data-insights-target="settings"
       data-menu-action-target="settings-panel"
       tabIndex={-1}
     >

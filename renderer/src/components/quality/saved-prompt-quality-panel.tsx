@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import type { PromptAsset, PromptVersion } from "../../../../electron/ipc-types"
 import { usePromptQuality } from "../../hooks/use-prompt-quality"
+import { PrivacyWarningDialog } from "../privacy/privacy-warning-dialog"
 import {
   buildSavedPromptVersionQualitySnapshot,
   PromptQualityReviewPanel,
@@ -36,19 +37,27 @@ export function SavedPromptQualityPanel({
   }, [loadedPromptVersionId, quality.loadLatestReview, selectedVersion.id])
 
   return (
-    <PromptQualityReviewPanel
-      actionState={quality.actionState}
-      appliedScore={quality.appliedScore}
-      error={quality.error}
-      llmResult={quality.llmResult}
-      operation={quality.operation}
-      review={quality.review}
-      versionQualityScore={selectedVersion.qualityScore}
-      onApplyScore={quality.applyScore}
-      onClearError={quality.clearError}
-      onRunLLMReview={quality.runLLMReview}
-      onReviewVersionLocally={quality.reviewVersionLocally}
-      onSaveReview={quality.saveReview}
-    />
+    <>
+      <PromptQualityReviewPanel
+        actionState={quality.actionState}
+        appliedScore={quality.appliedScore}
+        error={quality.error}
+        llmResult={quality.llmResult}
+        operation={quality.operation}
+        review={quality.review}
+        versionQualityScore={selectedVersion.qualityScore}
+        onApplyScore={quality.applyScore}
+        onClearError={quality.clearError}
+        onRunLLMReview={quality.runLLMReview}
+        onReviewVersionLocally={quality.reviewVersionLocally}
+        onSaveReview={quality.saveReview}
+      />
+      <PrivacyWarningDialog
+        confirmLabel="Send to OpenAI"
+        onCancel={quality.privacyWarning.cancel}
+        onConfirm={quality.privacyWarning.confirm}
+        state={quality.privacyWarning.state}
+      />
+    </>
   )
 }

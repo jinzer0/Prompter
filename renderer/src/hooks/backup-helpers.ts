@@ -1,10 +1,11 @@
-import type { BackupValidationPreview, ImportBackupInput } from "../../../electron/ipc-types"
+import type { ImportBackupInput } from "../../../electron/ipc-types"
+import type { BackupValidationView } from "./backup-state"
 
 export type BackupImportGateInput = {
   readonly destinationProjectId: string
   readonly isImportConfirmed: boolean
   readonly isWorking: boolean
-  readonly preview: BackupValidationPreview | null
+  readonly preview: BackupValidationView | null
 }
 
 export function canSubmitBackupImport(input: BackupImportGateInput): boolean {
@@ -20,7 +21,7 @@ export function canSubmitBackupImport(input: BackupImportGateInput): boolean {
 }
 
 export function importBackupInputFromPreview(
-  preview: BackupValidationPreview,
+  preview: BackupValidationView,
   destinationProjectId: string,
 ): ImportBackupInput {
   const trimmedDestinationProjectId = destinationProjectId.trim()

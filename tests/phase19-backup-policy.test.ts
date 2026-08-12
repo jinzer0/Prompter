@@ -183,7 +183,7 @@ describe("Phase 19 backup privacy policy", () => {
 
   it("keeps JSON and encrypted backup extensions reachable from the main-process open dialog", async () => {
     // Given: the main-process native backup composition.
-    const mainSource = await readFile("electron/main.ts", "utf8")
+    const mainSource = await readFile("electron/main-native-dependencies.ts", "utf8")
 
     // When: the open-dialog filter is inspected.
     // Then: legacy JSON and encrypted backups are selectable.

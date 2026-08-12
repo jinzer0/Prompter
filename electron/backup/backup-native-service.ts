@@ -30,6 +30,8 @@ export type BackupNativeDependencies = {
   readonly getAppVersion?: () => string
 }
 
+import type { AppLockEpoch, AppLockGuard } from "../app-lock/app-lock-guard.js"
+
 type BackupSaveInput = {
   readonly content: string
   readonly defaultFilename: string
@@ -62,9 +64,16 @@ export class BackupNativeOpenDialogError extends Error {
   }
 }
 
-export function createBackupNativeService(dependencies: BackupNativeDependencies) {
+export function createBackupNativeService(
+  dependencies: BackupNativeDependencies,
+  appLockGuard?: AppLockGuard,
+) {
   return {
-    async saveBackup(input: BackupSaveInput): Promise<BackupSaveResult> {
+    async saveBackup(
+      input: BackupSaveInput,
+      existingEpoch?: AppLockEpoch,
+    ): Promise<BackupSaveResult> {
+      const epoch = existingEpoch ?? appLockGuard?.capture()
       const dialogResult = await dependencies.showSaveDialog({
         defaultPath: input.defaultFilename,
         filters:
@@ -72,6 +81,7 @@ export function createBackupNativeService(dependencies: BackupNativeDependencies
             ? [{ name: "Prompter Encrypted Backup", extensions: ["enc"] }]
             : [{ name: "Prompter Backup", extensions: ["json"] }],
       })
+      if (epoch !== undefined) appLockGuard?.check(epoch)
       if (dialogResult.canceled) {
         return { cancelled: true }
       }
@@ -80,6 +90,7 @@ export function createBackupNativeService(dependencies: BackupNativeDependencies
       }
 
       try {
+        if (epoch !== undefined) appLockGuard?.check(epoch)
         await dependencies.writeFile(dialogResult.filePath, input.content)
       } catch (error) {
         throw new BackupNativeWriteError(error)
@@ -88,7 +99,9 @@ export function createBackupNativeService(dependencies: BackupNativeDependencies
       return { cancelled: false }
     },
     async openBackupFile(): Promise<{ readonly cancelled: true } | { readonly filePath: string }> {
+      const epoch = appLockGuard?.capture()
       const dialogResult = await dependencies.showOpenDialog()
+      if (epoch !== undefined) appLockGuard?.check(epoch)
       if (dialogResult.canceled) {
         return { cancelled: true }
       }

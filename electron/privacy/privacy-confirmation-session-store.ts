@@ -153,6 +153,13 @@ export function createPrivacyConfirmationSessionStore(
     cancelPrivacyConfirmationSession(privacyConfirmationSessionId: string): void {
       requireReadyPrivacyConfirmationSession(privacyConfirmationSessionId).status = "cancelled"
     },
+    revokePrivacyConfirmationSessions(): void {
+      for (const session of sessions.values()) {
+        if (session.status === "ready") {
+          session.status = "cancelled"
+        }
+      }
+    },
     expirePrivacyConfirmationSessions,
   }
 }

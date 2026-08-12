@@ -158,6 +158,13 @@ export function createMaintenanceActionSessionStore(
     cancelActionSession(actionSessionId: string): void {
       requireReadyActionSession(actionSessionId).status = "cancelled"
     },
+    revokeMaintenanceActionSessions(): void {
+      for (const session of sessions.values()) {
+        if (session.status === "ready") {
+          session.status = "cancelled"
+        }
+      }
+    },
     preserveActionSessionAfterConfirmationCancel(actionSessionId: string): void {
       requireReadyActionSession(actionSessionId)
     },

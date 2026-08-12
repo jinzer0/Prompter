@@ -3,17 +3,19 @@ import { useEffect, useState } from "react"
 import type { BackupImportResult, PingResponse } from "../../electron/ipc-types"
 import { HarnessTemplateManager } from "./components/harness-template-manager"
 import { InsightsDashboard } from "./components/insights/insights-dashboard"
+import { PrivacyCenter } from "./components/privacy/privacy-center"
 import { ProjectContextProfileManager } from "./components/project-context-profile-manager"
 import { ProjectSidebarSection } from "./components/project-sidebar-section"
 import { PromptCompilerPanel } from "./components/prompt-compiler-panel"
 import { PromptLibraryPanel } from "./components/prompt-library-panel"
 import { PromptTemplateManager } from "./components/prompt-template-manager"
 import { SettingsPanel } from "./components/settings-panel"
-import { SidebarItem } from "./components/shell/sidebar-item"
 import { SidebarSection, sidebarSections } from "./components/shell/sidebar-section"
+import { WorkspaceViewNavigation } from "./components/shell/workspace-view-navigation"
 import { useInsightsWorkspaceNavigation } from "./hooks/use-insights-workspace-navigation"
 import { useProjectPrompts, useProjects } from "./hooks/use-prompter-library"
 import { handleMenuAction, handleMenuKeyDown } from "./lib/menu-actions"
+import { navigateToPrivacyFinding } from "./lib/privacy-navigation"
 
 type PingState = PingResponse | "pending"
 
@@ -142,16 +144,11 @@ export function App() {
               Prompter
             </p>
             <p className="mt-2 text-[14px] leading-5 text-muted-strong">Prompt workspace shell</p>
-            <nav className="mt-4" aria-label="Workspace views">
-              <SidebarItem
-                data-menu-action-target="library-insights"
-                aria-current={insightsNavigation.workspaceView === "insights" ? "page" : undefined}
-                variant={insightsNavigation.workspaceView === "insights" ? "active" : "default"}
-                onClick={insightsNavigation.openInsights}
-              >
-                Library Insights
-              </SidebarItem>
-            </nav>
+            <WorkspaceViewNavigation
+              onOpenInsights={insightsNavigation.openInsights}
+              onOpenPrivacy={insightsNavigation.openPrivacy}
+              workspaceView={insightsNavigation.workspaceView}
+            />
           </div>
 
           <div className="mt-5 flex min-w-0 flex-1 flex-col gap-5">
@@ -255,6 +252,20 @@ export function App() {
               projects={projectLibrary.projects}
               onBackToLibrary={insightsNavigation.openLibrary}
               onNavigate={insightsNavigation.navigate}
+            />
+          </section>
+        )}
+        {insightsNavigation.workspaceView === "privacy" && (
+          <section data-testid="privacy-workspace" className="col-span-2 h-full min-h-0">
+            <PrivacyCenter
+              onBackToLibrary={insightsNavigation.openLibrary}
+              onNavigate={(location) =>
+                void navigateToPrivacyFinding(location, {
+                  navigate: insightsNavigation.navigate,
+                  openLibrary: insightsNavigation.openLibrary,
+                  projectIds: projectLibrary.projects.map((project) => project.id),
+                })
+              }
             />
           </section>
         )}

@@ -11,13 +11,20 @@ import type {
   PromptVersion,
   SavePromptQualityReviewInput,
 } from "../ipc-types.js"
+import type { PrivacyGuardService } from "../privacy/privacy-guard-service.js"
 import { reviewLocalPromptQuality } from "./local-reviewer.js"
 
 export type PromptQualityServiceConfig = {
   readonly getPromptAsset: (id: string) => PromptAsset | null
   readonly getPromptVersion: (id: string) => PromptVersion | null
   readonly getOpenAIKeyForMainProcessOnly: () => Promise<string | null>
+  readonly privacyGuard: PrivacyGuardService
   readonly reviews: PromptQualityReviewRepository
+}
+
+export type PromptQualityLLMReviewInput = {
+  readonly privacyConfirmationSessionId?: string
+  readonly snapshot: PromptQualityReviewResult["snapshot"]
 }
 
 export type PromptQualityLLMReviewResult = {
@@ -30,7 +37,9 @@ export type PromptQualityService = {
   readonly reviewPromptQualityDraft: (
     snapshot: PromptQualityReviewResult["snapshot"],
   ) => PromptQualityReviewResult
-  readonly reviewPromptQualityWithLLM: () => Promise<PromptQualityLLMReviewResult>
+  readonly reviewPromptQualityWithLLM: (
+    input?: PromptQualityLLMReviewInput,
+  ) => Promise<PromptQualityLLMReviewResult>
   readonly reviewPromptQualityVersion: (promptVersionId: string) => PromptQualityReviewResult
   readonly savePromptQualityReview: (
     input: SavePromptQualityReviewInput,
@@ -56,7 +65,22 @@ export function createPromptQualityService(
     reviewPromptQualityDraft(snapshot) {
       return reviewLocalPromptQuality({ snapshot, createdAt: Date.now() })
     },
-    async reviewPromptQualityWithLLM() {
+    async reviewPromptQualityWithLLM(input) {
+      if (input === undefined) {
+        return {
+          ok: false,
+          code: "llm_review_unavailable",
+          message: "LLM prompt review is not available yet. Use local review instead.",
+        }
+      }
+
+      const payload = JSON.stringify(input.snapshot)
+      config.privacyGuard.assertAuthorized({
+        action: "llm_review",
+        payload,
+        privacyConfirmationSessionId: input.privacyConfirmationSessionId,
+      })
+
       try {
         const apiKey = await config.getOpenAIKeyForMainProcessOnly()
 

@@ -8,7 +8,7 @@ import {
   resolveInsightsNavigationStep,
 } from "../lib/insights-workspace-navigation"
 
-export type WorkspaceView = "library" | "insights"
+export type WorkspaceView = "library" | "insights" | "privacy"
 
 export type InsightsSelectionRequest = {
   readonly id: string
@@ -132,6 +132,7 @@ export function useInsightsWorkspaceNavigation({
     navigate,
     openInsights: () => setWorkspaceView("insights"),
     openLibrary: () => setWorkspaceView("library"),
+    openPrivacy: () => setWorkspaceView("privacy"),
     promptTemplateRequest,
     tagRequest,
     workspaceView,

@@ -7,6 +7,9 @@ import {
   promptQualityActionState,
   reducePromptQualityState,
 } from "./prompt-quality-state"
+import { confirmedPromptQualityRequest, usePromptQualityLlm } from "./use-prompt-quality-llm"
+
+export { confirmedPromptQualityRequest }
 
 export type UsePromptQualityConfig = {
   readonly currentSnapshot: PromptQualityReviewSnapshot | null
@@ -32,6 +35,13 @@ export function usePromptQuality({
       }),
     [currentSnapshot, promptVersionId, state.operation, state.review],
   )
+  const llm = usePromptQualityLlm({
+    actionState: actionState.runLLMReview,
+    currentSnapshot,
+    dispatch,
+    sourceRevision,
+    sourceRevisionRef,
+  })
 
   const loadLatestReview = useCallback(async (): Promise<void> => {
     if (!actionState.loadLatestReview.isEnabled || promptVersionId === null) {
@@ -124,44 +134,6 @@ export function usePromptQuality({
     }
   }, [actionState.reviewVersionLocally, promptVersionId])
 
-  const runLLMReview = useCallback(async (): Promise<void> => {
-    if (!actionState.runLLMReview.isEnabled) {
-      dispatch({
-        kind: "operation_failed",
-        message: actionState.runLLMReview.disabledReason ?? "LLM review is unavailable.",
-      })
-      return
-    }
-
-    const requestedRevision = sourceRevision
-    dispatch({ kind: "operation_started", operation: "reviewing_llm" })
-
-    try {
-      const result = await resolveCurrentRevisionResponse(
-        window.prompter.promptQuality.reviewWithLLM(),
-        requestedRevision,
-        () => sourceRevisionRef.current,
-      )
-      if (result === null) {
-        dispatch({ kind: "operation_failed", message: "Draft changed; late review discarded." })
-        return
-      }
-      dispatch({ kind: "llm_review_received", result })
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error
-      }
-
-      dispatch({
-        kind: "operation_failed",
-        message:
-          sourceRevisionRef.current === requestedRevision
-            ? "LLM review could not be completed."
-            : "Draft changed; late review discarded.",
-      })
-    }
-  }, [actionState.runLLMReview, sourceRevision])
-
   const saveReview = useCallback(async (): Promise<void> => {
     const review = state.review
 
@@ -238,9 +210,10 @@ export function usePromptQuality({
     clearError,
     clearReview,
     loadLatestReview,
+    privacyWarning: llm.privacyWarning,
     reviewDraftLocally,
     reviewVersionLocally,
-    runLLMReview,
+    runLLMReview: llm.runLLMReview,
     saveReview,
     applyScore,
   }

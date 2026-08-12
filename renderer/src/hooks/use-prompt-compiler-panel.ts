@@ -241,6 +241,7 @@ export function usePromptCompilerPanel({
     pendingClipboardImport: quickCapture.pendingClipboardImport,
     pendingTemplate: template.pendingTemplate,
     previewTemplate: generationActions.previewTemplate,
+    privacyWarning: llm.privacyWarning,
     projectBinding: projectBinding.state,
     rebindProject,
     requestTemplateApply: generationActions.requestTemplateApply,

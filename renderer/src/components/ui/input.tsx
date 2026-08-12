@@ -1,8 +1,8 @@
-import type { InputHTMLAttributes } from "react"
+import type { ComponentProps } from "react"
 
 import { cn } from "../../lib/utils"
 
-export type InputProps = InputHTMLAttributes<HTMLInputElement>
+export type InputProps = ComponentProps<"input">
 
 export function Input({ className, ...props }: InputProps) {
   return (

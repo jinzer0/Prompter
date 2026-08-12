@@ -8,7 +8,7 @@ import type {
   PromptAsset,
   PromptVersion,
 } from "../../../electron/ipc-types"
-import { emptyCompilerInput } from "../lib/prompt-compiler/llm-compiler-flow"
+import type { CompilerMemory } from "../lib/prompt-compiler/compiler-memory"
 import {
   createOutputRevisionGate,
   type OutputRevisionGate,
@@ -19,6 +19,7 @@ import type { CreatePrompt } from "./prompt-library-data"
 import { useBoundCompilerGenerationActions } from "./use-bound-compiler-generation-actions"
 import { useCompilerDefaults } from "./use-compiler-defaults"
 import { useCompilerLlmActions } from "./use-compiler-llm-actions"
+import { useCompilerMemoryState } from "./use-compiler-memory-state"
 import { useCompilerPersistenceActions } from "./use-compiler-persistence-actions"
 import { useCompilerProjectBinding } from "./use-compiler-project-binding"
 import { useCompilerQuickCapture } from "./use-compiler-quick-capture"
@@ -35,6 +36,7 @@ type CreateDerivedAsset = (
 export { promptCompilerDraftChangeResetsStaleState } from "../lib/prompt-compiler/draft-state"
 
 type UsePromptCompilerPanelConfig = {
+  readonly compilerMemory: CompilerMemory
   readonly createDerivedAsset: CreateDerivedAsset
   readonly createPrompt: CreatePrompt
   readonly createNextVersion: CreateNextVersion
@@ -44,6 +46,7 @@ type UsePromptCompilerPanelConfig = {
 }
 
 export function usePromptCompilerPanel({
+  compilerMemory,
   createDerivedAsset,
   createNextVersion,
   createPrompt,
@@ -51,23 +54,24 @@ export function usePromptCompilerPanel({
   selectedAsset,
   selectedProject,
 }: UsePromptCompilerPanelConfig) {
-  const [draft, setDraft] = useState<PromptCompilerInput>(emptyCompilerInput)
-  const draftRef = useRef<PromptCompilerInput>(emptyCompilerInput)
-  const [routingFieldAuthorship] = useState(createCompilerRoutingFieldAuthorship)
-  const [compiled, setCompiled] = useState<CompiledPromptResult | null>(null)
-  const [editablePrompt, setEditablePromptValue] = useState("")
+  const memoryState = useCompilerMemoryState(compilerMemory)
+  const { compiled, draft, editablePrompt, setCompiled, setDraft } = memoryState
+  const draftRef = useRef<PromptCompilerInput>(draft)
+  const [routingFieldAuthorship] = useState(() => {
+    const authorship = createCompilerRoutingFieldAuthorship()
+    if (compilerMemory.hasSnapshot()) authorship.markAllAuthored()
+    return authorship
+  })
   const [message, setMessage] = useState<string | null>(null)
-  const projectId = selectedProject?.id ?? null
-  const projectBinding = useCompilerProjectBinding(projectId)
+  const projectBinding = useCompilerProjectBinding(selectedProject?.id ?? null)
   const compilerActionsEnabled = projectBinding.actionIsAllowed("compile_static")
   const canEditOutput = projectBinding.actionIsAllowed("edit_output")
   const canSaveExportToFile = projectBinding.actionIsAllowed("save_export_file")
   const template = useCompilerTemplateDraftController()
   const outputRevisionGateRef = useRef<OutputRevisionGate | null>(null)
 
-  if (outputRevisionGateRef.current === null) {
+  if (outputRevisionGateRef.current === null)
     outputRevisionGateRef.current = createOutputRevisionGate()
-  }
 
   const outputRevisionGate = outputRevisionGateRef.current
   const [outputRevision, setOutputRevision] = useState(outputRevisionGate.current())
@@ -76,11 +80,11 @@ export function usePromptCompilerPanel({
   const replaceEditablePrompt = useCallback(
     (prompt: string): number => {
       const revision = outputRevisionGate.advance()
-      setEditablePromptValue(prompt)
+      memoryState.setEditablePrompt(prompt)
       setOutputRevision(revision)
       return revision
     },
-    [outputRevisionGate],
+    [memoryState.setEditablePrompt, outputRevisionGate],
   )
   const derivedPrompt = useDerivedCompilerDraft({
     clearSuggestedTags: suggestedTags.clearSuggestedTags,
@@ -94,9 +98,7 @@ export function usePromptCompilerPanel({
   })
   const setEditablePrompt = useCallback(
     (prompt: string): void => {
-      if (!projectBinding.currentActionIsAllowed("edit_output")) {
-        return
-      }
+      if (!projectBinding.currentActionIsAllowed("edit_output")) return
       replaceEditablePrompt(prompt)
     },
     [projectBinding.currentActionIsAllowed, replaceEditablePrompt],
@@ -113,6 +115,7 @@ export function usePromptCompilerPanel({
     [
       derivedPrompt.clearDerivedPrompt,
       replaceEditablePrompt,
+      setCompiled,
       suggestedTags.clearSuggestedTags,
       template.resetTemplateDraft,
     ],
@@ -151,6 +154,7 @@ export function usePromptCompilerPanel({
     derivedPrompt.clearDerivedPrompt,
     llm.clearDerivedState,
     replaceEditablePrompt,
+    setCompiled,
     suggestedTags.clearSuggestedTags,
     template.resetTemplateDraft,
   ])
@@ -193,9 +197,8 @@ export function usePromptCompilerPanel({
     suggestedTags,
   })
 
-  function setHarnessTemplateId(id: string | null): void {
+  const setHarnessTemplateId = (id: string | null) =>
     routingDraftActions.setCompilerDraft((current) => ({ ...current, harnessTemplateId: id }))
-  }
 
   function rebindProject(): boolean {
     return projectBinding.rebind({

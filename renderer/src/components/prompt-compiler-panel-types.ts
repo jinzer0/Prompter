@@ -11,6 +11,7 @@ import type {
 import type { CreatePrompt } from "../hooks/prompt-library-data"
 import type { LoadStatus } from "../hooks/use-prompter-library"
 import type { CompilerStatePreservationRequest } from "../lib/compiler-project-binding"
+import type { CompilerMemory } from "../lib/prompt-compiler/compiler-memory"
 
 export type PromptCompilerPanelProps = {
   readonly assets: readonly PromptAsset[]
@@ -18,6 +19,7 @@ export type PromptCompilerPanelProps = {
     baseVersionId: string,
     compareVersionId: string,
   ) => Promise<ComparePromptVersionsResult>
+  readonly compilerMemory: CompilerMemory
   readonly createDerivedAsset: (
     input: CreateDerivedPromptAssetInput,
   ) => Promise<CreatePromptWithInitialVersionResult>

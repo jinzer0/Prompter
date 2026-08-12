@@ -22,6 +22,7 @@ import { Panel } from "./shell/panel"
 export function PromptCompilerPanel({
   assets,
   compareVersions,
+  compilerMemory,
   createDerivedAsset,
   createNextVersion,
   createPrompt,
@@ -52,6 +53,7 @@ export function PromptCompilerPanel({
     createDerivedAsset,
     createNextVersion,
     createPrompt,
+    compilerMemory,
     onTagsChanged,
     selectedAsset,
     selectedProject,

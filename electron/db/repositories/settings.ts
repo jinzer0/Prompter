@@ -1,5 +1,6 @@
 import { desc, eq } from "drizzle-orm"
 
+import { APP_LOCK_METADATA_SETTING_KEY } from "../../app-lock/app-lock-metadata.js"
 import { settingKeyIsPublic, settingsDefaultsSchema } from "../../ipc-contract.js"
 import type {
   PrivacySettings,
@@ -16,6 +17,9 @@ export type SettingsRepository = {
   readonly getSetting: (key: string) => Setting | null
   readonly setSetting: (key: string, value: string) => Setting
   readonly listSettings: () => readonly Setting[]
+  readonly getAppLockMetadata: () => string | null
+  readonly setAppLockMetadata: (value: string) => void
+  readonly deleteAppLockMetadata: () => void
   readonly getDefaults: () => SettingsDefaults
   readonly updateDefaults: (input: UpdateDefaultsInput) => SettingsDefaults
   readonly getPrivacySettings: () => PrivacySettings
@@ -40,6 +44,14 @@ const privacySettingKeys = {
 
 function publicSettingKey(key: string): string {
   if (!settingKeyIsPublic(key)) {
+    if (
+      key
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "")
+        .startsWith("applock")
+    ) {
+      throw new TypeError("Private settings cannot be stored through public settings APIs")
+    }
     throw new TypeError("Secrets cannot be stored in settings")
   }
 
@@ -92,6 +104,9 @@ function privacySettingsFromSettings(settings: readonly Setting[]): PrivacySetti
 export function createSettingsRepository(db: AppDatabase): SettingsRepository {
   return {
     getSetting(key) {
+      if (!settingKeyIsPublic(key)) {
+        return null
+      }
       return db.select().from(schema.settings).where(eq(schema.settings.key, key)).get() ?? null
     },
     setSetting(key, value) {
@@ -113,7 +128,34 @@ export function createSettingsRepository(db: AppDatabase): SettingsRepository {
       )
     },
     listSettings() {
-      return db.select().from(schema.settings).orderBy(desc(schema.settings.updatedAt)).all()
+      return db
+        .select()
+        .from(schema.settings)
+        .orderBy(desc(schema.settings.updatedAt))
+        .all()
+        .filter((setting) => settingKeyIsPublic(setting.key))
+    },
+    getAppLockMetadata() {
+      return (
+        db
+          .select({ value: schema.settings.value })
+          .from(schema.settings)
+          .where(eq(schema.settings.key, APP_LOCK_METADATA_SETTING_KEY))
+          .get()?.value ?? null
+      )
+    },
+    setAppLockMetadata(value) {
+      const updatedAt = createTimestamp()
+      db.insert(schema.settings)
+        .values({ key: APP_LOCK_METADATA_SETTING_KEY, value, updatedAt })
+        .onConflictDoUpdate({
+          target: schema.settings.key,
+          set: { value, updatedAt },
+        })
+        .run()
+    },
+    deleteAppLockMetadata() {
+      db.delete(schema.settings).where(eq(schema.settings.key, APP_LOCK_METADATA_SETTING_KEY)).run()
     },
     getDefaults() {
       return defaultsFromSettings(db.select().from(schema.settings).all())

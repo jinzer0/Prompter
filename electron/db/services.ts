@@ -1,4 +1,5 @@
 import type Database from "better-sqlite3"
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import { createInsightsService } from "../insights/service.js"
 import type {
   CreateDerivedPromptAssetInput,
@@ -12,6 +13,7 @@ import type {
 } from "../ipc-types.js"
 import { createMaintenanceActionRepository } from "../maintenance/maintenance-action-repository.js"
 import { createMaintenanceScanService } from "../maintenance/scan-service.js"
+import type { PrivacyConfirmationSessionStore } from "../privacy/privacy-confirmation-session-store.js"
 import { createPrivacyScanService } from "../privacy/privacy-scan-service.js"
 import type { PromptCompilerClientFactory } from "../prompt-compiler/prompt-compiler-service.js"
 import {
@@ -58,6 +60,8 @@ export function createPersistenceServices(
   sqlite: Database.Database,
   openAIKeyStore: OpenAIKeyStore = createUnavailableOpenAIKeyStore(),
   promptCompilerClientFactory?: PromptCompilerClientFactory,
+  privacyConfirmationSessions?: PrivacyConfirmationSessionStore,
+  appLockGuard?: AppLockGuard,
 ) {
   const projects = createProjectRepository(db)
   const projectContextProfiles = createProjectContextProfileRepository(db)
@@ -88,6 +92,8 @@ export function createPersistenceServices(
     getPromptAsset: (id) => prompts.getPromptAsset(id),
     getPromptVersion: (id) => prompts.getPromptVersion(id),
     reviews: promptQualityReviews,
+    ...(privacyConfirmationSessions === undefined ? {} : { privacyConfirmationSessions }),
+    ...(appLockGuard === undefined ? {} : { appLockGuard }),
     ...(promptCompilerClientFactory === undefined ? {} : { promptCompilerClientFactory }),
   })
 

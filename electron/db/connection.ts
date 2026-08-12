@@ -2,6 +2,8 @@ import Database from "better-sqlite3"
 import type { BetterSQLite3Database } from "drizzle-orm/better-sqlite3"
 import { drizzle } from "drizzle-orm/better-sqlite3"
 import { migrate } from "drizzle-orm/better-sqlite3/migrator"
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
+import type { PrivacyConfirmationSessionStore } from "../privacy/privacy-confirmation-session-store.js"
 import type { PromptCompilerClientFactory } from "../prompt-compiler/prompt-compiler-service.js"
 import type { OpenAIKeyStore } from "../secrets/open-ai-key-store.js"
 import * as schema from "./schema.js"
@@ -33,6 +35,8 @@ export type PrompterDatabaseConfig = {
   readonly migrationsFolder: string
   readonly openAIKeyStore?: OpenAIKeyStore
   readonly promptCompilerClientFactory?: PromptCompilerClientFactory
+  readonly privacyConfirmationSessions?: PrivacyConfirmationSessionStore
+  readonly appLockGuard?: AppLockGuard
 }
 
 export type PrompterDatabase = {
@@ -57,6 +61,8 @@ export function openPrompterDatabase(config: PrompterDatabaseConfig): PrompterDa
     sqlite,
     config.openAIKeyStore,
     config.promptCompilerClientFactory,
+    config.privacyConfirmationSessions,
+    config.appLockGuard,
   )
   if (currentHarnessTemplateSchemaExists(sqlite)) {
     services.seedDefaultHarnessTemplates()

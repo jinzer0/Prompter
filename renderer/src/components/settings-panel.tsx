@@ -1,5 +1,6 @@
-import type { BackupImportResult, Project } from "../../../electron/ipc-types"
+import type { BackupImportResult, ElectronBridge, Project } from "../../../electron/ipc-types"
 import { useSettingsPanel } from "../hooks/use-settings-panel"
+import { AppLockSettingsPanel } from "./app-lock/app-lock-settings-panel"
 import { BackupSettingsPanel } from "./backup/backup-settings-panel"
 import { MaintenanceWorkbench } from "./maintenance/maintenance-workbench"
 import { OpenAIKeyCard } from "./openai-key-card"
@@ -7,21 +8,27 @@ import { SettingsDefaultsForm } from "./settings-defaults-form"
 import { Badge } from "./ui/badge"
 
 type SettingsPanelProps = {
+  readonly appLockBridge: ElectronBridge["appLock"]
   readonly projects: readonly Project[]
   readonly selectedPromptAssetId: string | null
   readonly selectedProjectId: string | null
+  readonly refreshSignal: number
   readonly onBackupImportComplete: (result: BackupImportResult) => Promise<void> | void
+  readonly onAppLockStateChange: () => Promise<void>
   readonly onViewImportedProject: (projectId: string) => void
 }
 
 export function SettingsPanel({
+  appLockBridge,
+  onAppLockStateChange,
   onBackupImportComplete,
   onViewImportedProject,
   projects,
+  refreshSignal,
   selectedPromptAssetId,
   selectedProjectId,
 }: SettingsPanelProps) {
-  const settings = useSettingsPanel()
+  const settings = useSettingsPanel(refreshSignal)
 
   return (
     <section
@@ -56,6 +63,8 @@ export function SettingsPanel({
         onSave={settings.saveKey}
         status={settings.keyStatus}
       />
+
+      <AppLockSettingsPanel bridge={appLockBridge} onStateChange={onAppLockStateChange} />
 
       <MaintenanceWorkbench projects={projects} selectedProjectId={selectedProjectId} />
 

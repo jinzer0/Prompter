@@ -22,7 +22,7 @@ function defaultsToForm(defaults: SettingsDefaults): DefaultsForm {
   }
 }
 
-export function useSettingsPanel() {
+export function useSettingsPanel(refreshSignal = 0) {
   const [defaultsForm, setDefaultsForm] = useState<DefaultsForm | null>(null)
   const [keyStatus, setKeyStatus] = useState<OpenAIKeyStatus | null>(null)
   const [defaultsMessage, setDefaultsMessage] = useState<string | null>(null)
@@ -33,6 +33,7 @@ export function useSettingsPanel() {
   const [isDeletingKey, setIsDeletingKey] = useState(false)
 
   useEffect(() => {
+    if (refreshSignal < 0) return
     let isActive = true
 
     async function loadSettings(): Promise<void> {
@@ -63,7 +64,7 @@ export function useSettingsPanel() {
     return () => {
       isActive = false
     }
-  }, [])
+  }, [refreshSignal])
 
   async function saveDefaults(form: DefaultsForm): Promise<void> {
     const defaultModel = form.defaultModel.trim()

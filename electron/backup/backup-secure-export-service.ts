@@ -1,3 +1,4 @@
+import type { AppLockGuard } from "../app-lock/app-lock-guard.js"
 import { backupExportResultSchema } from "../ipc-contract.js"
 import type { BackupEnvelope, BackupExportResult, BackupType } from "../ipc-types.js"
 import {
@@ -77,6 +78,7 @@ export type BackupSecureExportServiceDependencies = {
   readonly privacyConfirmationSessions?: PrivacyConfirmationSessionStore
   readonly crypto?: ReturnType<typeof createEncryptedBackupCrypto>
   readonly getWarnBeforeBackup?: () => boolean
+  readonly appLockGuard?: AppLockGuard
 }
 
 function serializedEnvelope(backup: BackupEnvelope): string {
@@ -222,6 +224,7 @@ export function createBackupSecureExportService(
   async function savePreparedEncryptedBackup(
     input: SavePreparedEncryptedBackupInput,
   ): Promise<SavePreparedEncryptedBackupResult> {
+    const epoch = dependencies.appLockGuard?.capture()
     const parsed = savePreparedEncryptedBackupInputSchema.parse(input)
     const session = exportSessions.requireReadyBackupExportSession(parsed.preparedBackupSessionId)
     const scanResult = scanBackupEnvelope(session.backupEnvelope)
@@ -234,6 +237,7 @@ export function createBackupSecureExportService(
           preparedBackupSessionId: session.id,
         })
       }
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       consumeConfirmation({
         backup: session.backupEnvelope,
         plaintext: false,
@@ -246,8 +250,13 @@ export function createBackupSecureExportService(
       passphrase: parsed.passphrase,
       crypto,
       native: dependencies.native,
+      ...(dependencies.appLockGuard === undefined
+        ? {}
+        : { appLockGuard: dependencies.appLockGuard }),
+      ...(epoch === undefined ? {} : { epoch }),
     })
     if (!saved.cancelled) {
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       exportSessions.consumeBackupExportSessionAfterSuccess(session.id)
     }
     return saved

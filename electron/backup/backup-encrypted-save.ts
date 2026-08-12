@@ -1,3 +1,4 @@
+import type { AppLockEpoch, AppLockGuard } from "../app-lock/app-lock-guard.js"
 import type { BackupEnvelope, BackupType, SavePreparedEncryptedBackupResult } from "../ipc-types.js"
 import type { BackupNativeService } from "./backup-native-service.js"
 import type { createEncryptedBackupCrypto } from "./encrypted-backup-crypto.js"
@@ -18,6 +19,8 @@ type SavePreparedEncryptedBackupInput = {
   readonly passphrase: string
   readonly crypto: ReturnType<typeof createEncryptedBackupCrypto>
   readonly native: BackupNativeService
+  readonly appLockGuard?: AppLockGuard
+  readonly epoch?: AppLockEpoch
 }
 
 export async function saveEncryptedBackup(
@@ -30,11 +33,15 @@ export async function saveEncryptedBackup(
     backupEnvelope: input.backupEnvelope,
     passphrase: input.passphrase,
   })
-  const saved = await input.native.saveBackup({
-    content: JSON.stringify(encryptedBackup),
-    defaultFilename: encryptedDefaultFilenames[input.backupType],
-    format: "encrypted",
-  })
+  if (input.epoch !== undefined) input.appLockGuard?.check(input.epoch)
+  const saved = await input.native.saveBackup(
+    {
+      content: JSON.stringify(encryptedBackup),
+      defaultFilename: encryptedDefaultFilenames[input.backupType],
+      format: "encrypted",
+    },
+    input.epoch,
+  )
   return savePreparedEncryptedBackupResultSchema.parse({
     cancelled: saved.cancelled,
     backupType: input.backupType,

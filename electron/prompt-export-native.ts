@@ -1,3 +1,4 @@
+import type { AppLockGuard } from "./app-lock/app-lock-guard.js"
 import type {
   ClipboardReadTextResult,
   CopyTextInput,
@@ -32,6 +33,7 @@ export type PromptExportNativeDependencies = {
   readonly copyText: (text: string) => void
   readonly readText: () => string
   readonly privacyGuard: PrivacyGuardService
+  readonly appLockGuard?: AppLockGuard
 }
 
 export type PromptExportNativeService = ReturnType<typeof createPromptExportNativeService>
@@ -93,6 +95,7 @@ export function createPromptExportNativeService(dependencies: PromptExportNative
       return formatPromptExport(input)
     },
     async savePromptToFile(input: SavePromptToFileInput): Promise<SavePromptToFileResult> {
+      const epoch = dependencies.appLockGuard?.capture()
       const result = exportResultForSave(input)
       dependencies.privacyGuard.assertAuthorized({
         action: "prompt_export",
@@ -103,6 +106,7 @@ export function createPromptExportNativeService(dependencies: PromptExportNative
         defaultPath: result.filename,
         filters: [{ name: "Markdown", extensions: ["md"] }],
       })
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
 
       if (dialogResult.canceled) {
         return { cancelled: true }
@@ -112,16 +116,19 @@ export function createPromptExportNativeService(dependencies: PromptExportNative
         throw new Error("Save dialog did not return a file path")
       }
 
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       await dependencies.writeFile(dialogResult.filePath, result.content)
 
       return { cancelled: false, filePath: dialogResult.filePath }
     },
     async copyText(input: CopyTextInput): Promise<CopyTextResult> {
+      const epoch = dependencies.appLockGuard?.capture()
       dependencies.privacyGuard.assertAuthorized({
         action: "clipboard_copy",
         payload: input.text,
         privacyConfirmationSessionId: input.privacyConfirmationSessionId,
       })
+      if (epoch !== undefined) dependencies.appLockGuard?.check(epoch)
       dependencies.copyText(input.text)
       return { copied: true }
     },

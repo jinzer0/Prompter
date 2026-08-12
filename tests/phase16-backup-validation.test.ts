@@ -281,9 +281,7 @@ describe("Phase 16 backup validation", () => {
     expect(() =>
       harness.sessions.requireReadyImportSession(validated.preview.importSessionId),
     ).toThrow("expired")
-    expect(harness.sessions.getImportSession(validated.preview.importSessionId)?.status).toBe(
-      "expired",
-    )
+    expect(harness.sessions.getImportSession(validated.preview.importSessionId)).toBeNull()
     const cancellable = await harness.service.validateBackupFile()
     if (cancellable.cancelled) {
       throw new Error("Expected a validation preview")
@@ -298,12 +296,8 @@ describe("Phase 16 backup validation", () => {
     harness.sessions.consumeImportSessionAfterFailure(failed.preview.importSessionId)
 
     // Then: each terminal state is visible only in this process and a new store has no old IDs.
-    expect(harness.sessions.getImportSession(cancellable.preview.importSessionId)?.status).toBe(
-      "cancelled",
-    )
-    expect(harness.sessions.getImportSession(failed.preview.importSessionId)?.status).toBe(
-      "consumed",
-    )
+    expect(harness.sessions.getImportSession(cancellable.preview.importSessionId)).toBeNull()
+    expect(harness.sessions.getImportSession(failed.preview.importSessionId)).toBeNull()
     const restarted = createBackupImportSessionStore({ now: () => 1_000, createId: randomUUID })
     expect(restarted.getImportSession(cancellable.preview.importSessionId)).toBeNull()
   })

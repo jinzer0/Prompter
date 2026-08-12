@@ -7,6 +7,8 @@ import { createElectronBridge } from "../electron/bridge"
 import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
 import { createPersistenceIpcHandlers } from "../electron/ipc-handlers"
 import type { ExportPromptInput, ExportPromptResult } from "../electron/ipc-types"
+import { createPrivacyGuardService } from "../electron/privacy/privacy-guard-service"
+import { privacySettingsSchema } from "../electron/privacy/privacy-schemas"
 import { createPromptExportNativeService } from "../electron/prompt-export-native"
 import { listFiles, validPromptAssetId } from "./electron-contract-helpers"
 import { createFailingServices } from "./electron-contract-service-fixture"
@@ -147,6 +149,9 @@ describe("Phase 8 export native boundary contract", () => {
         writeFile,
         copyText: () => undefined,
         readText: () => "",
+        privacyGuard: createPrivacyGuardService({
+          getPrivacySettings: () => privacySettingsSchema.parse({}),
+        }),
       })
 
       await expect(
@@ -172,6 +177,9 @@ describe("Phase 8 export native boundary contract", () => {
       writeFile,
       copyText: () => undefined,
       readText: () => clipboardText,
+      privacyGuard: createPrivacyGuardService({
+        getPrivacySettings: () => privacySettingsSchema.parse({}),
+      }),
     })
 
     await expect(service.readText()).resolves.toEqual({

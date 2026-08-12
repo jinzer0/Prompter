@@ -162,10 +162,35 @@ describe("phase18 insights workspace integration", () => {
     )
   })
 
+  it("preserves the Phase 18 workspace while Privacy Center uses the same mounted swap", () => {
+    // Given: the application composition after Privacy Center is added.
+    const appSource = readFileSync("renderer/src/app.tsx", "utf8")
+    const workspaceNavigationSource = readFileSync(
+      "renderer/src/components/shell/workspace-view-navigation.tsx",
+      "utf8",
+    )
+    const navigationSource = readFileSync(
+      "renderer/src/hooks/use-insights-workspace-navigation.ts",
+      "utf8",
+    )
+    // When: workspace visibility and sidebar routes are inspected.
+    // Then: Library remains mounted and both read-only workspaces are explicit selections.
+    expect(navigationSource).toContain(
+      'export type WorkspaceView = "library" | "insights" | "privacy"',
+    )
+    expect(appSource).toContain('data-testid="privacy-workspace"')
+    expect(workspaceNavigationSource).toContain('data-menu-action-target="privacy-center"')
+    expect(appSource).toContain(
+      'insightsNavigation.workspaceView === "library" ? "contents" : "hidden"',
+    )
+    expect(appSource).not.toMatch(/workspaceView.*&&.*(setDraft|scanLibrary|analyze|compile)/)
+  })
+
   it("provides stable sidebar and destination targets without clicking quality actions", () => {
     // Given: the sidebar, manager, library, and quality component sources.
     const sources = [
       "renderer/src/app.tsx",
+      "renderer/src/components/shell/workspace-view-navigation.tsx",
       "renderer/src/components/prompt-library-panel.tsx",
       "renderer/src/components/prompt-template-manager.tsx",
       "renderer/src/components/harness-template-manager.tsx",

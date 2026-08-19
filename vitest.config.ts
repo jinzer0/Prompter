@@ -3,6 +3,7 @@ import { defineConfig } from "vitest/config"
 export default defineConfig({
   test: {
     include: [
+      "tests/package-macos.test.mjs",
       "tests/privacy-guard-service.test.ts",
       "tests/privacy-guard-integration.test.ts",
       "tests/privacy-guard-analyze-integration.test.ts",

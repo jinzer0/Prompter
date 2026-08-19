@@ -281,7 +281,7 @@ describe("Electron shell contract", () => {
     expect(packageScript).toContain("Prompter.app")
     expect(packageScript).toContain(zipTemplate)
     expect(packageScript).toContain("CFBundleExecutable")
-    expect(packageScript).toContain('"Contents", "MacOS", "Electron"')
+    expect(packageScript).toContain('join(packagedApp, "Contents", "MacOS", appName)')
     expect(packageScript).toContain("better-sqlite3")
     expect(packageScript).toContain("drizzle")
     expect(packageScript).toContain("unsigned")

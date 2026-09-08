@@ -166,7 +166,7 @@ test("renames the main executable and all Electron helper bundles into a runnabl
   await assert.rejects(access(join(contentsPath, "MacOS", "Electron")))
 
   const appPlist = await readFile(join(contentsPath, "Info.plist"), "utf8")
-  assertBundlePlist(appPlist, "com.local.prompter", "Prompter")
+  assertBundlePlist(appPlist, "com.jinzer0.prompter", "Prompter")
 
   const frameworksPath = join(contentsPath, "Frameworks")
   for (const helperName of electronHelperNames) {
@@ -179,7 +179,7 @@ test("renames the main executable and all Electron helper bundles into a runnabl
     const helperPlist = await readFile(join(helperContentsPath, "Info.plist"), "utf8")
     assertBundlePlist(
       helperPlist,
-      `com.local.prompter.helper${helperSuffix(helperName)}`,
+      `com.jinzer0.prompter.helper${helperSuffix(helperName)}`,
       renamedHelperName,
     )
     const nestedDictionaryEnd = helperPlist.indexOf("</dict>")

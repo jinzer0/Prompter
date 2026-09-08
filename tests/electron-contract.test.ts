@@ -273,15 +273,17 @@ describe("Electron shell contract", () => {
       readonly scripts?: Record<string, string>
     }
     const packageScript = await readFile("scripts/package-macos.mjs", "utf8")
-    const zipTemplate = ["darwin-", "{process.arch}.zip"].join("$")
+    const zipTemplate = ["$", "{appName}-", "$", "{version}-mac-", "$", "{architecture}.zip"].join(
+      "",
+    )
 
     expect(packageJson.scripts?.["package"]).toBe("npm run build && node scripts/package-macos.mjs")
     expect(packageJson.scripts?.["make"]).toBe("npm run package")
-    expect(packageScript).toContain("com.local.prompter")
+    expect(packageScript).toContain("com.jinzer0.prompter")
     expect(packageScript).toContain("Prompter.app")
     expect(packageScript).toContain(zipTemplate)
     expect(packageScript).toContain("CFBundleExecutable")
-    expect(packageScript).toContain('join(packagedApp, "Contents", "MacOS", appName)')
+    expect(packageScript).toContain('join(appPath, "Contents", "MacOS", appName)')
     expect(packageScript).toContain("better-sqlite3")
     expect(packageScript).toContain("drizzle")
     expect(packageScript).toContain("unsigned")

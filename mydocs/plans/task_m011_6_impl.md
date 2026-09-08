@@ -18,6 +18,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6 | 8 | pre-PR review blocker 교정과 재검증 | macOS release scripts, focused tests, Stage 6 보고서, 최종 보고서 갱신 | blocker 7건 교정, full validation, fresh review 통과 전 PR 차단 |
 | 6.2 | 8 | failed fresh review blocker 교정 addendum | Stage 6.2 governance, release pre-build validator, helper ownership, tests/docs/evidence 갱신 | fresh blocker 전건 교정, checked-in regression matrix, five-lane PASS 전 closure 차단 |
 | 6.3 | 8 | latest fresh-review failure 교정 addendum | Stage 6.3 governance, alias provenance, candidate ownership, state-machine/schema regressions | code-quality blocker 2건과 regression gap 전건 교정, fresh five-lane PASS 전 closure 차단 |
+| 6.4 | 8 | latest failed fresh-review 교정 addendum | Stage 6.4 governance, Electron 43 alias/version binding, preflight-before-candidate ordering, pending-state/schema regressions | five-lane FAIL blocker 전건 교정, direct security review 포함 fresh five-lane PASS 전 closure 차단 |
 
 ## 구현 전 공통 기준
 
@@ -940,6 +941,114 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
 별도 승인하기 전까지 차단한다. 기존 Stage 6/final report drafts는 uncommitted 상태로 byte-preserved
 보존하며 이 governance commit에 포함하지 않는다.
 
+## Stage 6.4 - latest failed fresh-review 교정 addendum
+
+최신 fresh five-lane review 결과는 Security PASS, Code quality FAIL, Goal FAIL, Context FAIL,
+QA FAIL이다. Security PASS는 same-user evidence/candidate race hardening을 medium note로 남겼지만
+closure를 허용하지 않는다. Stage 6.4는 product code, tests, official docs, evidence, preserved report
+draft를 수정하기 전 governance와 orders note만 먼저 고정한다. 아래 blocker를 모두 교정하고 direct
+security review와 installed Electron probe를 포함한 fresh five-lane review가 전부 PASS하기 전까지 Stage
+6 closure report commit, final report commit, orders 완료 처리, `publish/task6` push, PR, Todo 8 완료,
+Issue #7 진입을 차단한다.
+
+### latest failed fresh-review lane 판정
+
+| Lane | 판정 | Stage 6.4 의미 |
+|---|---|---|
+| Security | PASS | Same-user race hardening note는 잔여 위험으로 보존하되 release boundary 차단 사유는 아니다. Fresh closure 전 direct security review를 다시 요구한다. |
+| Code quality | FAIL | real Electron 43 `Helpers`/`Libraries` alias rejection, mixed-version alias binding gap, alias descendant traversal, helper error taxonomy를 교정한다. |
+| Goal | FAIL | root `Versions/Current`와 root binary 및 conventional root directory aliases가 같은 canonical version에 묶이지 않아 목표 계약을 충족하지 못했다. |
+| Context | FAIL | Stage 6.3의 concurrency 언어가 root Todo 5의 preflight-before-candidate-mutation 계약보다 앞서 해석될 수 있어 정정한다. |
+| QA | FAIL | accepted-pending coordinator boundary와 executable final-evidence schema regression이 부족하고 QA checklist temporal wording이 맞지 않는다. |
+
+### Stage 6.4 blocker 매핑
+
+| Blocking finding | 재현된 동작 또는 결함 | 소유 파일 | 필수 테스트와 증거 |
+|---|---|---|---|
+| Electron 43 framework compatibility | 실제 Electron 43 framework root에는 `Versions/Current`, root framework binary, `Resources`, `Headers`, `Modules`, `Helpers`, `Libraries` aliases가 있을 수 있다. 현재 allowlist는 `Helpers`와 `Libraries`를 막아 설치된 번들을 거부한다. | `scripts/macos/framework-alias.mjs`, `scripts/macos/signing.mjs`, `tests/package-macos-signing.test.mjs` | complete conventional-layout fixture가 Current, root binary, Resources, Headers, Modules, Helpers, Libraries, nested executable/Mach-O descendants, one-time canonical inspection, installed Electron 43 discovery regression을 고정한다. Runtime evidence는 observed target count와 layout을 별도로 기록한다. |
+| mixed-version alias binding | `Versions/Current -> A`인데 root binary 또는 root directory alias가 `Versions/B`로 향해도 같은 framework 내부라는 이유로 통과할 수 있다. | `scripts/macos/framework-alias.mjs`, `tests/package-macos-signing.test.mjs` | root framework binary alias와 모든 conventional root directory alias는 같은 framework의 same `Versions/Current` canonical version에 묶인다. Current -> A, root binary/resources -> B 같은 mixed-version layout은 reject한다. |
+| allowed-alias nested descendants | 허용된 directory alias 자체는 검증되지만 traversal이 lexical alias path를 유지하면 nested signable descendant가 arbitrary alias처럼 오분류될 수 있다. | `scripts/macos/signing.mjs`, `scripts/macos/framework-alias.mjs` | directory alias provenance를 검증한 뒤 canonical `targetPath`로 descendant traversal을 진행한다. `Helpers`와 `Libraries` 내부 nested executable/Mach-O가 arbitrary alias가 아니라 same-current-version accepted alias descendant로 분류됨을 증명한다. |
+| preflight ordering conflict | Stage 6.3은 candidate ownership을 모든 non-mutating preflight 직후로 썼지만 실제 plan text와 code flow가 notary profile preflight보다 reservation을 앞세웠다. 이는 root Todo 5의 preflight-before-candidate-mutation 계약과 충돌한다. | `scripts/release-macos.mjs`, `scripts/macos/release-lifecycle.mjs`, `tests/package-macos.test.mjs`, `docs/release-macos.md`, `docs/qa-checklist.md` | identity, Keychain, notary profile, connectivity preflight가 모두 candidate mutation 전에 끝난다. Atomic candidate reservation은 그 직후, staging, assembly, signing, evidence, submit, archive 전에 실행된다. Docs는 candidate가 absent여야 한다고 쓰고 notary connectivity가 candidate mutation 전에 온다고 정확히 말한다. |
+| concurrent loser scope | Stage 6.3 loser-zero-profile assertion은 higher-priority preflight contract와 충돌한다. | `tests/package-macos.test.mjs`, `scripts/release-macos.mjs` | Stage 6.3의 loser-zero-profile assertion만 명시적으로 supersede한다. concurrent loser는 required non-mutating notary profile preflight를 수행할 수 있지만 candidate ownership, staging, assembly, signing, evidence writes, submit/info/log for artifact recovery, staple, archive, DMG, checksum은 0건이어야 한다. |
+| accepted-pending coordinator boundary | module-level pending tests는 있으나 `acceptNotarization` 또는 full coordinator boundary에서 In Progress/Rejected가 downstream을 막는지 부족하다. | `scripts/macos/release-lifecycle.mjs`, `scripts/release-macos.mjs`, `tests/package-macos.test.mjs`, `tests/package-macos-notarization.test.mjs` | accepted-pending In Progress와 Rejected를 `acceptNotarization` 또는 full coordinator boundary로 통과시켜 no staple, no Gatekeeper, no archive, no DMG, no checksum, no resubmit을 증명한다. |
+| executable final-evidence schema | QA evidence validator가 docs snippet 또는 unexecuted duplicated logic에 머물 수 있고 wrong root kind, missing/extra/mismatch fields, warning/error issues를 충분히 fail closed로 고정하지 않는다. | `scripts/macos/notarization-evidence.mjs`, `docs/qa-checklist.md`, `tests/package-macos-notarization.test.mjs` | wrong root kind, missing field, extra field, mismatched field, warning issue, error issue, valid app, valid DMG cases를 checked-in executable tests로 검증한다. 구현이 선택하면 strict final-evidence validator를 `scripts/macos/notarization-evidence.mjs`에서 reusable export로 빼고 docs와 tests가 같은 코드를 호출한다. |
+| helper error taxonomy and LOC | alias helper가 generic `Error`를 던져 signing domain error와 일관되지 않을 수 있다. | `scripts/macos/framework-alias.mjs`, `scripts/macos/signing.mjs` | 250 production pure LOC 상한을 유지하면서 가능하면 alias helper가 decision을 return하거나 signing domain error를 일관되게 throw하게 한다. 불가하면 Stage report에 LOC와 error taxonomy tradeoff를 명시한다. |
+
+### Stage 6.3 concurrency language 정정
+
+- Root Todo 5 계약이 우선한다. 모든 identity, Keychain, notary profile, connectivity preflight는 candidate
+  mutation 전에 끝나야 한다.
+- Atomic exclusive candidate ownership은 위 preflight가 끝난 즉시 예약한다. 그 뒤에만 staging, app
+  assembly, signing, evidence write, app submit, archive, DMG, checksum이 가능하다.
+- Stage 6.3의 loser-zero-profile assertion만 supersede한다. concurrent loser는 non-mutating notary profile
+  preflight를 수행할 수 있다.
+- concurrent loser는 candidate ownership, staging, assembly, signing, evidence writes, submit/info/log for
+  artifact recovery, staple, archive, DMG, checksum을 수행할 수 없다.
+- Atomic exclusive candidate ownership과 caller-owned candidate cleanup guarantee는 유지한다. 실패 cleanup은
+  owner token 또는 동등한 ownership proof가 있는 task-created candidate만 제거한다.
+
+### Stage 6.4 산출물
+
+수정:
+
+- `scripts/macos/framework-alias.mjs`
+- `scripts/macos/signing.mjs`
+- `scripts/release-macos.mjs`
+- `scripts/macos/release-lifecycle.mjs`
+- `scripts/macos/notarization-evidence.mjs` if reusable strict final-evidence validator is chosen
+- `tests/package-macos-signing.test.mjs`
+- `tests/package-macos.test.mjs`
+- `tests/package-macos-notarization.test.mjs`
+- `docs/release-macos.md`
+- `docs/qa-checklist.md`
+- `mydocs/working/task_m011_6_stage6.md` only after Stage 6.4 validation
+- `mydocs/report/task_m011_6_report.md` only after fresh five-lane PASS and closure approval
+- `mydocs/orders/20260908.md` remains `진행중` until closure approval
+
+Evidence:
+
+- `.omo/evidence/task-8-stage6-4-fresh-review-remediation.md` (ignored, sanitized)
+
+Preserved drafts:
+
+- `mydocs/report/task_m011_6_report.md` and `mydocs/working/task_m011_6_stage6.md` must remain
+  byte-for-byte unchanged by the governance commit. They are not Stage 6.4 closure evidence yet.
+
+### Stage 6.4 validation matrix
+
+| Check class | Required commands or proof | PASS condition |
+|---|---|---|
+| targeted alias | checked-in tests for Current, root binary, Resources, Headers, Modules, Helpers, Libraries, nested executable/Mach-O descendants, one-time canonical inspection, mixed-version rejection | valid Electron 43 conventional aliases pass, arbitrary aliases fail closed, mixed versions fail closed |
+| installed Electron probe | checked-in discovery regression when dev dependency is installed, using fake read-only file runner and zero codesign calls | installed Electron 43 layout is accepted and target count/layout are recorded in ignored runtime evidence |
+| preflight ordering | coordinator tests for identity, Keychain, notary profile and connectivity before candidate reservation | candidate directory is absent before preflight, then atomically reserved before staging, assembly, signing, evidence, submit, archive, DMG, checksum |
+| concurrent loser | deterministic concurrent or two-invocation test | loser may complete non-mutating profile preflight but has zero ownership, staging, assembly, signing, evidence writes, submit/info/log for artifact recovery, staple, archive, DMG, checksum |
+| accepted-pending coordinator | `acceptNotarization` or full coordinator boundary tests for In Progress and Rejected | no staple, no Gatekeeper, no archive, no DMG, no checksum, no resubmit |
+| evidence schema | executable checked-in final-evidence validator tests | wrong root kind, missing field, extra field, mismatched field, warning issue, error issue reject; valid app and DMG pass |
+| docs wording | `docs/release-macos.md` and `docs/qa-checklist.md` review | docs say absent candidate, not empty; notary connectivity before candidate mutation; pre-release absence/preflight checks occur before signed command, post-release checks occur after success |
+| focused | `npm test -- tests/package-macos.test.mjs tests/package-macos-signing.test.mjs tests/package-macos-notarization.test.mjs tests/electron-contract.test.ts` | focused suite passes with checked-in regressions |
+| full | `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` | all exit 0 or pre-existing environment limits are classified |
+| package and smoke | unsigned package, signed missing-input expected failure, Electron smoke | unsigned succeeds; signed path fails before mutation when inputs are absent; smoke passes |
+| protected | protected-path diff, whitespace, artifact cleanup, secret and publication scans | no protected diff, no whitespace issue, no tracked generated artifact, no secret leakage, no publication command |
+| five-lane review | fresh Goal, QA, Code quality, Context, direct Security lanes plus installed Electron probe | all five lanes PASS before closure report, orders completion, push, PR, Todo 8, or Issue #7 |
+
+### Stage 6.4 커밋 경계
+
+이 addendum과 orders latest failed fresh-review remediation note만 먼저 고정한다.
+
+```text
+Task #6: Stage 6.4 재검토 교정 계획
+```
+
+제품, 테스트, 공식 문서 교정은 다음 implementation commit으로만 고정한다.
+
+```text
+Task #6 [Stage 6.4]: Electron alias와 preflight 계약 교정
+```
+
+Stage 6.2와 Stage 6.3에서 고정한 fixes와 250 production pure LOC 상한은 유지한다. Fresh five-lane
+review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Stage 6 closure reports, orders completion,
+`publish/task6` push, PR, Todo 8 completion, Issue #7 entry는 blocked 상태다.
+
 ## UltraQA trigger 매핑
 
 | 실패 클래스 | 주입/관찰 방법 | 필수 fail-closed 결과 | Stage/Evidence |
@@ -956,6 +1065,7 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
 | forbidden publication | fake trace와 static scan에서 `gh release`, `git tag`, upload/publish 탐지 | 구현 이슈 실패 처리, 원격 ref/release 변경 0건 | Stage 3/5, task-5/8 evidence |
 | pre-PR review blockers | Electron framework layout, detach failure, exact version, artifact-bound resume, timeout/abort, DMG runtime signing, ownership variance fixture와 review 재실행 | blocker 7건 교정, Stage 6 report 작성, fresh review PASS 전 PR 0건 | Stage 6, task-8-stage6 evidence |
 | failed fresh review blockers | pre-build version entrypoint, traversal-order alias, accepted-log retry, absolute Apple tools, helper ownership, checked-in regression gaps, docs/evidence wording을 재현 | blocker 전건 교정, Stage 6.2 report 작성, five-lane PASS 전 closure 0건 | Stage 6.2, task-8-stage6-2 evidence |
+| latest failed fresh review blockers | Electron 43 Helpers/Libraries alias, same-Current mixed-version binding, accepted alias descendant traversal, preflight-before-candidate ordering, accepted-pending coordinator boundary, executable evidence schema, docs temporal wording을 재현 | blocker 전건 교정, Stage 6.4 report 작성, direct security review 포함 five-lane PASS 전 closure 0건 | Stage 6.4, task-8-stage6-4 evidence |
 
 ## 검증
 
@@ -975,6 +1085,9 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
   closure와 PR publication을 완료로 취급하지 않는다.
 - failed fresh review blocker가 확인된 뒤에는 Stage 6.2 검증과 fresh five-lane PASS 전까지 Stage 6
   closure report commit, orders 완료 처리, PR publication, Issue #7 진입을 완료로 취급하지 않는다.
+- latest failed fresh review blocker가 확인된 뒤에는 Stage 6.4 검증과 fresh five-lane PASS 전까지 Stage
+  6 closure report commit, final report commit, orders 완료 처리, PR publication, Todo 8 완료, Issue #7
+  진입을 완료로 취급하지 않는다.
 
 ## 커밋
 
@@ -985,6 +1098,8 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
   - `Task #6: Stage 6 교정 계획과 오늘할일 재개`
 - failed fresh review 뒤 Stage 6.2 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
   - `Task #6: Stage 6.2 재검토 교정 계획`
+- latest failed fresh review 뒤 Stage 6.4 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
+  - `Task #6: Stage 6.4 재검토 교정 계획`
 - Stage 산출물과 `mydocs/working/task_m011_6_stage{N}.md`는 같은 Stage 커밋에 둔다.
 - Stage 1: `Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가`
 - Stage 2: `Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가`
@@ -994,10 +1109,13 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
 - Stage 6 제품 교정: `Task #6 Stage 6: pre-PR blocker 교정`
 - Stage 6.1 후속 보강: `Task #6 [Stage 6.1]: Stage 6 교정 후속 보강`
 - Stage 6.2 제품 교정: `Task #6 [Stage 6.2]: fresh review blocker 교정`
+- Stage 6.4 제품 교정: `Task #6 [Stage 6.4]: Electron alias와 preflight 계약 교정`
 - Stage 6 검증 및 보고서: `Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료`
 - 구현계획서, Stage, 최종 보고서의 각각의 승인 전에는 해당 커밋/push/PR을 실행하지 않는다.
 - Stage 6.2 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push와
   `master` 대상 PR 생성을 실행하지 않는다.
+- Stage 6.4 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push,
+  `master` 대상 PR 생성, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
 
 ## 단계 의존성
 
@@ -1014,6 +1132,9 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
 - Stage 6.2는 failed fresh review의 blocking finding 전건을 고친 뒤 checked-in regression matrix,
   corrected Stage 6 evidence wording, Stage 6 report 갱신, final report 갱신, fresh five-lane PASS를
   요구한다.
+- Stage 6.4는 latest failed fresh review의 blocking finding 전건을 고친 뒤 Electron 43 installed
+  discovery probe, root preflight-before-candidate ordering, coordinator pending-state, executable final-evidence
+  schema, docs wording, Stage 6 report 갱신, final report 갱신, fresh five-lane PASS를 요구한다.
 - 이슈 #7은 Stage 6 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
 
 ## 위험과 대응
@@ -1038,6 +1159,10 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
 - **fresh review blocker 재발**: Stage 6.2에서 실제 npm entrypoint, traversal-order alias,
   accepted-log retry, absolute Apple tool path, helper ownership, checked-in matrix, docs/evidence wording을
   모두 소유 파일과 검증 lane에 연결하고, five-lane PASS 전에는 closure와 PR publication을 차단한다.
+- **latest failed fresh review blocker 재발**: Stage 6.4에서 Electron 43 `Helpers`/`Libraries`, same-Current
+  alias binding, preflight-before-candidate ordering, concurrent loser scope, accepted-pending coordinator
+  boundary, executable evidence schema, docs temporal wording을 소유 파일과 검증 lane에 연결하고,
+  five-lane PASS 전에는 closure, PR publication, Todo 8 완료, Issue #7 진입을 차단한다.
 
 ## 승인 요청 사항
 
@@ -1059,6 +1184,10 @@ Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모�
 - failed fresh review 이후 Stage 6.2 교정 계획, Stage 6.1 helper ownership, release-version preflight,
   checked-in regression matrix, docs/evidence wording correction, governance commit, implementation commit,
   fresh five-lane PASS 전 closure 차단 조건
+- latest failed fresh review 이후 Stage 6.4 교정 계획, Electron 43 conventional alias compatibility,
+  same-current-version binding, preflight-before-candidate ordering, coordinator pending-state regression,
+  executable final-evidence schema, docs wording correction, governance commit, implementation commit,
+  direct security review 포함 fresh five-lane PASS 전 closure 차단 조건
 
 이 구현계획서가 명시적으로 승인되기 전에는 governance 문서를 포함한 어떤 커밋도 만들지
 않고, 제품/소스/테스트/공식 문서를 수정하거나 live Apple/GitHub release 명령을 실행하지

@@ -18,7 +18,7 @@
     "test:smoke": "npm run native:electron && playwright test",
     "package": "npm run build && node scripts/package-macos.mjs",
     "make": "npm run package",
-    "package:release:macos": "node scripts/package-macos.mjs --release-preflight"
+    "package:release:macos": "npm run build && node scripts/release-macos.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

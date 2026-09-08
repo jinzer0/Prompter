@@ -15,19 +15,13 @@ Use this checklist after Phase 10 and later release-candidate changes before pac
 
 ## Signed macOS Release Checks
 
-Run this section only for the maintainer signed release path. These checks assume
-`npm run package:release:macos` has already completed successfully on ARM64 macOS and created
-`release/v0.1.1/`.
+Run the pre-release checks below before the maintainer signed command on ARM64 macOS. Run the
+post-release checks only after `npm run package:release:macos` completes successfully.
 
 Prepare local path variables without embedding secrets:
 
 ```bash
 RELEASE_DIR="release/v0.1.1"
-ZIP_PATH="${RELEASE_DIR}/Prompter-0.1.1-mac-arm64.zip"
-DMG_PATH="${RELEASE_DIR}/Prompter-0.1.1-mac-arm64.dmg"
-CHECKSUM_PATH="${RELEASE_DIR}/SHA256SUMS"
-EXTRACT_DIR="$(mktemp -d)"
-MOUNT_DIR="$(mktemp -d)"
 ```
 
 - [ ] The version-specific candidate directory is absent before the release starts:
@@ -39,8 +33,8 @@ MOUNT_DIR="$(mktemp -d)"
 - [ ] Full Xcode is selected and visible to the active shell:
 
   ```bash
-  xcode-select -p
-  xcodebuild -version
+  /usr/bin/xcode-select -p
+  /usr/bin/xcodebuild -version
   ```
 
 - [ ] Required release variables are present without printing their values:
@@ -50,6 +44,19 @@ MOUNT_DIR="$(mktemp -d)"
   : "${PROMPTER_NOTARY_PROFILE:?PROMPTER_NOTARY_PROFILE is required}"
   test -n "${PROMPTER_SIGNING_IDENTITY}"
   test -n "${PROMPTER_NOTARY_PROFILE}"
+  ```
+
+- [ ] The Keychain is unlocked and exactly one signing identity is available:
+
+  ```bash
+  /usr/bin/security show-keychain-info
+  /usr/bin/security find-identity -v -p codesigning
+  ```
+
+- [ ] The named notary profile can complete its connectivity preflight:
+
+  ```bash
+  /usr/bin/xcrun notarytool history --keychain-profile "${PROMPTER_NOTARY_PROFILE}" --output-format json
   ```
 
 - [ ] Unsigned local packaging and signed release scripts map to the approved commands:
@@ -69,6 +76,24 @@ MOUNT_DIR="$(mktemp -d)"
   }
   NODE
   ```
+
+- [ ] Run the signed command only after the preceding absence and preflight checks pass:
+
+  ```bash
+  npm run package:release:macos
+  ```
+
+## Signed macOS Post-Release Checks
+
+Prepare artifact paths only after the signed command succeeds:
+
+```bash
+ZIP_PATH="${RELEASE_DIR}/Prompter-0.1.1-mac-arm64.zip"
+DMG_PATH="${RELEASE_DIR}/Prompter-0.1.1-mac-arm64.dmg"
+CHECKSUM_PATH="${RELEASE_DIR}/SHA256SUMS"
+EXTRACT_DIR="$(mktemp -d)"
+MOUNT_DIR="$(mktemp -d)"
+```
 
 - [ ] The release candidate contains only the approved final files:
 
@@ -92,49 +117,22 @@ MOUNT_DIR="$(mktemp -d)"
   `Prompter-0.1.1-mac-arm64.dmg`, and `SHA256SUMS`.
 
 - [ ] The app notarization evidence and DMG notarization evidence are separate, sanitized, and
-      show `Accepted` plus warning-free and error-free log receipts:
+       show `Accepted` plus warning-free and error-free log receipts:
+
+  The shared validator verifies matching `submissionId`, `artifactKind`, and `artifactSha256`
+  fields rather than duplicating the final-evidence schema in this checklist.
 
   ```bash
   node --input-type=module <<'NODE'
-  import { readFile } from "node:fs/promises"
-  import { join } from "node:path"
+  import { validateFinalNotarizationEvidence } from "./scripts/macos/notarization-evidence.mjs"
 
-  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
   const roots = [
     [".omo/evidence/release-macos/v0.1.1/app", "app"],
     [".omo/evidence/release-macos/v0.1.1/dmg", "dmg"],
   ]
 
   for (const [root, artifactKind] of roots) {
-    const resume = JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8"))
-    if (resume.status !== "Accepted" || !uuid.test(resume.submissionId)) {
-      throw new Error(`Invalid notarization resume: ${root}`)
-    }
-    if (resume.logPath !== `notary-${resume.submissionId}.json`) {
-      throw new Error(`Invalid notarization log path: ${root}`)
-    }
-    const receipt = JSON.parse(await readFile(join(root, resume.logPath), "utf8"))
-    for (const field of ["submissionId", "artifactKind", "artifactSha256"]) {
-      if (resume[field] !== receipt[field]) {
-        throw new Error(`Mismatched notarization evidence field ${field}: ${root}`)
-      }
-    }
-    if (
-      resume.artifactKind !== artifactKind ||
-      !/^[0-9a-f]{64}$/.test(resume.artifactSha256) ||
-      !Array.isArray(receipt.issues) ||
-      JSON.stringify(Object.keys(resume).sort()) !==
-        JSON.stringify(["artifactKind", "artifactSha256", "logPath", "status", "submissionId"]) ||
-      JSON.stringify(Object.keys(receipt).sort()) !==
-        JSON.stringify(["artifactKind", "artifactSha256", "issues", "submissionId"])
-    ) {
-      throw new Error(`Invalid notarization receipt: ${root}`)
-    }
-    for (const issue of receipt.issues) {
-      if (issue?.severity === "warning" || issue?.severity === "error") {
-        throw new Error(`Unsafe notarization issue severity: ${root}`)
-      }
-    }
+    await validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind })
   }
   NODE
   ```
@@ -142,31 +140,31 @@ MOUNT_DIR="$(mktemp -d)"
 - [ ] The final ZIP extracts cleanly and the contained app has a strict valid signature:
 
   ```bash
-  ditto -x -k "${ZIP_PATH}" "${EXTRACT_DIR}"
-  codesign --verify --deep --strict "${EXTRACT_DIR}/Prompter.app"
+  /usr/bin/ditto -x -k "${ZIP_PATH}" "${EXTRACT_DIR}"
+  /usr/bin/codesign --verify --deep --strict "${EXTRACT_DIR}/Prompter.app"
   ```
 
 - [ ] The extracted app has a valid stapled ticket and passes Gatekeeper execute assessment:
 
   ```bash
-  xcrun stapler validate "${EXTRACT_DIR}/Prompter.app"
-  spctl --assess --type execute --verbose=4 "${EXTRACT_DIR}/Prompter.app"
+  /usr/bin/xcrun stapler validate "${EXTRACT_DIR}/Prompter.app"
+  /usr/sbin/spctl --assess --type execute --verbose=4 "${EXTRACT_DIR}/Prompter.app"
   ```
 
 - [ ] The DMG image verifies, has a strict valid signature, has a valid stapled ticket, and passes
       Gatekeeper open assessment:
 
   ```bash
-  hdiutil verify "${DMG_PATH}"
-  codesign --verify --strict "${DMG_PATH}"
-  xcrun stapler validate "${DMG_PATH}"
-  spctl --assess --type open --verbose=4 "${DMG_PATH}"
+  /usr/bin/hdiutil verify "${DMG_PATH}"
+  /usr/bin/codesign --verify --strict "${DMG_PATH}"
+  /usr/bin/xcrun stapler validate "${DMG_PATH}"
+  /usr/sbin/spctl --assess --type open --verbose=4 "${DMG_PATH}"
   ```
 
 - [ ] The DMG mounts read-only and contains `Prompter.app`:
 
   ```bash
-  hdiutil attach -readonly -nobrowse -mountpoint "${MOUNT_DIR}" "${DMG_PATH}"
+  /usr/bin/hdiutil attach -readonly -nobrowse -mountpoint "${MOUNT_DIR}" "${DMG_PATH}"
   test -d "${MOUNT_DIR}/Prompter.app"
   ```
 
@@ -174,15 +172,15 @@ MOUNT_DIR="$(mktemp -d)"
       assessment:
 
   ```bash
-  codesign --verify --deep --strict "${MOUNT_DIR}/Prompter.app"
-  spctl --assess --type execute --verbose=4 "${MOUNT_DIR}/Prompter.app"
-  hdiutil detach "${MOUNT_DIR}"
+  /usr/bin/codesign --verify --deep --strict "${MOUNT_DIR}/Prompter.app"
+  /usr/sbin/spctl --assess --type execute --verbose=4 "${MOUNT_DIR}/Prompter.app"
+  /usr/bin/hdiutil detach "${MOUNT_DIR}"
   ```
 
 - [ ] The packaged app plist maps to the expected bundle identity and version:
 
   ```bash
-  plutil -p "${EXTRACT_DIR}/Prompter.app/Contents/Info.plist"
+  /usr/bin/plutil -p "${EXTRACT_DIR}/Prompter.app/Contents/Info.plist"
   ```
 
   Confirm `CFBundleIdentifier` is `com.jinzer0.prompter`, `CFBundleShortVersionString` is
@@ -192,13 +190,13 @@ MOUNT_DIR="$(mktemp -d)"
       mount checks pass:
 
   ```bash
-  (cd "${RELEASE_DIR}" && shasum -a 256 -c "SHA256SUMS")
+  (cd "${RELEASE_DIR}" && /usr/bin/shasum -a 256 -c "SHA256SUMS")
   ```
 
 - [ ] The extracted app smoke-opens from the signed artifact:
 
   ```bash
-  open -n "${EXTRACT_DIR}/Prompter.app"
+  /usr/bin/open -n "${EXTRACT_DIR}/Prompter.app"
   ```
 
 - [ ] If any signed release check fails, no GitHub Release, tag, upload, public README update, or

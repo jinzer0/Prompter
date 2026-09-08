@@ -151,3 +151,58 @@ export function createNotarizationEvidence(options) {
     },
   })
 }
+
+export async function validateFinalNotarizationEvidence(options) {
+  const value = exactNotarizationObject(
+    options,
+    ["evidenceDir", "artifactKind"],
+    "Invalid final notarization evidence",
+  )
+  if (!["app", "dmg"].includes(value.artifactKind)) {
+    failNotarization("Invalid final notarization evidence")
+  }
+  const evidenceDir = evidenceDirectory(value.evidenceDir)
+  let saved
+  let receipt
+  try {
+    saved = resume(json(await readFile(join(evidenceDir, resumeFileName), "utf8"), "resume state"))
+    receipt = json(await readFile(join(evidenceDir, saved.logPath), "utf8"), "notarization receipt")
+  } catch {
+    failNotarization("Invalid final notarization evidence")
+  }
+  if (
+    saved.status !== "Accepted" ||
+    saved.artifactKind !== value.artifactKind ||
+    !Array.isArray(receipt.issues) ||
+    receipt.submissionId !== saved.submissionId ||
+    receipt.artifactKind !== saved.artifactKind ||
+    receipt.artifactSha256 !== saved.artifactSha256
+  ) {
+    failNotarization("Invalid final notarization evidence")
+  }
+  exactNotarizationObject(
+    receipt,
+    ["submissionId", "artifactKind", "artifactSha256", "issues"],
+    "Invalid final notarization evidence",
+  )
+  if (
+    !validArtifactIdentity({
+      artifactKind: receipt.artifactKind,
+      artifactSha256: receipt.artifactSha256,
+    }) ||
+    !receipt.issues.every(
+      (issue) =>
+        issue !== null &&
+        typeof issue === "object" &&
+        !Array.isArray(issue) &&
+        Reflect.ownKeys(issue).length === 1 &&
+        Object.hasOwn(issue, "severity") &&
+        typeof issue.severity === "string" &&
+        issue.severity !== "warning" &&
+        issue.severity !== "error",
+    )
+  ) {
+    failNotarization("Invalid final notarization evidence")
+  }
+  return saved
+}

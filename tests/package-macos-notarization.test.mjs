@@ -15,6 +15,7 @@ import {
   stapleAndValidate,
   submitAndWait,
 } from "../scripts/macos/notarization.mjs"
+import { validateFinalNotarizationEvidence } from "../scripts/macos/notarization-evidence.mjs"
 import { runner } from "../scripts/macos/release-support.mjs"
 
 const profile = "SYNTHETIC_PROFILE"
@@ -43,6 +44,26 @@ async function artifact(root, name, contents = "artifact") {
 
 function sha256(contents) {
   return createHash("sha256").update(contents).digest("hex")
+}
+
+async function writeFinalEvidence(root, artifactKind) {
+  const artifactSha256 = sha256(`${artifactKind} evidence`)
+  const resume = {
+    submissionId: id,
+    status: "Accepted",
+    logPath: `notary-${id}.json`,
+    artifactKind,
+    artifactSha256,
+  }
+  const receipt = {
+    submissionId: id,
+    artifactKind,
+    artifactSha256,
+    issues: [],
+  }
+  await writeFile(join(root, "notarization-resume.json"), JSON.stringify(resume))
+  await writeFile(join(root, resume.logPath), JSON.stringify(receipt))
+  return { receipt, resume }
 }
 
 function notaryRunner({
@@ -511,6 +532,80 @@ test("uses absolute Apple trust command paths", async () => {
 
   assert.equal(calls[0]?.command, "/usr/bin/xcrun")
   assert.equal(calls[1]?.command, "/usr/sbin/spctl")
+})
+
+test.each([
+  "app",
+  "dmg",
+])("accepts complete warning-free final %s notarization evidence", async (artifactKind) => {
+  const root = await evidence()
+  const { resume } = await writeFinalEvidence(root, artifactKind)
+
+  assert.deepEqual(
+    await validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind }),
+    resume,
+  )
+})
+
+test("rejects final notarization evidence for the wrong requested artifact kind", async () => {
+  const root = await evidence()
+  await writeFinalEvidence(root, "app")
+
+  await assert.rejects(
+    validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind: "dmg" }),
+    /Invalid final notarization evidence/,
+  )
+})
+
+test.each([
+  ["missing resume field", (resume, _receipt) => delete resume.artifactSha256],
+  [
+    "extra receipt field",
+    (_resume, receipt) => {
+      receipt.extra = "unexpected"
+    },
+  ],
+  [
+    "mismatched submission",
+    (_resume, receipt) => {
+      receipt.submissionId = "123e4567-e89b-42d3-a456-426614174001"
+    },
+  ],
+  [
+    "mismatched artifact kind",
+    (_resume, receipt) => {
+      receipt.artifactKind = "dmg"
+    },
+  ],
+  [
+    "mismatched artifact hash",
+    (_resume, receipt) => {
+      receipt.artifactSha256 = sha256("different artifact")
+    },
+  ],
+  [
+    "warning issue",
+    (_resume, receipt) => {
+      receipt.issues = [{ severity: "warning" }]
+    },
+  ],
+  [
+    "error issue",
+    (_resume, receipt) => {
+      receipt.issues = [{ severity: "error" }]
+    },
+  ],
+])("rejects final notarization evidence with %s", async (_label, mutate) => {
+  const root = await evidence()
+  const { receipt, resume } = await writeFinalEvidence(root, "app")
+  mutate(resume, receipt)
+  await writeFile(join(root, "notarization-resume.json"), JSON.stringify(resume))
+  await writeFile(join(root, resume.logPath), JSON.stringify(receipt))
+
+  await assert.rejects(
+    validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind: "app" }),
+    /Invalid final notarization evidence/,
+  )
 })
 
 test("maps a real child-process AbortSignal failure to a sanitized production-runner error", async () => {

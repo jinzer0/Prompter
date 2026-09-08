@@ -2,10 +2,9 @@ import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises"
 import { extname, isAbsolute, relative, resolve, sep } from "node:path"
 
 import {
-  assertFrameworkDirectoryAlias,
   containingFramework,
+  createFrameworkAliasPolicy,
   isFrameworkBinary,
-  sameFrameworkBinaryAlias,
 } from "./framework-alias.mjs"
 
 const codesignCommand = "/usr/bin/codesign"
@@ -72,18 +71,15 @@ function assertContained(rootPath, targetPath) {
   const contained =
     pathFromRoot === "" ||
     (!pathFromRoot.startsWith(`..${sep}`) && pathFromRoot !== ".." && !isAbsolute(pathFromRoot))
-  if (contained) return
-  throw new SigningInputError("Signable code resolves outside the app bundle")
+  if (!contained) throw new SigningInputError("Signable code resolves outside the app bundle")
 }
 
 function pathDepth(rootPath, targetPath) {
-  const pathFromRoot = relative(rootPath, targetPath)
-  return pathFromRoot === "" ? 0 : pathFromRoot.split(sep).length
+  return targetPath === rootPath ? 0 : relative(rootPath, targetPath).split(sep).length
 }
 
 function lexicalCompare(left, right) {
-  if (left === right) return 0
-  return left < right ? -1 : 1
+  return left === right ? 0 : left < right ? -1 : 1
 }
 
 function bundleKind(targetPath) {
@@ -102,10 +98,6 @@ function rawKind(targetPath, mode, frameworkPath) {
   return undefined
 }
 
-function usesEntitlements(kind) {
-  return kind === "helper-app" || kind === "xpc-service" || kind === "executable-host"
-}
-
 function sortedTargets(rootPath, targets) {
   return [...targets.values()].sort((left, right) => {
     const depthDifference = pathDepth(rootPath, right.path) - pathDepth(rootPath, left.path)
@@ -122,6 +114,7 @@ export async function discoverSignableCode({ appPath, runFile }) {
 
   const visited = new Set()
   const targets = new Map()
+  const frameworkAliases = createFrameworkAliasPolicy(rootPath)
 
   async function visit(candidatePath) {
     const candidateMetadata = await lstat(candidatePath)
@@ -138,7 +131,12 @@ export async function discoverSignableCode({ appPath, runFile }) {
     }
     const metadata = await stat(targetPath)
     if (metadata.isDirectory()) {
-      await assertFrameworkDirectoryAlias(candidateMetadata, candidatePath, targetPath, rootPath)
+      if (
+        candidateMetadata.isSymbolicLink() &&
+        !(await frameworkAliases.directory(candidatePath, targetPath))
+      ) {
+        throw new SigningInputError("Signable directory alias is not allowed")
+      }
       if (visited.has(targetPath)) return
       visited.add(targetPath)
       const kind = targetPath === rootPath ? undefined : bundleKind(targetPath)
@@ -146,12 +144,12 @@ export async function discoverSignableCode({ appPath, runFile }) {
         targets.set(targetPath, {
           path: targetPath,
           kind,
-          entitlements: usesEntitlements(kind),
+          entitlements: ["helper-app", "xpc-service", "executable-host"].includes(kind),
         })
       }
       const entries = await readdir(targetPath)
       entries.sort(lexicalCompare)
-      for (const entry of entries) await visit(resolve(candidatePath, entry))
+      for (const entry of entries) await visit(resolve(targetPath, entry))
       return
     }
     if (!metadata.isFile()) return
@@ -166,8 +164,8 @@ export async function discoverSignableCode({ appPath, runFile }) {
     const isInvalidAlias =
       mustInspect &&
       candidatePath !== targetPath &&
-      !(await sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath))
-    if (isInvalidAlias) throw new SigningInputError("Duplicate signable code path is not allowed")
+      !(await frameworkAliases.binary(candidatePath, targetPath))
+    if (isInvalidAlias) throw new SigningInputError("Signable binary alias is not allowed")
     if (visited.has(targetPath)) return
     visited.add(targetPath)
     if (!mustInspect) return
@@ -190,7 +188,7 @@ export async function discoverSignableCode({ appPath, runFile }) {
     targets.set(targetPath, {
       path: targetPath,
       kind,
-      entitlements: usesEntitlements(kind),
+      entitlements: ["helper-app", "xpc-service", "executable-host"].includes(kind),
     })
   }
 

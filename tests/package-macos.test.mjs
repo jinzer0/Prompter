@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
+import { createHash } from "node:crypto"
 import {
   access,
   chmod,
@@ -254,6 +255,7 @@ async function createCoordinatorFixture({
   failure,
   identityListing = "one",
   label = "default",
+  pendingAppStatus,
   reservationBarrier,
   shared,
   warningLog = false,
@@ -288,6 +290,7 @@ async function createCoordinatorFixture({
   const rawCalls = []
   const observedTempRoots = new Set()
   const counts = { gatekeeper: 0, submit: 0 }
+  let candidateExistsDuringProfile = false
   let packagedApp
   const runFile = async (command, arguments_, options = {}) => {
     const stage = commandStage(command, arguments_, counts)
@@ -332,6 +335,12 @@ async function createCoordinatorFixture({
       await writeFile(join(releaseRoot, "v0.1.1", "race"), "race")
     }
     if (stage === "worktree") await reservationBarrier?.wait(label)
+    if (stage === "profile") {
+      candidateExistsDuringProfile = await stat(join(releaseRoot, "v0.1.1")).then(
+        () => true,
+        () => false,
+      )
+    }
     if (stage === "app-submit" && failure === "app-timeout") {
       const error = new Error(syntheticSecret)
       error.code = "ETIMEDOUT"
@@ -358,6 +367,15 @@ async function createCoordinatorFixture({
                 ? "123e4567-e89b-42d3-a456-426614174000"
                 : "123e4567-e89b-42d3-a456-426614174001",
             status: "Accepted",
+          }),
+          stderr: "",
+        }
+      }
+      if (arguments_[1] === "info") {
+        return {
+          stdout: JSON.stringify({
+            id: "123e4567-e89b-42d3-a456-426614174000",
+            status: pendingAppStatus ?? "In Progress",
           }),
           stderr: "",
         }
@@ -398,6 +416,9 @@ async function createCoordinatorFixture({
     observedTempRoots,
     candidate: join(releaseRoot, "v0.1.1"),
     evidenceRoot,
+    get candidateExistsDuringProfile() {
+      return candidateExistsDuringProfile
+    },
     releaseRoot,
     shared: { root, sourceRoot, releaseRoot, evidenceRoot, electron },
     run: () =>
@@ -793,7 +814,7 @@ test("atomically reserves a candidate before loser assembly, Apple work, evidenc
   assert.equal((await stat(winner.candidate)).isDirectory(), true)
   assert.equal(loser.observedTempRoots.size, 0)
   assert.equal(loser.calls.includes("native-copied"), false)
-  assert.equal(loser.calls.includes("profile"), false)
+  assert.equal(loser.calls.includes("profile"), true)
   assertNoLaterReleaseStages(loser.calls)
   assert.equal(
     loser.rawCalls.some(
@@ -801,6 +822,58 @@ test("atomically reserves a candidate before loser assembly, Apple work, evidenc
         command === "/usr/bin/xcrun" && ["submit", "info", "log"].includes(arguments_[1]),
     ),
     false,
+  )
+})
+
+test("completes every non-mutating preflight before reserving the candidate directory", async () => {
+  const fixture = await createCoordinatorFixture({ failure: "profile" })
+
+  await assert.rejects(fixture.run(), assertSanitizedReleaseFailure)
+
+  assert.equal(fixture.calls.includes("keychain"), true)
+  assert.equal(fixture.calls.includes("identity"), true)
+  assert.equal(fixture.calls.includes("profile"), true)
+  assert.equal(fixture.candidateExistsDuringProfile, false)
+  assertNoLaterReleaseStages(fixture.calls)
+  await assert.rejects(access(fixture.candidate))
+})
+
+test.each([
+  "In Progress",
+  "Rejected",
+])("blocks a %s accepted-pending app submission before downstream release mutation", async (pendingAppStatus) => {
+  const fixture = await createCoordinatorFixture({ pendingAppStatus })
+  const appEvidenceDirectory = join(fixture.evidenceRoot, "v0.1.1", "app")
+  const submissionId = "123e4567-e89b-42d3-a456-426614174000"
+  await mkdir(appEvidenceDirectory, { recursive: true })
+  await writeFile(
+    join(appEvidenceDirectory, "notarization-resume.json"),
+    JSON.stringify({
+      submissionId,
+      status: "accepted",
+      artifactKind: "app",
+      artifactSha256: createHash("sha256").update("zip").digest("hex"),
+    }),
+  )
+
+  await assert.rejects(fixture.run())
+
+  assert.equal(fixture.calls.includes("app-staple"), false)
+  assert.equal(fixture.calls.includes("gatekeeper-2"), false)
+  assert.equal(fixture.calls.includes("final-zip"), false)
+  assert.equal(fixture.calls.includes("dmg-create"), false)
+  assert.equal(fixture.calls.includes("checksum"), false)
+  assert.equal(
+    fixture.calls
+      .slice(fixture.calls.lastIndexOf("profile") + 1)
+      .some((stage) => stage.startsWith("gatekeeper-")),
+    false,
+  )
+  assert.equal(
+    fixture.rawCalls.filter(
+      ({ command, arguments_ }) => command === "/usr/bin/xcrun" && arguments_[1] === "submit",
+    ).length,
+    0,
   )
 })
 

@@ -1,6 +1,8 @@
 import { lstat, realpath } from "node:fs/promises"
 import { basename, relative, resolve, sep } from "node:path"
 
+const directoryAliases = new Set(["Resources", "Headers", "Modules", "Helpers", "Libraries"])
+
 export function containingFramework(filePath, rootPath) {
   let currentPath = filePath
   while (currentPath !== rootPath) {
@@ -17,45 +19,78 @@ export function isFrameworkBinary(filePath, frameworkPath) {
   return basename(filePath) === basename(frameworkPath, ".framework")
 }
 
-export async function sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath) {
+function frameworkParts(candidatePath, targetPath, rootPath) {
   const candidateFramework = containingFramework(candidatePath, rootPath)
   const targetFramework = containingFramework(targetPath, rootPath)
-  if (candidateFramework === undefined || targetFramework === undefined) return false
-  const frameworkName = basename(candidateFramework, ".framework")
-  const conventionalBinary = (filePath, frameworkPath) => {
-    if (filePath === resolve(frameworkPath, frameworkName)) return true
-    const segments = relative(frameworkPath, filePath).split(sep)
-    return segments.length === 3 && segments[0] === "Versions" && segments[2] === frameworkName
+  if (candidateFramework === undefined || targetFramework === undefined) return undefined
+  return { candidateFramework, targetFramework }
+}
+
+export function createFrameworkAliasPolicy(rootPath) {
+  const currentVersions = new Map()
+
+  async function currentVersion(frameworkPath) {
+    const canonicalFramework = await realpath(frameworkPath)
+    const cached = currentVersions.get(canonicalFramework)
+    if (cached !== undefined) return cached
+    const versionPath = await realpath(resolve(frameworkPath, "Versions", "Current"))
+    const segments = relative(canonicalFramework, versionPath).split(sep)
+    if (segments.length !== 2 || segments[0] !== "Versions" || segments[1] === "Current") {
+      return undefined
+    }
+    currentVersions.set(canonicalFramework, versionPath)
+    return versionPath
   }
-  return (
-    conventionalBinary(candidatePath, candidateFramework) &&
-    conventionalBinary(targetPath, targetFramework) &&
-    (await realpath(candidateFramework)) === (await realpath(targetFramework))
-  )
+
+  async function sameFramework(candidatePath, targetPath) {
+    const parts = frameworkParts(candidatePath, targetPath, rootPath)
+    if (parts === undefined) return undefined
+    if ((await realpath(parts.candidateFramework)) !== (await realpath(parts.targetFramework))) {
+      return undefined
+    }
+    const versionPath = await currentVersion(parts.candidateFramework)
+    if (versionPath === undefined) return undefined
+    return { ...parts, versionPath }
+  }
+
+  return Object.freeze({
+    async binary(candidatePath, targetPath) {
+      const framework = await sameFramework(candidatePath, targetPath)
+      if (framework === undefined) return false
+      const frameworkName = basename(framework.candidateFramework, ".framework")
+      const rootBinary = resolve(framework.candidateFramework, frameworkName)
+      const versionBinary = resolve(framework.versionPath, frameworkName)
+      const candidateSegments = relative(framework.candidateFramework, candidatePath).split(sep)
+      const conventionalCandidate =
+        candidatePath === rootBinary ||
+        (candidateSegments.length === 3 &&
+          candidateSegments[0] === "Versions" &&
+          candidateSegments[2] === frameworkName)
+      return conventionalCandidate && targetPath === versionBinary
+    },
+    async directory(candidatePath, targetPath) {
+      const framework = await sameFramework(candidatePath, targetPath)
+      if (framework === undefined) return false
+      const candidateSegments = relative(framework.candidateFramework, candidatePath).split(sep)
+      if (candidateSegments.length === 2 && candidateSegments[0] === "Versions") {
+        return candidateSegments[1] === "Current" && targetPath === framework.versionPath
+      }
+      return (
+        candidateSegments.length === 1 &&
+        directoryAliases.has(candidateSegments[0]) &&
+        targetPath === resolve(framework.versionPath, candidateSegments[0])
+      )
+    },
+  })
+}
+
+export async function sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath) {
+  return createFrameworkAliasPolicy(rootPath).binary(candidatePath, targetPath)
 }
 
 export async function sameFrameworkDirectoryAlias(candidatePath, targetPath, rootPath) {
   if (!(await lstat(candidatePath)).isSymbolicLink()) return candidatePath === targetPath
-  const candidateFramework = containingFramework(candidatePath, rootPath)
-  const targetFramework = containingFramework(targetPath, rootPath)
-  if (candidateFramework === undefined || targetFramework === undefined) return false
-  if ((await realpath(candidateFramework)) !== (await realpath(targetFramework))) return false
-  const candidateSegments = relative(candidateFramework, candidatePath).split(sep)
-  const targetSegments = relative(targetFramework, targetPath).split(sep)
-  if (
-    candidateSegments.length === 2 &&
-    candidateSegments[0] === "Versions" &&
-    candidateSegments[1] === "Current"
-  ) {
-    return targetSegments.length === 2 && targetSegments[0] === "Versions"
-  }
-  return (
-    candidateSegments.length === 1 &&
-    ["Resources", "Headers", "Modules"].includes(candidateSegments[0]) &&
-    targetSegments.length === 3 &&
-    targetSegments[0] === "Versions" &&
-    targetSegments[2] === candidateSegments[0]
-  )
+  return createFrameworkAliasPolicy(rootPath).directory(candidatePath, targetPath)
 }
 
 export async function assertFrameworkDirectoryAlias(
@@ -63,11 +98,7 @@ export async function assertFrameworkDirectoryAlias(
   candidatePath,
   targetPath,
   rootPath,
+  policy = createFrameworkAliasPolicy(rootPath),
 ) {
-  if (
-    candidateMetadata.isSymbolicLink() &&
-    !(await sameFrameworkDirectoryAlias(candidatePath, targetPath, rootPath))
-  ) {
-    throw new Error("Signable directory alias is not allowed")
-  }
+  return !candidateMetadata.isSymbolicLink() || (await policy.directory(candidatePath, targetPath))
 }

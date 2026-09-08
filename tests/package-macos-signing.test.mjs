@@ -1,7 +1,8 @@
 import assert from "node:assert/strict"
-import { chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises"
+import { access, chmod, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join, relative } from "node:path"
+import { dirname, join, relative, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { afterEach, test } from "vitest"
 
@@ -13,6 +14,8 @@ import {
 
 const identity = "Developer ID Application: SYNTHETIC_IDENTITY"
 const temporaryDirectories = []
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+const frameworkDirectories = ["Resources", "Headers", "Modules", "Helpers", "Libraries"]
 const expectedEntitlements = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -41,6 +44,8 @@ async function fixture({
   frameworkAliases = false,
   unexpectedFrameworkDirectoryAlias,
   unexpectedFrameworkBinaryAlias,
+  mixedFrameworkBinaryAlias = false,
+  mixedFrameworkDirectoryAlias,
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "prompter-signing-test-"))
   temporaryDirectories.push(root)
@@ -82,8 +87,34 @@ async function fixture({
     await executable(versionBinary)
     await symlink("A", join(frameworkRoot, "Versions", "Current"))
     await symlink("Versions/Current/Kit", paths.framework)
-    await mkdir(join(versionRoot, "Resources"), { recursive: true })
-    await symlink("Versions/Current/Resources", join(frameworkRoot, "Resources"))
+    await Promise.all(
+      frameworkDirectories.map(async (directory) => {
+        await executable(join(versionRoot, directory, `${directory.toLowerCase()}-tool`))
+        await symlink(`Versions/Current/${directory}`, join(frameworkRoot, directory))
+      }),
+    )
+    await executable(join(versionRoot, "Modules", "nested.node"))
+    await executable(join(versionRoot, "Libraries", "libnested.dylib"))
+    if (mixedFrameworkBinaryAlias || mixedFrameworkDirectoryAlias !== undefined) {
+      const otherVersionRoot = join(frameworkRoot, "Versions", "B")
+      await executable(join(otherVersionRoot, "Kit"))
+      await Promise.all(
+        frameworkDirectories.map((directory) =>
+          mkdir(join(otherVersionRoot, directory), { recursive: true }),
+        ),
+      )
+      if (mixedFrameworkBinaryAlias) {
+        await rm(paths.framework)
+        await symlink("Versions/B/Kit", paths.framework)
+      }
+      if (mixedFrameworkDirectoryAlias !== undefined) {
+        await rm(join(frameworkRoot, mixedFrameworkDirectoryAlias))
+        await symlink(
+          `Versions/B/${mixedFrameworkDirectoryAlias}`,
+          join(frameworkRoot, mixedFrameworkDirectoryAlias),
+        )
+      }
+    }
     if (unexpectedFrameworkBinaryAlias !== undefined) {
       const aliasDirectory =
         unexpectedFrameworkBinaryAlias === "before-conventional" ? "Aliases" : "Library"
@@ -250,6 +281,86 @@ test("coalesces only same-framework version aliases and signs their canonical ta
   assert.equal(signedFrameworks.length, 1)
 })
 
+test("accepts the complete Current-bound framework layout and inspects canonical descendants once", async () => {
+  const paths = await fixture({ frameworkAliases: true })
+  const calls = []
+  const targets = await discoverSignableCode({ appPath: paths.appPath, runFile: runner({ calls }) })
+  const canonicalAppPath = await realpath(paths.appPath)
+  const relativeTargets = targets.map(({ path }) => relative(canonicalAppPath, path))
+
+  assert.deepEqual(
+    relativeTargets.filter((path) =>
+      path.startsWith("Contents/Frameworks/Kit.framework/Versions/A/"),
+    ),
+    [
+      "Contents/Frameworks/Kit.framework/Versions/A/Headers/headers-tool",
+      "Contents/Frameworks/Kit.framework/Versions/A/Helpers/helpers-tool",
+      "Contents/Frameworks/Kit.framework/Versions/A/Libraries/libnested.dylib",
+      "Contents/Frameworks/Kit.framework/Versions/A/Libraries/libraries-tool",
+      "Contents/Frameworks/Kit.framework/Versions/A/Modules/modules-tool",
+      "Contents/Frameworks/Kit.framework/Versions/A/Modules/nested.node",
+      "Contents/Frameworks/Kit.framework/Versions/A/Resources/resources-tool",
+      "Contents/Frameworks/Kit.framework/Versions/A/Kit",
+    ],
+  )
+  const inspected = calls
+    .filter(({ command }) => command === "/usr/bin/file")
+    .map(({ arguments_ }) => arguments_[1])
+  assert.equal(new Set(inspected).size, inspected.length)
+  assert.equal(inspected.filter((path) => path.includes("Kit.framework/Versions/A/")).length, 8)
+})
+
+test("rejects root framework binary aliases bound to a version other than Current", async () => {
+  const paths = await fixture({ frameworkAliases: true, mixedFrameworkBinaryAlias: true })
+
+  await assert.rejects(
+    discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),
+    /Signable .* alias is not allowed/,
+  )
+})
+
+test.each(
+  frameworkDirectories,
+)("rejects the %s root directory alias when it is not Current-bound", async (mixedFrameworkDirectoryAlias) => {
+  const paths = await fixture({
+    frameworkAliases: true,
+    mixedFrameworkDirectoryAlias,
+  })
+
+  await assert.rejects(
+    discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),
+    /Signable directory alias is not allowed/,
+  )
+})
+
+test("discovers the installed Electron 43 framework with only a read-only file runner", async () => {
+  const appPath = join(repositoryRoot, "node_modules", "electron", "dist", "Electron.app")
+  try {
+    await access(appPath)
+  } catch {
+    throw new Error(
+      "Installed Electron 43 framework is unavailable; run npm install before this test",
+    )
+  }
+  const calls = []
+  const targets = await discoverSignableCode({
+    appPath,
+    runFile: async (command, arguments_) => {
+      calls.push({ command, arguments_ })
+      assert.equal(command, "/usr/bin/file")
+      assert.deepEqual(arguments_.slice(0, 1), ["-b"])
+      return { stdout: "Mach-O 64-bit executable" }
+    },
+  })
+
+  assert.equal(targets.length, 23)
+  assert.equal(calls.length, 15)
+  assert.equal(
+    calls.every(({ command }) => command === "/usr/bin/file"),
+    true,
+  )
+})
+
 test.each([
   "before-canonical",
   "before-conventional",
@@ -258,7 +369,7 @@ test.each([
 
   await assert.rejects(
     discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),
-    /Duplicate signable code path is not allowed/,
+    /Signable binary alias is not allowed/,
   )
 })
 

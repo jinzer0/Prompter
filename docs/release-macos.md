@@ -15,10 +15,10 @@ Prompter has two macOS packaging paths.
   builds, then runs the signed release coordinator through `scripts/release-macos.mjs`.
 
 The signed path requires exact version `0.1.1` before build, native rebuild, bundling, Apple
-preflight, candidate creation, or evidence writes. It is ARM64 only. The coordinator then
-preflights the current platform, architecture, clean Git worktree, empty release candidate
-directory, selected Xcode installation, signing identity, unlocked Keychain, notary profile, and
-Apple notary connectivity before it mutates the release candidate. It reads only these two
+preflight, candidate creation, or evidence writes. It is ARM64 only. The coordinator then requires
+the candidate directory to be absent and preflights the current platform, architecture, clean Git
+worktree, selected Xcode installation, signing identity, unlocked Keychain, notary profile, and
+Apple notary connectivity before it reserves or mutates the release candidate. It reads only these two
 non-secret variable names from the environment:
 
 - `PROMPTER_SIGNING_IDENTITY`
@@ -34,9 +34,9 @@ Use a full Xcode installation, not only the Command Line Tools. Select it before
 verify both commands:
 
 ```bash
-sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
-xcode-select -p
-xcodebuild -version
+sudo /usr/bin/xcode-select --switch /Applications/Xcode.app/Contents/Developer
+/usr/bin/xcode-select -p
+/usr/bin/xcodebuild -version
 ```
 
 The selected developer directory must end in `Xcode.app/Contents/Developer`, and
@@ -53,8 +53,8 @@ before app assembly.
 Verify identity availability without copying the identity value into tracked notes:
 
 ```bash
-security find-identity -v -p codesigning
-security show-keychain-info
+/usr/bin/security find-identity -v -p codesigning
+/usr/bin/security show-keychain-info
 ```
 
 The coordinator signs nested code first, helper apps next, and the outer `Prompter.app` last. App
@@ -70,7 +70,7 @@ then keep the profile name outside tracked files except through `PROMPTER_NOTARY
 Verify the stored profile can reach Apple's notary service before release:
 
 ```bash
-xcrun notarytool history --keychain-profile "${PROMPTER_NOTARY_PROFILE}" --output-format json
+/usr/bin/xcrun notarytool history --keychain-profile "${PROMPTER_NOTARY_PROFILE}" --output-format json
 ```
 
 The release path uses Keychain profile authentication only. It doesn't accept Apple account
@@ -132,9 +132,9 @@ verified, signed, submitted, stapled, validated, assessed by Gatekeeper, mounted
 checked for a contained `Prompter.app`. `SHA256SUMS` is written last, after ZIP and DMG validation
 pass.
 
-Do not add extra files to `release/v0.1.1/`. If the candidate directory is stale, non-empty, or
-contains unexpected files, remove it only after you understand its owner and after you've confirmed
-no other task needs it.
+Do not add extra files to `release/v0.1.1/`. The candidate directory must be absent before the
+signed command starts. If it already exists or contains unexpected files after a run, remove it only
+after you understand its owner and after you've confirmed no other task needs it.
 
 ## Publication Boundary
 
@@ -151,7 +151,7 @@ approved release action instead of editing history.
 Before running the signed command:
 
 - Confirm `git status --short` is empty.
- - Confirm `release/v0.1.1/` is absent. An empty version-specific candidate directory is unavailable.
+- Confirm `release/v0.1.1/` is absent. An empty version-specific candidate directory is unavailable.
 - Confirm full Xcode is selected and `xcodebuild -version` reports Xcode.
 - Confirm exactly one prepared Developer ID Application identity and matching private key are
   available in Keychain.

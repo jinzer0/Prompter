@@ -56,6 +56,11 @@ async function preflight(release, run, state) {
     (await run("/usr/bin/security", ["find-identity", "-v", "-p", "codesigning"], {})).stdout,
     release.signingIdentity,
   )
+  await preflightNotaryProfile({
+    profile: release.notaryProfile,
+    runFile: run,
+    ...(release.signal === undefined ? {} : { signal: release.signal }),
+  })
 }
 
 export async function runMacOSRelease(options) {
@@ -66,11 +71,6 @@ export async function runMacOSRelease(options) {
   try {
     await preflight(release, run, state)
     await prepareReleaseCandidate(state)
-    await preflightNotaryProfile({
-      profile: release.notaryProfile,
-      runFile: run,
-      ...(release.signal === undefined ? {} : { signal: release.signal }),
-    })
     state.appStageDirectory = await mkdtemp(join(tmpdir(), "prompter-release-app-"))
     const appPath = join(state.appStageDirectory, appBundleName)
     await assembleMacOSApp({

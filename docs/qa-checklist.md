@@ -13,6 +13,186 @@ Use this checklist after Phase 10 and later release-candidate changes before pac
 - [ ] Packaged `Prompter.app` opens without a missing-executable error.
 - [ ] `npm run test:smoke` exits 0, or the exact blocker is recorded.
 
+## Signed macOS Release Checks
+
+Run this section only for the maintainer signed release path. These checks assume
+`npm run package:release:macos` has already completed successfully on ARM64 macOS and created
+`release/v0.1.1/`.
+
+Prepare local path variables without embedding secrets:
+
+```bash
+RELEASE_DIR="release/v0.1.1"
+ZIP_PATH="${RELEASE_DIR}/Prompter-0.1.1-mac-arm64.zip"
+DMG_PATH="${RELEASE_DIR}/Prompter-0.1.1-mac-arm64.dmg"
+CHECKSUM_PATH="${RELEASE_DIR}/SHA256SUMS"
+EXTRACT_DIR="$(mktemp -d)"
+MOUNT_DIR="$(mktemp -d)"
+```
+
+- [ ] Full Xcode is selected and visible to the active shell:
+
+  ```bash
+  xcode-select -p
+  xcodebuild -version
+  ```
+
+- [ ] Required release variables are present without printing their values:
+
+  ```bash
+  : "${PROMPTER_SIGNING_IDENTITY:?PROMPTER_SIGNING_IDENTITY is required}"
+  : "${PROMPTER_NOTARY_PROFILE:?PROMPTER_NOTARY_PROFILE is required}"
+  test -n "${PROMPTER_SIGNING_IDENTITY}"
+  test -n "${PROMPTER_NOTARY_PROFILE}"
+  ```
+
+- [ ] Unsigned local packaging and signed release scripts map to the approved commands:
+
+  ```bash
+  node --input-type=module <<'NODE'
+  import { readFile } from "node:fs/promises"
+
+  const { scripts } = JSON.parse(await readFile("package.json", "utf8"))
+  const expected = {
+    package: "npm run build && node scripts/package-macos.mjs",
+    make: "npm run package",
+    "package:release:macos": "npm run build && node scripts/release-macos.mjs",
+  }
+  for (const [name, command] of Object.entries(expected)) {
+    if (scripts?.[name] !== command) throw new Error(`Unexpected script: ${name}`)
+  }
+  NODE
+  ```
+
+- [ ] The release candidate contains only the approved final files:
+
+  ```bash
+  node --input-type=module <<'NODE'
+  import { readdir } from "node:fs/promises"
+
+  const expected = [
+    "Prompter-0.1.1-mac-arm64.dmg",
+    "Prompter-0.1.1-mac-arm64.zip",
+    "SHA256SUMS",
+  ]
+  const actual = (await readdir("release/v0.1.1")).sort()
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`Unexpected release candidate allowlist: ${actual.join(",")}`)
+  }
+  NODE
+  ```
+
+  Expected files are `Prompter-0.1.1-mac-arm64.zip`,
+  `Prompter-0.1.1-mac-arm64.dmg`, and `SHA256SUMS`.
+
+- [ ] The app notarization evidence and DMG notarization evidence are separate, sanitized, and
+      show `Accepted` plus warning-free and error-free log receipts:
+
+  ```bash
+  node --input-type=module <<'NODE'
+  import { readFile } from "node:fs/promises"
+  import { join } from "node:path"
+
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  const roots = [
+    ".omo/evidence/release-macos/v0.1.1/app",
+    ".omo/evidence/release-macos/v0.1.1/dmg",
+  ]
+
+  for (const root of roots) {
+    const resume = JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8"))
+    if (resume.status !== "Accepted" || !uuid.test(resume.submissionId)) {
+      throw new Error(`Invalid notarization resume: ${root}`)
+    }
+    if (resume.logPath !== `notary-${resume.submissionId}.json`) {
+      throw new Error(`Invalid notarization log path: ${root}`)
+    }
+    const receipt = JSON.parse(await readFile(join(root, resume.logPath), "utf8"))
+    if (receipt.submissionId !== resume.submissionId || !Array.isArray(receipt.issues)) {
+      throw new Error(`Invalid notarization receipt: ${root}`)
+    }
+    for (const issue of receipt.issues) {
+      if (issue?.severity === "warning" || issue?.severity === "error") {
+        throw new Error(`Unsafe notarization issue severity: ${root}`)
+      }
+    }
+  }
+  NODE
+  ```
+
+- [ ] The final ZIP extracts cleanly and the contained app has a strict valid signature:
+
+  ```bash
+  ditto -x -k "${ZIP_PATH}" "${EXTRACT_DIR}"
+  codesign --verify --deep --strict "${EXTRACT_DIR}/Prompter.app"
+  ```
+
+- [ ] The extracted app has a valid stapled ticket and passes Gatekeeper execute assessment:
+
+  ```bash
+  xcrun stapler validate "${EXTRACT_DIR}/Prompter.app"
+  spctl --assess --type execute --verbose=4 "${EXTRACT_DIR}/Prompter.app"
+  ```
+
+- [ ] The DMG image verifies, has a strict valid signature, has a valid stapled ticket, and passes
+      Gatekeeper open assessment:
+
+  ```bash
+  hdiutil verify "${DMG_PATH}"
+  codesign --verify --strict "${DMG_PATH}"
+  xcrun stapler validate "${DMG_PATH}"
+  spctl --assess --type open --verbose=4 "${DMG_PATH}"
+  ```
+
+- [ ] The DMG mounts read-only and contains `Prompter.app`:
+
+  ```bash
+  hdiutil attach -readonly -nobrowse -mountpoint "${MOUNT_DIR}" "${DMG_PATH}"
+  test -d "${MOUNT_DIR}/Prompter.app"
+  ```
+
+- [ ] The app inside the mounted DMG has a strict valid signature and passes Gatekeeper execute
+      assessment:
+
+  ```bash
+  codesign --verify --deep --strict "${MOUNT_DIR}/Prompter.app"
+  spctl --assess --type execute --verbose=4 "${MOUNT_DIR}/Prompter.app"
+  hdiutil detach "${MOUNT_DIR}"
+  ```
+
+- [ ] The packaged app plist maps to the expected bundle identity and version:
+
+  ```bash
+  plutil -p "${EXTRACT_DIR}/Prompter.app/Contents/Info.plist"
+  ```
+
+  Confirm `CFBundleIdentifier` is `com.jinzer0.prompter`, `CFBundleShortVersionString` is
+  `0.1.1`, and `CFBundleVersion` is `0.1.1`.
+
+- [ ] The checksum file verifies after all signature, notary, staple, Gatekeeper, extract, and
+      mount checks pass:
+
+  ```bash
+  (cd "${RELEASE_DIR}" && shasum -a 256 -c "SHA256SUMS")
+  ```
+
+- [ ] The extracted app smoke-opens from the signed artifact:
+
+  ```bash
+  open -n "${EXTRACT_DIR}/Prompter.app"
+  ```
+
+- [ ] If any signed release check fails, no GitHub Release, tag, upload, public README update, or
+      partial asset allowlist is created. Immutable tags are never rewritten.
+
+  ```bash
+  if rg -n 'gh[[:space:]]+release|git[[:space:]]+tag|release create|release upload' \
+    scripts/release-macos.mjs package.json
+  then
+    exit 1
+  fi
+  ```
+
 ## Manual App Flow
 
 - [ ] App starts in development mode.
@@ -68,6 +248,11 @@ Use this checklist after Phase 10 and later release-candidate changes before pac
 - [ ] Packaged app can find Drizzle migration files.
 - [ ] No `prompt_runs`, `agent_runs`, `execution_results`, `validation_results`, or `run_logs` table/data exists.
 - [ ] No prompt execution, external-agent launch, cloud sync, account, vector search, embedding, plugin, or team-collaboration feature was added.
+- [ ] Signed release docs and evidence name only `PROMPTER_SIGNING_IDENTITY` and
+      `PROMPTER_NOTARY_PROFILE` as variable names and contain no credential values, private-key
+      blocks, local key paths, Apple account values, password values, or full environment dumps.
+- [ ] `.gitignore` contains exactly the narrow Apple secret artifact patterns `AuthKey_*.p8`,
+      `*.p12`, and `*.mobileprovision`, with no broad key ignore.
 
 ## Attribution
 

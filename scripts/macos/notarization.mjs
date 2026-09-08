@@ -19,7 +19,8 @@ function fail(message) {
 }
 
 function input(value, fields) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) fail("Invalid notarization options")
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    fail("Invalid notarization options")
   const keys = Reflect.ownKeys(value)
   if (
     keys.length !== fields.length ||
@@ -48,14 +49,16 @@ function submissionId(value) {
 }
 
 function submitArtifact(value) {
-  if (typeof value !== "string" || value.toLowerCase().endsWith(".app")) fail("Unsupported notarization artifact")
+  if (typeof value !== "string" || value.toLowerCase().endsWith(".app"))
+    fail("Unsupported notarization artifact")
   if (!value.toLowerCase().endsWith(".zip") && !value.toLowerCase().endsWith(".dmg")) {
     fail("Unsupported notarization artifact")
   }
 }
 
 function stapledArtifact(value, kind) {
-  if (typeof value !== "string" || !["app", "dmg"].includes(kind)) fail("Unsupported stapling artifact")
+  if (typeof value !== "string" || !["app", "dmg"].includes(kind))
+    fail("Unsupported stapling artifact")
   if (!value.toLowerCase().endsWith(`.${kind}`)) fail("Unsupported stapling artifact")
 }
 
@@ -112,12 +115,19 @@ function timeoutId(error) {
 }
 
 function timedOut(error) {
-  return error?.code === "ETIMEDOUT" || error?.name === "AbortError" || (typeof error?.signal === "string" && signals.has(error.signal))
+  return (
+    error?.code === "ETIMEDOUT" ||
+    error?.name === "AbortError" ||
+    (typeof error?.signal === "string" && signals.has(error.signal))
+  )
 }
 
 function reviewedLog(payload, id) {
   api(payload)
-  if (!Array.isArray(payload.issues) || !payload.issues.every((issue) => issue && typeof issue.severity === "string")) {
+  if (
+    !Array.isArray(payload.issues) ||
+    !payload.issues.every((issue) => issue && typeof issue.severity === "string")
+  ) {
     fail("Invalid notarization log")
   }
   if (payload.issues.some((issue) => issue.severity === "error" || issue.severity === "warning")) {
@@ -131,7 +141,8 @@ function logPath(id) {
 }
 
 function resume(value) {
-  const fields = value.status === "unknown" ? ["submissionId", "status"] : ["submissionId", "status", "logPath"]
+  const fields =
+    value.status === "unknown" ? ["submissionId", "status"] : ["submissionId", "status", "logPath"]
   if (
     !value ||
     typeof value !== "object" ||
@@ -144,7 +155,9 @@ function resume(value) {
   }
   const id = submissionId(value.submissionId)
   if (value.status === "Accepted" && value.logPath !== logPath(id)) fail("Invalid resume state")
-  return value.status === "Accepted" ? { submissionId: id, status: "Accepted", logPath: value.logPath } : { submissionId: id, status: "unknown" }
+  return value.status === "Accepted"
+    ? { submissionId: id, status: "Accepted", logPath: value.logPath }
+    : { submissionId: id, status: "unknown" }
 }
 
 async function readResume(evidenceDir) {
@@ -164,12 +177,22 @@ async function save(evidenceDir, fileName, value) {
 
 async function hasSavedLog(evidenceDir, saved) {
   try {
-    const value = json(await readFile(join(evidenceDir, saved.logPath), "utf8"), "notarization log receipt")
+    const value = json(
+      await readFile(join(evidenceDir, saved.logPath), "utf8"),
+      "notarization log receipt",
+    )
     return (
       Reflect.ownKeys(value).length === 2 &&
       submissionId(value.submissionId) === saved.submissionId &&
       Array.isArray(value.issues) &&
-      value.issues.every((issue) => issue && Object.hasOwn(issue, "severity") && typeof issue.severity === "string" && !["warning", "error"].includes(issue.severity) && Reflect.ownKeys(issue).length === 1)
+      value.issues.every(
+        (issue) =>
+          issue &&
+          Object.hasOwn(issue, "severity") &&
+          typeof issue.severity === "string" &&
+          !["warning", "error"].includes(issue.severity) &&
+          Reflect.ownKeys(issue).length === 1,
+      )
     )
   } catch {
     return false
@@ -177,7 +200,13 @@ async function hasSavedLog(evidenceDir, saved) {
 }
 
 async function info(id, keychainProfile, runFile) {
-  const result = submission(await command(runFile, ["notarytool", "info", id, "--keychain-profile", keychainProfile, "--output-format", "json"], "notarization info"))
+  const result = submission(
+    await command(
+      runFile,
+      ["notarytool", "info", id, "--keychain-profile", keychainProfile, "--output-format", "json"],
+      "notarization info",
+    ),
+  )
   if (result.submissionId !== id) fail("Invalid notarization submission")
   return result.status
 }
@@ -185,7 +214,13 @@ async function info(id, keychainProfile, runFile) {
 export async function preflightNotaryProfile(options) {
   const value = input(options, ["profile", "runFile"])
   const keychainProfile = profile(value.profile)
-  api(await command(value.runFile, ["notarytool", "history", "--keychain-profile", keychainProfile, "--output-format", "json"], "notarization profile response"))
+  api(
+    await command(
+      value.runFile,
+      ["notarytool", "history", "--keychain-profile", keychainProfile, "--output-format", "json"],
+      "notarization profile response",
+    ),
+  )
   return { status: "ready" }
 }
 
@@ -194,7 +229,14 @@ export async function fetchNotaryLog(options) {
   const id = submissionId(value.submissionId)
   const keychainProfile = profile(value.profile)
   const evidenceDir = directory(value.evidenceDir)
-  const receipt = reviewedLog(await command(value.runFile, ["notarytool", "log", id, "--keychain-profile", keychainProfile, "--output-format", "json"], "notarization log"), id)
+  const receipt = reviewedLog(
+    await command(
+      value.runFile,
+      ["notarytool", "log", id, "--keychain-profile", keychainProfile, "--output-format", "json"],
+      "notarization log",
+    ),
+    id,
+  )
   const reviewed = { submissionId: id, status: "Accepted", logPath: logPath(id) }
   await save(evidenceDir, reviewed.logPath, receipt)
   await save(evidenceDir, resumeFileName, reviewed)
@@ -208,18 +250,50 @@ export async function submitAndWait(options) {
   const evidenceDir = directory(value.evidenceDir)
   const saved = await readResume(evidenceDir)
   await preflightNotaryProfile({ profile: keychainProfile, runFile: value.runFile })
-  if (saved?.status === "Accepted") return (await hasSavedLog(evidenceDir, saved)) ? saved : fetchNotaryLog({ submissionId: saved.submissionId, profile: keychainProfile, evidenceDir, runFile: value.runFile })
+  if (saved?.status === "Accepted")
+    return (await hasSavedLog(evidenceDir, saved))
+      ? saved
+      : fetchNotaryLog({
+          submissionId: saved.submissionId,
+          profile: keychainProfile,
+          evidenceDir,
+          runFile: value.runFile,
+        })
   if (saved !== undefined) {
     const status = await info(saved.submissionId, keychainProfile, value.runFile)
-    if (status === "Accepted") return fetchNotaryLog({ submissionId: saved.submissionId, profile: keychainProfile, evidenceDir, runFile: value.runFile })
+    if (status === "Accepted")
+      return fetchNotaryLog({
+        submissionId: saved.submissionId,
+        profile: keychainProfile,
+        evidenceDir,
+        runFile: value.runFile,
+      })
     if (status === "In Progress") return saved
     fail("Notarization submission was not accepted")
   }
   try {
-    const response = await value.runFile("xcrun", ["notarytool", "submit", value.artifactPath, "--keychain-profile", keychainProfile, "--wait", "--output-format", "json"], {})
+    const response = await value.runFile(
+      "xcrun",
+      [
+        "notarytool",
+        "submit",
+        value.artifactPath,
+        "--keychain-profile",
+        keychainProfile,
+        "--wait",
+        "--output-format",
+        "json",
+      ],
+      {},
+    )
     const result = submission(json(response?.stdout, "notarization submission"))
     if (result.status !== "Accepted") fail("Notarization submission was not accepted")
-    return fetchNotaryLog({ submissionId: result.submissionId, profile: keychainProfile, evidenceDir, runFile: value.runFile })
+    return fetchNotaryLog({
+      submissionId: result.submissionId,
+      profile: keychainProfile,
+      evidenceDir,
+      runFile: value.runFile,
+    })
   } catch (error) {
     const id = timedOut(error) ? timeoutId(error) : undefined
     if (id !== undefined) {
@@ -250,7 +324,17 @@ export async function assessGatekeeper(options) {
   const value = input(options, ["artifactPath", "artifactKind", "runFile"])
   stapledArtifact(value.artifactPath, value.artifactKind)
   try {
-    await value.runFile("spctl", ["--assess", "--type", value.artifactKind === "app" ? "execute" : "open", "--verbose=4", value.artifactPath], {})
+    await value.runFile(
+      "spctl",
+      [
+        "--assess",
+        "--type",
+        value.artifactKind === "app" ? "execute" : "open",
+        "--verbose=4",
+        value.artifactPath,
+      ],
+      {},
+    )
   } catch (error) {
     commandError(error)
   }

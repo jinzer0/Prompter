@@ -19,6 +19,9 @@ test-results/
 .env
 .env.*
 !.env.example
+AuthKey_*.p8
+*.p12
+*.mobileprovision
 
 # Local databases and generated runtime state
 *.db

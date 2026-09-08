@@ -1,4 +1,4 @@
-import { readFile, readdir, realpath, stat } from "node:fs/promises"
+import { readdir, readFile, realpath, stat } from "node:fs/promises"
 import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path"
 
 const codesignCommand = "/usr/bin/codesign"
@@ -52,9 +52,7 @@ async function requireIdentity(identity, runFile) {
   }
   let exactMatches = 0
   for (const line of lines) {
-    const match = line.match(
-      /^\s*\d+\)\s+(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})\s+"([^"\r\n]+)"\s*$/u,
-    )
+    const match = line.match(/^\s*\d+\)\s+(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})\s+"([^"\r\n]+)"\s*$/u)
     if (match === null) throw new SigningInputError("Unable to validate signing identity")
     if (match[1] === identity) exactMatches += 1
   }
@@ -149,7 +147,8 @@ export async function discoverSignableCode({ appPath, runFile }) {
       throw new SigningInputError("Signable symlink alias has an ambiguous target type")
     }
     if (visited.has(targetPath)) {
-      if (targets.has(targetPath)) throw new SigningInputError("Duplicate signable code path is not allowed")
+      if (targets.has(targetPath))
+        throw new SigningInputError("Duplicate signable code path is not allowed")
       return
     }
     visited.add(targetPath)
@@ -183,7 +182,11 @@ export async function discoverSignableCode({ appPath, runFile }) {
     const { stdout } = await executeFile(fileCommand, ["-b", targetPath], {})
     const kind = rawKind(targetPath, metadata.mode, frameworkPath)
     if (!stdout.includes("Mach-O")) {
-      if (extension === ".node" || extension === ".dylib" || isFrameworkBinary(targetPath, frameworkPath)) {
+      if (
+        extension === ".node" ||
+        extension === ".dylib" ||
+        isFrameworkBinary(targetPath, frameworkPath)
+      ) {
         throw new SigningInputError("Native-code path is not a Mach-O object")
       }
       return
@@ -206,7 +209,10 @@ async function validateEntitlements(entitlementsPath, runFile) {
   const canonicalPath = await realpath(resolve(entitlementsPath))
   await runFile(plutilCommand, ["-lint", canonicalPath], {})
   const contents = await readFile(canonicalPath)
-  if ([...contents].some((byte) => byte > 0x7f) || contents.toString("ascii") !== expectedEntitlements) {
+  if (
+    [...contents].some((byte) => byte > 0x7f) ||
+    contents.toString("ascii") !== expectedEntitlements
+  ) {
     throw new SigningInputError("Entitlements must contain only com.apple.security.cs.allow-jit")
   }
   return canonicalPath
@@ -250,7 +256,11 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   await verifyTargets(postSignTargets, executeFile)
   await executeFile(
     codesignCommand,
-    signingArguments(signingIdentity, { path: rootPath, entitlements: true }, canonicalEntitlementsPath),
+    signingArguments(
+      signingIdentity,
+      { path: rootPath, entitlements: true },
+      canonicalEntitlementsPath,
+    ),
     {},
   )
   await executeFile(codesignCommand, ["--verify", "--deep", "--strict", rootPath], {})

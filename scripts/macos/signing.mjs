@@ -135,18 +135,10 @@ export async function discoverSignableCode({ appPath, runFile }) {
     ) {
       throw new SigningInputError("Signable symlink alias has an ambiguous target type")
     }
-    if (visited.has(targetPath)) {
-      if (
-        targets.has(targetPath) &&
-        !(await sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath))
-      )
-        throw new SigningInputError("Duplicate signable code path is not allowed")
-      return
-    }
-    visited.add(targetPath)
-
     const metadata = await stat(targetPath)
     if (metadata.isDirectory()) {
+      if (visited.has(targetPath)) return
+      visited.add(targetPath)
       const kind = targetPath === rootPath ? undefined : bundleKind(targetPath)
       if (kind !== undefined) {
         targets.set(targetPath, {
@@ -169,6 +161,13 @@ export async function discoverSignableCode({ appPath, runFile }) {
       extension === ".dylib" ||
       (metadata.mode & 0o111) !== 0 ||
       isFrameworkBinary(targetPath, frameworkPath)
+    const isInvalidAlias =
+      mustInspect &&
+      candidatePath !== targetPath &&
+      !(await sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath))
+    if (isInvalidAlias) throw new SigningInputError("Duplicate signable code path is not allowed")
+    if (visited.has(targetPath)) return
+    visited.add(targetPath)
     if (!mustInspect) return
 
     const { stdout } = await executeFile(fileCommand, ["-b", targetPath], {})

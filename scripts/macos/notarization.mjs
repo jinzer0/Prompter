@@ -65,18 +65,6 @@ export async function submitAndWait(options) {
   }
   const notary = client(value.runFile, signal)
   await notary.preflight(profile)
-  if (saved?.status === "Accepted") {
-    return (await evidence.hasSavedLog(saved))
-      ? saved
-      : fetchNotaryLog({
-          submissionId: saved.submissionId,
-          profile,
-          evidenceDir,
-          artifactPath: value.artifactPath,
-          runFile: value.runFile,
-          ...(signal === undefined ? {} : { signal }),
-        })
-  }
   if (saved !== undefined) {
     const status = await notary.info({ submissionId: saved.submissionId, profile })
     if (status === "Accepted") {
@@ -97,6 +85,7 @@ export async function submitAndWait(options) {
   if (result.status !== "Accepted") {
     failNotarization("Notarization submission was not accepted")
   }
+  await evidence.saveAcceptedPending(result.submissionId)
   return fetchNotaryLog({
     submissionId: result.submissionId,
     profile,

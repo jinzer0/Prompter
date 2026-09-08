@@ -1,8 +1,10 @@
 import assert from "node:assert/strict"
+import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { promisify } from "node:util"
 
 import { afterEach, test } from "vitest"
 
@@ -13,11 +15,13 @@ import {
   stapleAndValidate,
   submitAndWait,
 } from "../scripts/macos/notarization.mjs"
+import { runner } from "../scripts/macos/release-support.mjs"
 
 const profile = "SYNTHETIC_PROFILE"
 const id = "123e4567-e89b-42d3-a456-426614174000"
 const sentinel = "SYNTHETIC_SECRET_SENTINEL"
 const temporaryDirectories = []
+const executeFile = promisify(execFile)
 
 afterEach(async () =>
   Promise.all(
@@ -95,8 +99,9 @@ test("requires valid profile JSON, Accepted status, and a warning-free reviewed 
     { issues: "bad" },
   ]) {
     const { calls, runFile } = notaryRunner({ log })
+    const logEvidence = await evidence()
     await assert.rejects(
-      submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+      submitAndWait({ artifactPath, profile, evidenceDir: logEvidence, runFile }),
       /Notarization log blocks publication|Invalid notarization log/,
     )
     assert.equal(
@@ -256,7 +261,7 @@ test("preserves only artifact-bound unknown evidence after a recovered AbortErro
   )
 })
 
-test("re-fetches a tampered accepted receipt without resubmission and keeps errors redacted", async () => {
+test("refreshes Apple status and log for a forged accepted receipt before blocking downstream work", async () => {
   const root = await evidence()
   const artifactPath = await artifact(root, "Prompter.dmg")
   await writeFile(
@@ -279,11 +284,21 @@ test("re-fetches a tampered accepted receipt without resubmission and keeps erro
       secret: sentinel,
     }),
   )
-  const { calls, runFile } = notaryRunner()
-  await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+  const { calls, runFile } = notaryRunner({
+    info: { id, status: "Accepted" },
+    log: { issues: [{ severity: "warning" }] },
+  })
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+    /Notarization log blocks publication/,
+  )
   assert.equal(
     calls.some(({ arguments_ }) => arguments_[1] === "submit"),
     false,
+  )
+  assert.equal(
+    calls.some(({ arguments_ }) => arguments_[1] === "info"),
+    true,
   )
   assert.equal(
     calls.some(({ arguments_ }) => arguments_[1] === "log"),
@@ -312,10 +327,39 @@ test("re-fetches a tampered accepted receipt without resubmission and keeps erro
   )
 })
 
-test("rejects accepted resume evidence whose artifact kind or bytes do not match before notary work", async () => {
+test("persists an accepted submission before log retrieval and resumes it without a second submit", async () => {
   const root = await evidence()
-  const zipContents = "app archive"
-  const dmgPath = await artifact(root, "Prompter.dmg", "disk image")
+  const artifactPath = await artifact(root, "Prompter.zip")
+  let logFails = true
+  const { calls, runFile } = notaryRunner({
+    info: { id, status: "Accepted" },
+    fail: (_command, arguments_) =>
+      logFails && arguments_[1] === "log" ? new Error(sentinel) : undefined,
+  })
+
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+    /Notarization command failed/,
+  )
+  assert.deepEqual(JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8")), {
+    submissionId: id,
+    status: "accepted",
+    artifactKind: "app",
+    artifactSha256: sha256("artifact"),
+  })
+
+  logFails = false
+  const accepted = await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+
+  assert.equal(accepted.status, "Accepted")
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 2)
+})
+
+test("rejects accepted resume evidence with a mismatched artifact kind before notary work", async () => {
+  const root = await evidence()
+  const dmgPath = await artifact(root, "Prompter.dmg")
   await writeFile(
     join(root, "notarization-resume.json"),
     JSON.stringify({
@@ -323,7 +367,7 @@ test("rejects accepted resume evidence whose artifact kind or bytes do not match
       status: "Accepted",
       logPath: `notary-${id}.json`,
       artifactKind: "app",
-      artifactSha256: sha256(zipContents),
+      artifactSha256: sha256("artifact"),
     }),
   )
   await writeFile(
@@ -331,8 +375,30 @@ test("rejects accepted resume evidence whose artifact kind or bytes do not match
     JSON.stringify({
       submissionId: id,
       artifactKind: "app",
-      artifactSha256: sha256(zipContents),
+      artifactSha256: sha256("artifact"),
       issues: [],
+    }),
+  )
+  const { calls, runFile } = notaryRunner()
+
+  await assert.rejects(
+    submitAndWait({ artifactPath: dmgPath, profile, evidenceDir: root, runFile }),
+    /Notarization resume does not match artifact/,
+  )
+  assert.equal(calls.length, 0)
+})
+
+test("rejects accepted resume evidence with a mismatched artifact hash before notary work", async () => {
+  const root = await evidence()
+  const dmgPath = await artifact(root, "Prompter.dmg")
+  await writeFile(
+    join(root, "notarization-resume.json"),
+    JSON.stringify({
+      submissionId: id,
+      status: "Accepted",
+      logPath: `notary-${id}.json`,
+      artifactKind: "dmg",
+      artifactSha256: sha256("different bytes"),
     }),
   )
   const { calls, runFile } = notaryRunner()
@@ -378,4 +444,35 @@ test("retries stapling a bounded three times and uses Gatekeeper's app and disk-
       ["--assess", "--type", "open", "--verbose=4"],
     ],
   )
+})
+
+test("uses absolute Apple trust command paths", async () => {
+  const { calls, runFile } = notaryRunner()
+
+  await preflightNotaryProfile({ profile, runFile })
+  await assessGatekeeper({ artifactPath: "Prompter.app", artifactKind: "app", runFile })
+
+  assert.equal(calls[0]?.command, "/usr/bin/xcrun")
+  assert.equal(calls[1]?.command, "/usr/sbin/spctl")
+})
+
+test("maps a real child-process AbortSignal failure to a sanitized production-runner error", async () => {
+  const controller = new AbortController()
+  const startedAt = Date.now()
+  const timer = setTimeout(() => controller.abort(), 50)
+  const run = runner(executeFile)
+
+  try {
+    await assert.rejects(
+      run(process.execPath, ["--eval", "setInterval(() => undefined, 1000)"], {
+        timeoutMs: 2_000,
+        signal: controller.signal,
+      }),
+      (error) => error instanceof Error && error.message === "macOS release command failed",
+    )
+  } finally {
+    clearTimeout(timer)
+  }
+
+  assert.equal(Date.now() - startedAt < 1_000, true)
 })

@@ -11,13 +11,15 @@ Prompter has two macOS packaging paths.
 - `npm run package` builds the app, then creates unsigned local outputs in `release/` for the
   current supported local architecture.
 - `npm run make` is the same unsigned local path because it calls `npm run package`.
-- `npm run package:release:macos` builds first, then runs the signed release coordinator through
-  `scripts/release-macos.mjs`.
+- `npm run package:release:macos` first runs `scripts/macos/release-version-preflight.mjs`, then
+  builds, then runs the signed release coordinator through `scripts/release-macos.mjs`.
 
-The signed path is ARM64 only. It preflights the current platform, architecture, clean Git
-worktree, empty release candidate directory, selected Xcode installation, signing identity,
-unlocked Keychain, notary profile, and Apple notary connectivity before it mutates the release
-candidate. It reads only these two non-secret variable names from the environment:
+The signed path requires exact version `0.1.1` before build, native rebuild, bundling, Apple
+preflight, candidate creation, or evidence writes. It is ARM64 only. The coordinator then
+preflights the current platform, architecture, clean Git worktree, empty release candidate
+directory, selected Xcode installation, signing identity, unlocked Keychain, notary profile, and
+Apple notary connectivity before it mutates the release candidate. It reads only these two
+non-secret variable names from the environment:
 
 - `PROMPTER_SIGNING_IDENTITY`
 - `PROMPTER_NOTARY_PROFILE`
@@ -103,15 +105,17 @@ errors before the next release step can run.
 Each submission gate is strict: `Accepted`, no warnings and no errors.
 
 Evidence is stored under ignored local paths beneath `.omo/evidence/release-macos/v0.1.1/app` and
-`.omo/evidence/release-macos/v0.1.1/dmg`. Evidence records only sanitized submission state and
-receipt filenames. It must not contain identity values, profile values, private keys, credential
+`.omo/evidence/release-macos/v0.1.1/dmg`. Each resume and final receipt binds `submissionId`,
+`artifactKind`, and `artifactSha256`; final evidence also records `Accepted` and warning-free,
+error-free issues. It must not contain identity values, profile values, private keys, credential
 values, local key paths, full environment dumps, or raw notary payloads.
 
-If `notarytool submit --wait` times out or is interrupted after Apple returns a valid submission
-ID, the local state is `unknown`. Resume by using `notarytool info` and `notarytool log` through
-the same Keychain profile. The rule is resume, not automatic resubmission of the same bytes. A
-resumed submission still needs an `Accepted` status and a warning-free, error-free log receipt
-before stapling or packaging continues.
+If `notarytool submit --wait` returns `Accepted`, the artifact-bound submission state is saved
+before log retrieval. If log retrieval fails, resume by using `notarytool info` and `notarytool
+log` through the same Keychain profile, not by submitting the same bytes again. A cached accepted
+receipt is not trusted alone: every continuation refreshes Apple status and log before staple,
+Gatekeeper, final archive, checksum, or publication-adjacent work. The refreshed state must be
+`Accepted` with warning-free, error-free issues before stapling or packaging continues.
 
 ## Final Artifact Contract
 

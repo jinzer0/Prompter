@@ -11,6 +11,8 @@ import {
 
 const appleCommandTimeoutMs = 10 * 60 * 1000
 const retryDelaysMs = [0, 100, 250]
+const xcrunCommand = "/usr/bin/xcrun"
+const spctlCommand = "/usr/sbin/spctl"
 
 function json(output, label) {
   if (typeof output !== "string" || output.trim() === "") {
@@ -93,7 +95,7 @@ export function createNotarizationClient(options) {
 
   async function command(args, label) {
     try {
-      const result = await value.runFile("xcrun", args, commandOptions)
+      const result = await value.runFile(xcrunCommand, args, commandOptions)
       return json(result?.stdout, label)
     } catch (error) {
       if (isNotarizationError(error)) throw error
@@ -173,7 +175,7 @@ export function createNotarizationClient(options) {
       const profile = notaryProfile(submitOptions.profile)
       try {
         const response = await value.runFile(
-          "xcrun",
+          xcrunCommand,
           [
             "notarytool",
             "submit",
@@ -206,12 +208,12 @@ export function createNotarizationClient(options) {
         if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
         try {
           await value.runFile(
-            "xcrun",
+            xcrunCommand,
             ["stapler", "staple", stapleOptions.artifactPath],
             commandOptions,
           )
           await value.runFile(
-            "xcrun",
+            xcrunCommand,
             ["stapler", "validate", stapleOptions.artifactPath],
             commandOptions,
           )
@@ -230,7 +232,7 @@ export function createNotarizationClient(options) {
       staplingArtifact(assessment.artifactPath, assessment.artifactKind)
       try {
         await value.runFile(
-          "spctl",
+          spctlCommand,
           [
             "--assess",
             "--type",

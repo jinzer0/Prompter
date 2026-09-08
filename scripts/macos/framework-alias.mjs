@@ -22,16 +22,14 @@ export async function sameFrameworkBinaryAlias(candidatePath, targetPath, rootPa
   const targetFramework = containingFramework(targetPath, rootPath)
   if (candidateFramework === undefined || targetFramework === undefined) return false
   const frameworkName = basename(candidateFramework, ".framework")
-  const targetSegments = relative(targetFramework, targetPath).split(sep)
-  if (
-    targetSegments.length !== 3 ||
-    targetSegments[0] !== "Versions" ||
-    targetSegments[1] === "Current" ||
-    targetSegments[2] !== frameworkName
-  ) {
-    return false
+  const conventionalBinary = (filePath, frameworkPath) => {
+    if (filePath === resolve(frameworkPath, frameworkName)) return true
+    const segments = relative(frameworkPath, filePath).split(sep)
+    return segments.length === 3 && segments[0] === "Versions" && segments[2] === frameworkName
   }
-  if (candidatePath === targetPath) return true
-  if (candidatePath !== resolve(candidateFramework, frameworkName)) return false
-  return (await realpath(candidateFramework)) === (await realpath(targetFramework))
+  return (
+    conventionalBinary(candidatePath, candidateFramework) &&
+    conventionalBinary(targetPath, targetFramework) &&
+    (await realpath(candidateFramework)) === (await realpath(targetFramework))
+  )
 }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { execFile } from "node:child_process"
 import {
   access,
   chmod,
@@ -14,7 +15,9 @@ import {
   writeFile,
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
+import { promisify } from "node:util"
 
 import { afterEach, test } from "vitest"
 
@@ -29,6 +32,8 @@ import {
 import { runMacOSRelease } from "../scripts/release-macos.mjs"
 
 const temporaryDirectories = []
+const executeFile = promisify(execFile)
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const electronHelperNames = [
   "Electron Helper",
   "Electron Helper (Renderer)",
@@ -60,6 +65,59 @@ async function createFixture() {
   ])
 
   return { appPath, outputDirectory, packageJsonPath }
+}
+
+async function createReleaseEntrypointFixture(version) {
+  const root = await mkdtemp(join(tmpdir(), "prompter-release-entrypoint-test-"))
+  temporaryDirectories.push(root)
+  await mkdir(join(root, "scripts", "macos"), { recursive: true })
+  await cp(
+    join(repositoryRoot, "scripts", "macos", "release-version-preflight.mjs"),
+    join(root, "scripts", "macos", "release-version-preflight.mjs"),
+  )
+  await writeFile(
+    join(root, "package.json"),
+    JSON.stringify({
+      name: "release-entrypoint-fixture",
+      private: true,
+      ...(version === undefined ? {} : { version }),
+      scripts: {
+        build: "node build-marker.mjs",
+        "package:release:macos":
+          "node scripts/macos/release-version-preflight.mjs && npm run build && node downstream-marker.mjs",
+      },
+    }),
+  )
+  await Promise.all([
+    writeFile(
+      join(root, "build-marker.mjs"),
+      'await import("node:fs/promises").then(({ writeFile }) => writeFile("build-ran", "1"))',
+    ),
+    writeFile(
+      join(root, "downstream-marker.mjs"),
+      'await import("node:fs/promises").then(({ writeFile }) => writeFile("downstream-ran", "1"))',
+    ),
+  ])
+  return root
+}
+
+async function assertReleaseEntrypointRejectsBeforeMutation(version) {
+  const root = await createReleaseEntrypointFixture(version)
+
+  await assert.rejects(
+    executeFile("npm", ["run", "package:release:macos"], { cwd: root }),
+    (error) =>
+      error instanceof Error &&
+      `${error.stdout ?? ""}\n${error.stderr ?? ""}`.includes("Invalid package version"),
+  )
+  for (const path of [
+    "build-ran",
+    "downstream-ran",
+    "release/v0.1.1",
+    ".omo/evidence/release-macos",
+  ]) {
+    await assert.rejects(access(join(root, path)))
+  }
 }
 
 function dmgOptions(fixture, arch) {
@@ -157,12 +215,12 @@ function commandStage(command, arguments_, counts) {
   if (command === "/usr/bin/security") return "identity"
   if (command === "/usr/bin/plutil") return "entitlements"
   if (command === "/usr/bin/file") return "inspect-binary"
-  if (command === "xcrun" && arguments_[1] === "history") return "profile"
-  if (command === "xcrun" && arguments_[1] === "submit")
+  if (command === "/usr/bin/xcrun" && arguments_[1] === "history") return "profile"
+  if (command === "/usr/bin/xcrun" && arguments_[1] === "submit")
     return counts.submit === 0 ? "app-submit" : "dmg-submit"
-  if (command === "xcrun" && arguments_[1] === "log")
+  if (command === "/usr/bin/xcrun" && arguments_[1] === "log")
     return counts.submit === 1 ? "app-log" : "dmg-log"
-  if (command === "xcrun" && arguments_[0] === "stapler")
+  if (command === "/usr/bin/xcrun" && arguments_[0] === "stapler")
     return arguments_[2].endsWith(".dmg") ? "dmg-staple" : "app-staple"
   if (command === "/usr/bin/ditto" && arguments_[0] === "-x") return "zip-extract"
   if (command === "/usr/bin/ditto" && arguments_[0] === "-c")
@@ -285,7 +343,7 @@ async function createCoordinatorFixture({
       command === "/usr/bin/file"
     )
       return { stdout: command === "/usr/bin/file" ? "Mach-O" : "", stderr: "" }
-    if (command === "xcrun") {
+    if (command === "/usr/bin/xcrun") {
       if (arguments_[1] === "history") return { stdout: "{}", stderr: "" }
       if (arguments_[1] === "submit") {
         counts.submit += 1
@@ -524,7 +582,7 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
       }
     if (command === "/usr/bin/security") return { stdout: "", stderr: "" }
     if (command === "/usr/bin/file") return { stdout: "Mach-O", stderr: "" }
-    if (command === "xcrun") {
+    if (command === "/usr/bin/xcrun") {
       if (arguments_[1] === "history") return { stdout: "{}", stderr: "" }
       if (arguments_[1] === "submit")
         return {
@@ -583,7 +641,7 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
     "SHA256SUMS",
   ])
   const submitted = calls
-    .filter(({ command, arguments_ }) => command === "xcrun" && arguments_[1] === "submit")
+    .filter(({ command, arguments_ }) => command === "/usr/bin/xcrun" && arguments_[1] === "submit")
     .map(({ arguments_ }) => arguments_[2])
   assert.equal(submitted.length, 2)
   const dmgSigning = calls.find(
@@ -608,7 +666,9 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
   )
   const appStaple = calls.findIndex(
     ({ command, arguments_ }) =>
-      command === "xcrun" && arguments_[0] === "stapler" && arguments_[2]?.endsWith(".app"),
+      command === "/usr/bin/xcrun" &&
+      arguments_[0] === "stapler" &&
+      arguments_[2]?.endsWith(".app"),
   )
   const extract = calls.findIndex(
     ({ command, arguments_ }) => command === "/usr/bin/ditto" && arguments_[0] === "-x",
@@ -686,11 +746,49 @@ test("orders the complete coordinator release flow and cleans every observed tem
     JSON.stringify(releaseStages.map((stage, position) => [stage, ordered[position]])),
   )
   const submissions = fixture.rawCalls
-    .filter(({ command, arguments_ }) => command === "xcrun" && arguments_[1] === "submit")
+    .filter(({ command, arguments_ }) => command === "/usr/bin/xcrun" && arguments_[1] === "submit")
     .map(({ arguments_ }) => arguments_[2])
   assert.equal(submissions.length, 2)
   assert.equal(submissions[0] === submissions[1], false)
   for (const temporaryRoot of fixture.observedTempRoots) await assert.rejects(access(temporaryRoot))
+})
+
+test("keeps signed Apple trust gates on absolute paths despite earlier PATH executables", async () => {
+  const root = await mkdtemp(join(tmpdir(), "prompter-path-hijack-test-"))
+  temporaryDirectories.push(root)
+  const binDirectory = join(root, "bin")
+  const markerPath = join(root, "hijacked")
+  await mkdir(binDirectory)
+  await Promise.all(
+    ["xcrun", "spctl"].map(async (command) => {
+      const fakePath = join(binDirectory, command)
+      await writeFile(fakePath, `#!/bin/sh\ntouch "${markerPath}"\n`)
+      await chmod(fakePath, 0o755)
+    }),
+  )
+  const fixture = await createCoordinatorFixture()
+  const originalPath = process.env.PATH
+  process.env.PATH = `${binDirectory}:${originalPath ?? ""}`
+
+  try {
+    await fixture.run()
+  } finally {
+    process.env.PATH = originalPath
+  }
+
+  await assert.rejects(access(markerPath))
+  assert.equal(
+    fixture.rawCalls
+      .filter(({ command }) => command.endsWith("xcrun"))
+      .every(({ command }) => command === "/usr/bin/xcrun"),
+    true,
+  )
+  assert.equal(
+    fixture.rawCalls
+      .filter(({ command }) => command.endsWith("spctl"))
+      .every(({ command }) => command === "/usr/sbin/spctl"),
+    true,
+  )
 })
 
 test("detaches the mounted app after a mounted-app Gatekeeper failure", async () => {
@@ -727,6 +825,14 @@ test("rejects every signed release version except 0.1.1 before the first externa
   await assert.rejects(fixture.run(), /Invalid package version/)
 
   assert.deepEqual(fixture.calls, [])
+})
+
+test("rejects a wrong package version at the npm release entrypoint before build or downstream mutation", async () => {
+  await assertReleaseEntrypointRejectsBeforeMutation("0.1.2")
+})
+
+test("rejects a missing package version at the npm release entrypoint before build or downstream mutation", async () => {
+  await assertReleaseEntrypointRejectsBeforeMutation(undefined)
 })
 
 test("maps bounded timeout and an AbortSignal to production execFile options", async () => {

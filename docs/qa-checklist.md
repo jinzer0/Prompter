@@ -56,7 +56,7 @@ MOUNT_DIR="$(mktemp -d)"
   const expected = {
     package: "npm run build && node scripts/package-macos.mjs",
     make: "npm run package",
-    "package:release:macos": "npm run build && node scripts/release-macos.mjs",
+    "package:release:macos": "node scripts/macos/release-version-preflight.mjs && npm run build && node scripts/release-macos.mjs",
   }
   for (const [name, command] of Object.entries(expected)) {
     if (scripts?.[name] !== command) throw new Error(`Unexpected script: ${name}`)
@@ -108,7 +108,16 @@ MOUNT_DIR="$(mktemp -d)"
       throw new Error(`Invalid notarization log path: ${root}`)
     }
     const receipt = JSON.parse(await readFile(join(root, resume.logPath), "utf8"))
-    if (receipt.submissionId !== resume.submissionId || !Array.isArray(receipt.issues)) {
+    for (const field of ["submissionId", "artifactKind", "artifactSha256"]) {
+      if (resume[field] !== receipt[field]) {
+        throw new Error(`Mismatched notarization evidence field ${field}: ${root}`)
+      }
+    }
+    if (
+      !["app", "dmg"].includes(resume.artifactKind) ||
+      !/^[0-9a-f]{64}$/.test(resume.artifactSha256) ||
+      !Array.isArray(receipt.issues)
+    ) {
       throw new Error(`Invalid notarization receipt: ${root}`)
     }
     for (const issue of receipt.issues) {

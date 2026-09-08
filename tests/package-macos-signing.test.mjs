@@ -39,7 +39,7 @@ async function fixture({
   duplicate = false,
   escapingAlias = false,
   frameworkAliases = false,
-  unexpectedFrameworkBinaryAlias = false,
+  unexpectedFrameworkBinaryAlias,
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "prompter-signing-test-"))
   temporaryDirectories.push(root)
@@ -83,9 +83,11 @@ async function fixture({
     await symlink("Versions/Current/Kit", paths.framework)
     await mkdir(join(versionRoot, "Resources"), { recursive: true })
     await symlink("Versions/Current/Resources", join(frameworkRoot, "Resources"))
-    if (unexpectedFrameworkBinaryAlias) {
-      await mkdir(join(frameworkRoot, "Resources", "Aliases"), { recursive: true })
-      await symlink("../../Kit", join(frameworkRoot, "Resources", "Aliases", "Kit"))
+    if (unexpectedFrameworkBinaryAlias !== undefined) {
+      const aliasDirectory =
+        unexpectedFrameworkBinaryAlias === "before-conventional" ? "Aliases" : "Library"
+      await mkdir(join(frameworkRoot, aliasDirectory), { recursive: true })
+      await symlink("../Versions/A/Kit", join(frameworkRoot, aliasDirectory, "Kit"))
     }
   }
   if (duplicate)
@@ -132,6 +134,18 @@ test("signs every nested code object deterministically before the outer app with
   const signed = calls.filter(
     ({ command, arguments_ }) => command === "/usr/bin/codesign" && arguments_[0] === "--force",
   )
+  for (const { command, arguments_ } of signed) {
+    assert.equal(command, "/usr/bin/codesign")
+    assert.deepEqual(arguments_.slice(0, 6), [
+      "--force",
+      "--timestamp",
+      "--options",
+      "runtime",
+      "--sign",
+      identity,
+    ])
+    assert.equal(arguments_.includes("--deep"), false)
+  }
   const canonicalAppPath = await realpath(paths.appPath)
   const targets = signed.map(({ arguments_ }) => relative(canonicalAppPath, arguments_.at(-1)))
   assert.deepEqual(targets, [
@@ -232,8 +246,11 @@ test("coalesces only same-framework version aliases and signs their canonical ta
   assert.equal(signedFrameworks.length, 1)
 })
 
-test("rejects a framework binary alias outside the conventional framework-root location", async () => {
-  const paths = await fixture({ frameworkAliases: true, unexpectedFrameworkBinaryAlias: true })
+test.each([
+  "before-canonical",
+  "before-conventional",
+])("rejects an invalid framework alias sorted %s entry", async (unexpectedFrameworkBinaryAlias) => {
+  const paths = await fixture({ frameworkAliases: true, unexpectedFrameworkBinaryAlias })
 
   await assert.rejects(
     discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),

@@ -273,7 +273,11 @@ describe("Electron shell contract", () => {
       readonly scripts?: Record<string, string>
       readonly version?: string
     }
-    const packageScript = await readFile("scripts/package-macos.mjs", "utf8")
+    const [packageScript, releaseGuide, qaChecklist] = await Promise.all([
+      readFile("scripts/package-macos.mjs", "utf8"),
+      readFile("docs/release-macos.md", "utf8"),
+      readFile("docs/qa-checklist.md", "utf8"),
+    ])
     const zipTemplate = ["$", "{appName}-", "$", "{version}-mac-", "$", "{architecture}.zip"].join(
       "",
     )
@@ -282,8 +286,13 @@ describe("Electron shell contract", () => {
     expect(packageJson.scripts?.["make"]).toBe("npm run package")
     expect(packageJson.version).toBe("0.1.1")
     expect(packageJson.scripts?.["package:release:macos"]).toBe(
-      "npm run build && node scripts/release-macos.mjs",
+      "node scripts/macos/release-version-preflight.mjs && npm run build && node scripts/release-macos.mjs",
     )
+    expect(releaseGuide).toContain("release-version-preflight.mjs")
+    expect(releaseGuide).toContain("not trusted alone")
+    expect(qaChecklist).toContain("submissionId")
+    expect(qaChecklist).toContain("artifactKind")
+    expect(qaChecklist).toContain("artifactSha256")
     expect(packageScript).toContain("com.jinzer0.prompter")
     expect(packageScript).toContain("Prompter.app")
     expect(packageScript).toContain(zipTemplate)

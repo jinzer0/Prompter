@@ -38,11 +38,11 @@ function resume(value) {
     failNotarization("Invalid resume state")
   }
   const fields =
-    value.status === "unknown"
-      ? ["submissionId", "status", "artifactKind", "artifactSha256"]
-      : ["submissionId", "status", "logPath", "artifactKind", "artifactSha256"]
+    value.status === "Accepted"
+      ? ["submissionId", "status", "logPath", "artifactKind", "artifactSha256"]
+      : ["submissionId", "status", "artifactKind", "artifactSha256"]
   if (
-    !["unknown", "Accepted"].includes(value.status) ||
+    !["unknown", "accepted", "Accepted"].includes(value.status) ||
     Reflect.ownKeys(value).length !== fields.length ||
     fields.some((field) => !Object.hasOwn(value, field))
   ) {
@@ -57,14 +57,15 @@ function resume(value) {
   if (value.status === "Accepted" && value.logPath !== notarizationLogPath(submissionId)) {
     failNotarization("Invalid resume state")
   }
-  return value.status === "Accepted"
-    ? {
-        submissionId,
-        status: "Accepted",
-        logPath: value.logPath,
-        ...artifactIdentity,
-      }
-    : { submissionId, status: "unknown", ...artifactIdentity }
+  if (value.status === "Accepted") {
+    return {
+      submissionId,
+      status: "Accepted",
+      logPath: value.logPath,
+      ...artifactIdentity,
+    }
+  }
+  return { submissionId, status: value.status, ...artifactIdentity }
 }
 
 async function save(evidenceDir, fileName, value) {
@@ -114,31 +115,6 @@ export function createNotarizationEvidence(options) {
         saved.artifactSha256 === artifactIdentity.artifactSha256
       )
     },
-    async hasSavedLog(saved) {
-      try {
-        const receipt = json(
-          await readFile(join(evidenceDir, saved.logPath), "utf8"),
-          "notarization log receipt",
-        )
-        return (
-          Reflect.ownKeys(receipt).length === 4 &&
-          notarizationSubmissionId(receipt.submissionId) === saved.submissionId &&
-          receipt.artifactKind === saved.artifactKind &&
-          receipt.artifactSha256 === saved.artifactSha256 &&
-          Array.isArray(receipt.issues) &&
-          receipt.issues.every(
-            (issue) =>
-              issue &&
-              Object.hasOwn(issue, "severity") &&
-              typeof issue.severity === "string" &&
-              !["warning", "error"].includes(issue.severity) &&
-              Reflect.ownKeys(issue).length === 1,
-          )
-        )
-      } catch {
-        return false
-      }
-    },
     async saveAccepted(submissionIdValue, issues) {
       const submissionId = notarizationSubmissionId(submissionIdValue)
       const reviewed = {
@@ -154,6 +130,15 @@ export function createNotarizationEvidence(options) {
       })
       await save(evidenceDir, resumeFileName, reviewed)
       return reviewed
+    },
+    async saveAcceptedPending(submissionIdValue) {
+      const pending = {
+        submissionId: notarizationSubmissionId(submissionIdValue),
+        status: "accepted",
+        ...artifactIdentity,
+      }
+      await save(evidenceDir, resumeFileName, pending)
+      return pending
     },
     async saveUnknown(submissionIdValue) {
       const unknown = {

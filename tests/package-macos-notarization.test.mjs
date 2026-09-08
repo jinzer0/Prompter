@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { createHash } from "node:crypto"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -30,6 +31,16 @@ async function evidence() {
   return path
 }
 
+async function artifact(root, name, contents = "artifact") {
+  const path = join(root, name)
+  await writeFile(path, contents)
+  return path
+}
+
+function sha256(contents) {
+  return createHash("sha256").update(contents).digest("hex")
+}
+
 function notaryRunner({
   submit = { id, status: "Accepted" },
   log = { issues: [] },
@@ -37,8 +48,8 @@ function notaryRunner({
   fail,
 } = {}) {
   const calls = []
-  const runFile = async (command, arguments_) => {
-    calls.push({ command, arguments_ })
+  const runFile = async (command, arguments_, options) => {
+    calls.push({ command, arguments_, options })
     if (fail?.(command, arguments_, calls.length)) throw fail(command, arguments_, calls.length)
     if (command === "spctl") return { stdout: "", stderr: "" }
     if (arguments_[1] === "history") return { stdout: "{}" }
@@ -71,6 +82,7 @@ test("uses exact option allowlists and rejects raw app submission or ZIP staplin
 
 test("requires valid profile JSON, Accepted status, and a warning-free reviewed receipt", async () => {
   const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
   for (const response of ["", "[]", '{"statusCode":401}', `{"error":"${sentinel}"}`]) {
     await assert.rejects(
       preflightNotaryProfile({ profile, runFile: async () => ({ stdout: response }) }),
@@ -84,7 +96,7 @@ test("requires valid profile JSON, Accepted status, and a warning-free reviewed 
   ]) {
     const { calls, runFile } = notaryRunner({ log })
     await assert.rejects(
-      submitAndWait({ artifactPath: "Prompter.zip", profile, evidenceDir: root, runFile }),
+      submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
       /Notarization log blocks publication|Invalid notarization log/,
     )
     assert.equal(
@@ -94,14 +106,22 @@ test("requires valid profile JSON, Accepted status, and a warning-free reviewed 
   }
   const { calls, runFile } = notaryRunner()
   const accepted = await submitAndWait({
-    artifactPath: "Prompter.zip",
+    artifactPath,
     profile,
     evidenceDir: root,
     runFile,
   })
-  assert.deepEqual(accepted, { submissionId: id, status: "Accepted", logPath: `notary-${id}.json` })
+  assert.deepEqual(accepted, {
+    submissionId: id,
+    status: "Accepted",
+    logPath: `notary-${id}.json`,
+    artifactKind: "app",
+    artifactSha256: sha256("artifact"),
+  })
   assert.deepEqual(JSON.parse(await readFile(join(root, accepted.logPath), "utf8")), {
     submissionId: id,
+    artifactKind: "app",
+    artifactSha256: sha256("artifact"),
     issues: [],
   })
   assert.equal(
@@ -113,6 +133,7 @@ test("requires valid profile JSON, Accepted status, and a warning-free reviewed 
 
 test("fails closed for malformed, unauthorized, Invalid, and Rejected submission or resume states", async () => {
   const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.dmg")
   for (const submit of [
     "bad",
     { statusCode: 401 },
@@ -120,9 +141,7 @@ test("fails closed for malformed, unauthorized, Invalid, and Rejected submission
     { id, status: "Rejected" },
   ]) {
     const { calls, runFile } = notaryRunner({ submit })
-    await assert.rejects(
-      submitAndWait({ artifactPath: "Prompter.dmg", profile, evidenceDir: root, runFile }),
-    )
+    await assert.rejects(submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }))
     assert.equal(
       calls.some(({ arguments_ }) => arguments_[1] === "log"),
       false,
@@ -134,17 +153,18 @@ test("fails closed for malformed, unauthorized, Invalid, and Rejected submission
   )
   await assert.rejects(
     submitAndWait({
-      artifactPath: "Prompter.dmg",
+      artifactPath,
       profile,
       evidenceDir: root,
       runFile: notaryRunner().runFile,
     }),
-    /Invalid notarization submission/,
+    /Invalid resume state/,
   )
 })
 
 test("stores only a UUID unknown state on a real timeout and resumes without resubmitting", async () => {
   const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
   let timedOut = true
   const { calls, runFile } = notaryRunner({
     fail: (_command, arguments_) => {
@@ -158,19 +178,24 @@ test("stores only a UUID unknown state on a real timeout and resumes without res
     },
   })
   const unknown = await submitAndWait({
-    artifactPath: "Prompter.zip",
+    artifactPath,
     profile,
     evidenceDir: root,
     runFile,
   })
-  assert.deepEqual(unknown, { submissionId: id, status: "unknown" })
+  assert.deepEqual(unknown, {
+    submissionId: id,
+    status: "unknown",
+    artifactKind: "app",
+    artifactSha256: sha256("artifact"),
+  })
   assert.equal(
     (await readFile(join(root, "notarization-resume.json"), "utf8")).includes(sentinel),
     false,
   )
   timedOut = false
   const resumed = await submitAndWait({
-    artifactPath: "Prompter.zip",
+    artifactPath,
     profile,
     evidenceDir: root,
     runFile,
@@ -179,7 +204,7 @@ test("stores only a UUID unknown state on a real timeout and resumes without res
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
   await assert.rejects(
     submitAndWait({
-      artifactPath: "Prompter.zip",
+      artifactPath: await artifact(await evidence(), "Prompter.zip"),
       profile,
       evidenceDir: await evidence(),
       runFile: notaryRunner({
@@ -193,18 +218,69 @@ test("stores only a UUID unknown state on a real timeout and resumes without res
   )
 })
 
+test("preserves only artifact-bound unknown evidence after a recovered AbortError", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.dmg", "abort artifact")
+  const controller = new AbortController()
+  const { calls, runFile } = notaryRunner({
+    fail: (_command, arguments_) =>
+      arguments_[1] === "submit"
+        ? Object.assign(new Error(sentinel), {
+            name: "AbortError",
+            stdout: JSON.stringify({ id, status: "In Progress" }),
+          })
+        : undefined,
+  })
+
+  const unknown = await submitAndWait({
+    artifactPath,
+    profile,
+    evidenceDir: root,
+    runFile,
+    signal: controller.signal,
+  })
+
+  assert.deepEqual(unknown, {
+    submissionId: id,
+    status: "unknown",
+    artifactKind: "dmg",
+    artifactSha256: sha256("abort artifact"),
+  })
+  assert.deepEqual(calls.find(({ arguments_ }) => arguments_[1] === "submit")?.options, {
+    timeoutMs: 10 * 60 * 1000,
+    signal: controller.signal,
+  })
+  assert.equal(
+    (await readFile(join(root, "notarization-resume.json"), "utf8")).includes(sentinel),
+    false,
+  )
+})
+
 test("re-fetches a tampered accepted receipt without resubmission and keeps errors redacted", async () => {
   const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.dmg")
   await writeFile(
     join(root, "notarization-resume.json"),
-    JSON.stringify({ submissionId: id, status: "Accepted", logPath: `notary-${id}.json` }),
+    JSON.stringify({
+      submissionId: id,
+      status: "Accepted",
+      logPath: `notary-${id}.json`,
+      artifactKind: "dmg",
+      artifactSha256: sha256("artifact"),
+    }),
   )
   await writeFile(
     join(root, `notary-${id}.json`),
-    JSON.stringify({ submissionId: id, issues: [{ severity: "warning" }], secret: sentinel }),
+    JSON.stringify({
+      submissionId: id,
+      artifactKind: "dmg",
+      artifactSha256: sha256("artifact"),
+      issues: [{ severity: "warning" }],
+      secret: sentinel,
+    }),
   )
   const { calls, runFile } = notaryRunner()
-  await submitAndWait({ artifactPath: "Prompter.dmg", profile, evidenceDir: root, runFile })
+  await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
   assert.equal(
     calls.some(({ arguments_ }) => arguments_[1] === "submit"),
     false,
@@ -219,13 +295,45 @@ test("re-fetches a tampered accepted receipt without resubmission and keeps erro
   })
   await assert.rejects(
     submitAndWait({
-      artifactPath: "Prompter.dmg",
+      artifactPath: await artifact(await evidence(), "Prompter.dmg"),
       profile: sentinel,
       evidenceDir: await evidence(),
       runFile: failing.runFile,
     }),
     (error) => !JSON.stringify(error).includes(sentinel),
   )
+})
+
+test("rejects accepted resume evidence whose artifact kind or bytes do not match before notary work", async () => {
+  const root = await evidence()
+  const zipContents = "app archive"
+  const dmgPath = await artifact(root, "Prompter.dmg", "disk image")
+  await writeFile(
+    join(root, "notarization-resume.json"),
+    JSON.stringify({
+      submissionId: id,
+      status: "Accepted",
+      logPath: `notary-${id}.json`,
+      artifactKind: "app",
+      artifactSha256: sha256(zipContents),
+    }),
+  )
+  await writeFile(
+    join(root, `notary-${id}.json`),
+    JSON.stringify({
+      submissionId: id,
+      artifactKind: "app",
+      artifactSha256: sha256(zipContents),
+      issues: [],
+    }),
+  )
+  const { calls, runFile } = notaryRunner()
+
+  await assert.rejects(
+    submitAndWait({ artifactPath: dmgPath, profile, evidenceDir: root, runFile }),
+    /Notarization resume does not match artifact/,
+  )
+  assert.equal(calls.length, 0)
 })
 
 test("retries stapling a bounded three times and uses Gatekeeper's app and disk-image kinds", async () => {

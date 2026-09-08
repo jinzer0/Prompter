@@ -35,7 +35,11 @@ async function executable(path) {
   await chmod(path, 0o755)
 }
 
-async function fixture({ duplicate = false, escapingAlias = false } = {}) {
+async function fixture({
+  duplicate = false,
+  escapingAlias = false,
+  frameworkAliases = false,
+} = {}) {
   const root = await mkdtemp(join(tmpdir(), "prompter-signing-test-"))
   temporaryDirectories.push(root)
   const appPath = join(root, "Prompter.app")
@@ -60,10 +64,25 @@ async function fixture({ duplicate = false, escapingAlias = false } = {}) {
   }
   await Promise.all(
     Object.values(paths)
-      .filter((path) => path !== paths.appPath && path !== paths.entitlements)
+      .filter(
+        (path) =>
+          path !== paths.appPath &&
+          path !== paths.entitlements &&
+          (!frameworkAliases || path !== paths.framework),
+      )
       .map(executable),
   )
   await writeFile(paths.entitlements, expectedEntitlements)
+  if (frameworkAliases) {
+    const frameworkRoot = join(appPath, "Contents", "Frameworks", "Kit.framework")
+    const versionRoot = join(frameworkRoot, "Versions", "A")
+    const versionBinary = join(versionRoot, "Kit")
+    await executable(versionBinary)
+    await symlink("A", join(frameworkRoot, "Versions", "Current"))
+    await symlink("Versions/Current/Kit", paths.framework)
+    await mkdir(join(versionRoot, "Resources"), { recursive: true })
+    await symlink("Versions/Current/Resources", join(frameworkRoot, "Resources"))
+  }
   if (duplicate)
     await symlink(paths.native, join(appPath, "Contents", "Resources", "app", "fixture-alias.node"))
   if (escapingAlias) {
@@ -185,6 +204,27 @@ test("rejects escaping and duplicate canonical aliases before nested or outer si
     )
     assert.equal(calls.filter(({ command }) => command === "/usr/bin/codesign").length, 0)
   }
+})
+
+test("coalesces only same-framework version aliases and signs their canonical target once", async () => {
+  const paths = await fixture({ frameworkAliases: true })
+  const calls = []
+
+  await signAppBundle({
+    appPath: paths.appPath,
+    identity,
+    entitlementsPath: paths.entitlements,
+    runFile: runner({ calls }),
+  })
+
+  const canonicalFrameworkBinary = await realpath(paths.framework)
+  const signedFrameworks = calls.filter(
+    ({ command, arguments_ }) =>
+      command === "/usr/bin/codesign" &&
+      arguments_[0] === "--force" &&
+      arguments_.at(-1) === canonicalFrameworkBinary,
+  )
+  assert.equal(signedFrameworks.length, 1)
 })
 
 test("rejects a post-sign unsigned native object and suppresses the outer signature", async () => {

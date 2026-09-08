@@ -32,8 +32,14 @@ function text(value, message) {
   if (typeof value !== "string" || value.trim() === "" || value.trim() !== value) fail(message)
   return value
 }
+function abortSignal(value, message) {
+  if (value === undefined) return undefined
+  if (!(value instanceof AbortSignal)) fail(message)
+  return value
+}
 export function input(value) {
-  const release = exactObject(value, releaseKeys, "Invalid macOS release options")
+  const fields = Object.hasOwn(value ?? {}, "signal") ? [...releaseKeys, "signal"] : releaseKeys
+  const release = exactObject(value, fields, "Invalid macOS release options")
   if (
     typeof release.runFile !== "function" ||
     release.platform !== "darwin" ||
@@ -49,6 +55,7 @@ export function input(value) {
     paths,
     signingIdentity,
     notaryProfile: text(release.notaryProfile, "Notary profile is required"),
+    signal: abortSignal(release.signal, "Invalid macOS release options"),
   }
 }
 function timeoutId(output) {
@@ -64,8 +71,31 @@ function timeoutId(output) {
 }
 export function runner(runFile) {
   return async (command, args, options) => {
+    const sourceOptions = options ?? {}
+    const commandOptions = exactObject(
+      sourceOptions,
+      Reflect.ownKeys(sourceOptions).filter(
+        (key) => key === "cwd" || key === "timeoutMs" || key === "signal",
+      ),
+      "Invalid macOS release command options",
+    )
+    if (
+      !Reflect.ownKeys(sourceOptions).every(
+        (key) => key === "cwd" || key === "timeoutMs" || key === "signal",
+      ) ||
+      (commandOptions.cwd !== undefined && typeof commandOptions.cwd !== "string") ||
+      (commandOptions.timeoutMs !== undefined &&
+        (!Number.isSafeInteger(commandOptions.timeoutMs) || commandOptions.timeoutMs <= 0))
+    )
+      fail("Invalid macOS release command options")
+    const signal = abortSignal(commandOptions.signal, "Invalid macOS release command options")
+    const executionOptions = {
+      ...(commandOptions.cwd === undefined ? {} : { cwd: commandOptions.cwd }),
+      ...(commandOptions.timeoutMs === undefined ? {} : { timeout: commandOptions.timeoutMs }),
+      ...(signal === undefined ? {} : { signal }),
+    }
     try {
-      const result = await runFile(command, args, options)
+      const result = await runFile(command, args, executionOptions)
       if (!result || typeof result.stdout !== "string" || typeof result.stderr !== "string")
         fail("Invalid macOS release command result")
       return result
@@ -89,10 +119,7 @@ export function runner(runFile) {
 export async function versionFrom(packageJsonPath) {
   try {
     const value = JSON.parse(await readFile(packageJsonPath, "utf8"))
-    if (
-      typeof value.version !== "string" ||
-      !/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/u.test(value.version)
-    )
+    if (typeof value.version !== "string" || value.version !== "0.1.1")
       fail("Invalid package version")
     return value.version
   } catch {

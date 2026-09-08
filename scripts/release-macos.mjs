@@ -51,7 +51,11 @@ async function preflight(release, run, state) {
     (await run("/usr/bin/security", ["find-identity", "-v", "-p", "codesigning"], {})).stdout,
     release.signingIdentity,
   )
-  await preflightNotaryProfile({ profile: release.notaryProfile, runFile: run })
+  await preflightNotaryProfile({
+    profile: release.notaryProfile,
+    runFile: run,
+    ...(release.signal === undefined ? {} : { signal: release.signal }),
+  })
 }
 
 async function accepted(artifactPath, evidenceDirectory, state) {
@@ -60,6 +64,7 @@ async function accepted(artifactPath, evidenceDirectory, state) {
     profile: state.notaryProfile,
     evidenceDir: evidenceDirectory,
     runFile: state.run,
+    ...(state.signal === undefined ? {} : { signal: state.signal }),
   })
   if (result?.status === "unknown") fail("Notarization submission is unresolved")
   if (result?.status !== "Accepted" || typeof result.logPath !== "string")
@@ -78,21 +83,39 @@ async function prepareCandidate(state) {
 }
 
 async function cleanup(run, state) {
-  if (state.mountAttached)
-    await Promise.allSettled([run("/usr/bin/hdiutil", ["detach", state.mountDirectory], {})])
-  await Promise.allSettled(
-    [
-      state.appStageDirectory,
-      state.submissionDirectory,
-      state.extractDirectory,
-      state.mountDirectory,
-      ...(!state.success ? state.assets : []),
-    ]
-      .filter(Boolean)
-      .map((path) => rm(path, { recursive: true, force: true })),
-  )
-  if (!state.success && state.candidateCreated)
-    await Promise.allSettled([rmdir(state.candidateDirectory)])
+  const failures = []
+  let detached = !state.mountAttached
+  if (state.mountAttached) {
+    try {
+      await run("/usr/bin/hdiutil", ["detach", state.mountDirectory], {})
+      state.mountAttached = false
+      detached = true
+    } catch {
+      failures.push(new Error("macOS release cleanup failed"))
+    }
+  }
+  const paths = [
+    state.appStageDirectory,
+    state.submissionDirectory,
+    state.extractDirectory,
+    ...(detached ? [state.mountDirectory] : []),
+    ...(!state.success ? state.assets : []),
+  ].filter(Boolean)
+  for (const path of paths) {
+    try {
+      await rm(path, { recursive: true, force: true })
+    } catch {
+      failures.push(new Error("macOS release cleanup failed"))
+    }
+  }
+  if (!state.success && state.candidateCreated) {
+    try {
+      await rmdir(state.candidateDirectory)
+    } catch {
+      failures.push(new Error("macOS release cleanup failed"))
+    }
+  }
+  if (failures.length > 0) throw new AggregateError(failures, "macOS release cleanup failed")
 }
 
 export async function runMacOSRelease(options) {
@@ -104,6 +127,7 @@ export async function runMacOSRelease(options) {
     appEvidenceDirectory: join(release.paths.notarizationEvidenceRoot, `v${version}`, "app"),
     dmgEvidenceDirectory: join(release.paths.notarizationEvidenceRoot, `v${version}`, "dmg"),
     notaryProfile: release.notaryProfile,
+    signal: release.signal,
     run,
     assets: [],
   }
@@ -127,7 +151,12 @@ export async function runMacOSRelease(options) {
       runFile: run,
     })
     await verifyAppSignature({ appPath, runFile: run })
-    await assessGatekeeper({ artifactPath: appPath, artifactKind: "app", runFile: run })
+    await assessGatekeeper({
+      artifactPath: appPath,
+      artifactKind: "app",
+      runFile: run,
+      ...(release.signal === undefined ? {} : { signal: release.signal }),
+    })
     state.submissionDirectory = await mkdtemp(join(tmpdir(), "prompter-notary-app-"))
     await accepted(
       await createZipArchive({
@@ -140,7 +169,12 @@ export async function runMacOSRelease(options) {
       state.appEvidenceDirectory,
       state,
     )
-    await stapleAndValidate({ artifactPath: appPath, artifactKind: "app", runFile: run })
+    await stapleAndValidate({
+      artifactPath: appPath,
+      artifactKind: "app",
+      runFile: run,
+      ...(release.signal === undefined ? {} : { signal: release.signal }),
+    })
     await prepareCandidate(state)
     state.assets.push(zipPath)
     const finalZip = await createZipArchive({
@@ -157,7 +191,12 @@ export async function runMacOSRelease(options) {
       join(state.extractDirectory, appBundleName),
     )
     await verifyAppSignature({ appPath: extractedApp, runFile: run })
-    await assessGatekeeper({ artifactPath: extractedApp, artifactKind: "app", runFile: run })
+    await assessGatekeeper({
+      artifactPath: extractedApp,
+      artifactKind: "app",
+      runFile: run,
+      ...(release.signal === undefined ? {} : { signal: release.signal }),
+    })
     state.assets.push(dmgPath)
     const finalDmg = await createDmgArchive({
       arch: release.arch,
@@ -169,13 +208,31 @@ export async function runMacOSRelease(options) {
     await run("/usr/bin/hdiutil", ["verify", finalDmg], {})
     await run(
       "/usr/bin/codesign",
-      ["--force", "--timestamp", "--sign", release.signingIdentity, finalDmg],
+      [
+        "--force",
+        "--timestamp",
+        "--options",
+        "runtime",
+        "--sign",
+        release.signingIdentity,
+        finalDmg,
+      ],
       {},
     )
     await verifyDmgSignature({ dmgPath: finalDmg, runFile: run })
     await accepted(finalDmg, state.dmgEvidenceDirectory, state)
-    await stapleAndValidate({ artifactPath: finalDmg, artifactKind: "dmg", runFile: run })
-    await assessGatekeeper({ artifactPath: finalDmg, artifactKind: "dmg", runFile: run })
+    await stapleAndValidate({
+      artifactPath: finalDmg,
+      artifactKind: "dmg",
+      runFile: run,
+      ...(release.signal === undefined ? {} : { signal: release.signal }),
+    })
+    await assessGatekeeper({
+      artifactPath: finalDmg,
+      artifactKind: "dmg",
+      runFile: run,
+      ...(release.signal === undefined ? {} : { signal: release.signal }),
+    })
     state.mountDirectory = await mkdtemp(join(tmpdir(), "prompter-release-mount-"))
     await run(
       "/usr/bin/hdiutil",
@@ -188,7 +245,12 @@ export async function runMacOSRelease(options) {
       join(state.mountDirectory, appBundleName),
     )
     await verifyAppSignature({ appPath: mountedApp, runFile: run })
-    await assessGatekeeper({ artifactPath: mountedApp, artifactKind: "app", runFile: run })
+    await assessGatekeeper({
+      artifactPath: mountedApp,
+      artifactKind: "app",
+      runFile: run,
+      ...(release.signal === undefined ? {} : { signal: release.signal }),
+    })
     await run("/usr/bin/hdiutil", ["detach", state.mountDirectory], {})
     state.mountAttached = false
     state.assets.push(checksumPath)
@@ -206,10 +268,17 @@ export async function runMacOSRelease(options) {
     )
       fail("Release candidate contains unexpected artifacts")
     state.success = true
-    return { artifacts }
-  } finally {
-    await cleanup(run, state)
+    state.result = { artifacts }
+  } catch (error) {
+    try {
+      await cleanup(run, state)
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], "macOS release failed and cleanup failed")
+    }
+    throw error
   }
+  await cleanup(run, state)
+  return state.result
 }
 
 const defaultPaths = () => ({
@@ -222,6 +291,10 @@ const defaultPaths = () => ({
 })
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  process.once("SIGINT", abort)
+  process.once("SIGTERM", abort)
   try {
     await runMacOSRelease({
       runFile: executeFile,
@@ -230,10 +303,14 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
       paths: defaultPaths(),
       signingIdentity: process.env.PROMPTER_SIGNING_IDENTITY,
       notaryProfile: process.env.PROMPTER_NOTARY_PROFILE,
+      signal: controller.signal,
     })
     console.log("macOS release artifacts are ready.")
   } catch {
     console.error("macOS release failed.")
     process.exitCode = 1
+  } finally {
+    process.removeListener("SIGINT", abort)
+    process.removeListener("SIGTERM", abort)
   }
 }

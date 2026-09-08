@@ -18,6 +18,7 @@ import { dirname, join } from "node:path"
 
 import { afterEach, test } from "vitest"
 
+import { runner } from "../scripts/macos/release-support.mjs"
 import {
   createDmgArchive,
   createZipArchive,
@@ -134,11 +135,13 @@ async function createElectronAppFixture() {
   }
 
   const frameworkName = "Electron Framework"
-  const frameworkBinaryPath = join(frameworksPath, `${frameworkName}.framework`, frameworkName)
-  await mkdir(join(frameworksPath, "Electron Framework.framework"), { recursive: true })
+  const frameworkPath = join(frameworksPath, `${frameworkName}.framework`)
+  const frameworkBinaryPath = join(frameworkPath, "Versions", "A", frameworkName)
+  await mkdir(join(frameworkBinaryPath, ".."), { recursive: true })
   await writeFile(frameworkBinaryPath, "framework binary")
-  const frameworkLinkPath = join(frameworksPath, "Electron Framework")
-  await symlink("Electron Framework.framework", frameworkLinkPath)
+  await symlink("A", join(frameworkPath, "Versions", "Current"))
+  const frameworkLinkPath = join(frameworkPath, frameworkName)
+  await symlink(`Versions/Current/${frameworkName}`, frameworkLinkPath)
 
   return { appPath, frameworkBinaryPath, frameworkLinkPath }
 }
@@ -201,7 +204,6 @@ async function createCoordinatorFixture({
   const releaseRoot = join(root, "release")
   const evidenceRoot = join(root, "evidence")
   const electron = await createElectronAppFixture()
-  await rm(electron.frameworkLinkPath)
   await mkdir(sourceRoot, { recursive: true })
   await mkdir(dirname(nativeSourcePath), { recursive: true })
   await Promise.all([
@@ -310,11 +312,17 @@ async function createCoordinatorFixture({
       await writeFile(arguments_.at(-1), "zip")
     }
     if (command === "/usr/bin/ditto" && arguments_[0] === "-x")
-      await cp(packagedApp, join(arguments_.at(-1), "Prompter.app"), { recursive: true })
+      await cp(packagedApp, join(arguments_.at(-1), "Prompter.app"), {
+        recursive: true,
+        verbatimSymlinks: true,
+      })
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "create")
       await writeFile(arguments_.at(-1), "dmg")
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "attach")
-      await cp(packagedApp, join(arguments_[4], "Prompter.app"), { recursive: true })
+      await cp(packagedApp, join(arguments_[4], "Prompter.app"), {
+        recursive: true,
+        verbatimSymlinks: true,
+      })
     if (command === "/usr/bin/shasum")
       return {
         stdout: `${"a".repeat(64)}  ${arguments_[2]}\n${"b".repeat(64)}  ${arguments_[3]}\n`,
@@ -401,7 +409,7 @@ test("renames the main executable and all Electron helper bundles into a runnabl
   }
 
   assert.equal(await readFile(fixture.frameworkBinaryPath, "utf8"), "framework binary")
-  assert.equal(await readlink(fixture.frameworkLinkPath), "Electron Framework.framework")
+  assert.equal(await readlink(fixture.frameworkLinkPath), "Versions/Current/Electron Framework")
 })
 
 function assertSanitizedReleaseFailure(error) {
@@ -494,7 +502,6 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
   const releaseRoot = join(root, "release")
   const evidenceRoot = join(root, "evidence")
   const electron = await createElectronAppFixture()
-  await rm(electron.frameworkLinkPath)
   await Promise.all(
     ["dist", "dist-electron", "drizzle", "node_modules"].map((name) =>
       mkdir(join(sourceRoot, name), { recursive: true }),
@@ -537,11 +544,17 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
       await writeFile(arguments_.at(-1), "zip")
     }
     if (command === "/usr/bin/ditto" && arguments_[0] === "-x")
-      await cp(packagedApp, join(arguments_.at(-1), "Prompter.app"), { recursive: true })
+      await cp(packagedApp, join(arguments_.at(-1), "Prompter.app"), {
+        recursive: true,
+        verbatimSymlinks: true,
+      })
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "create")
       await writeFile(arguments_.at(-1), "dmg")
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "attach")
-      await cp(packagedApp, join(arguments_[4], "Prompter.app"), { recursive: true })
+      await cp(packagedApp, join(arguments_[4], "Prompter.app"), {
+        recursive: true,
+        verbatimSymlinks: true,
+      })
     if (command === "/usr/bin/shasum")
       return {
         stdout: `${"a".repeat(64)}  ${arguments_[2]}\n${"b".repeat(64)}  ${arguments_[3]}\n`,
@@ -573,6 +586,20 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
     .filter(({ command, arguments_ }) => command === "xcrun" && arguments_[1] === "submit")
     .map(({ arguments_ }) => arguments_[2])
   assert.equal(submitted.length, 2)
+  const dmgSigning = calls.find(
+    ({ command, arguments_ }) =>
+      command === "/usr/bin/codesign" &&
+      arguments_.at(-1).endsWith(".dmg") &&
+      arguments_[0] === "--force",
+  )
+  assert.deepEqual(dmgSigning.arguments_.slice(0, 6), [
+    "--force",
+    "--timestamp",
+    "--options",
+    "runtime",
+    "--sign",
+    identity,
+  ])
   const firstFinalZip = calls.findIndex(
     ({ command, arguments_ }) =>
       command === "/usr/bin/ditto" &&
@@ -636,7 +663,10 @@ test.each([
   else await assert.rejects(access(fixture.candidate))
   assert.equal(await readFile(join(fixture.releaseRoot, "caller-sentinel"), "utf8"), "retain")
   assert.equal(await readFile(join(fixture.evidenceRoot, "caller-sentinel"), "utf8"), "retain")
-  for (const temporaryPath of fixture.observedTempRoots) await assert.rejects(access(temporaryPath))
+  for (const temporaryPath of fixture.observedTempRoots) {
+    if (failure === "detach" && temporaryPath.includes("prompter-release-mount-")) continue
+    await assert.rejects(access(temporaryPath))
+  }
 })
 
 test("orders the complete coordinator release flow and cleans every observed temp root", async () => {
@@ -672,6 +702,47 @@ test("detaches the mounted app after a mounted-app Gatekeeper failure", async ()
   assert.equal(fixture.calls.includes("app-verify-3"), true)
   assert.equal(fixture.calls.includes("detach"), true)
   assert.equal(fixture.calls.includes("checksum"), false)
+})
+
+test("preserves a mounted image when detach cleanup fails and reports aggregate failure", async () => {
+  const fixture = await createCoordinatorFixture({ failure: "detach" })
+
+  await assert.rejects(fixture.run(), (error) => error instanceof AggregateError)
+
+  const mountDirectory = [...fixture.observedTempRoots].find((path) =>
+    path.includes("prompter-release-mount-"),
+  )
+  assert.ok(mountDirectory)
+  await access(mountDirectory)
+  await rm(mountDirectory, { recursive: true, force: true })
+})
+
+test("rejects every signed release version except 0.1.1 before the first external command", async () => {
+  const fixture = await createCoordinatorFixture()
+  await writeFile(
+    join(fixture.releaseRoot, "..", "source", "package.json"),
+    JSON.stringify({ version: "0.1.2" }),
+  )
+
+  await assert.rejects(fixture.run(), /Invalid package version/)
+
+  assert.deepEqual(fixture.calls, [])
+})
+
+test("maps bounded timeout and an AbortSignal to production execFile options", async () => {
+  const controller = new AbortController()
+  let options
+  const run = runner(async (_command, _arguments, receivedOptions) => {
+    options = receivedOptions
+    return { stdout: "", stderr: "" }
+  })
+
+  await run("xcrun", ["notarytool"], { timeoutMs: 1000, signal: controller.signal })
+  assert.deepEqual(options, { timeout: 1000, signal: controller.signal })
+  await assert.rejects(
+    run("xcrun", ["notarytool"], { signal: {} }),
+    /Invalid macOS release command options/,
+  )
 })
 
 test.each([

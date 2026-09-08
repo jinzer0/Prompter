@@ -117,6 +117,15 @@ function isFrameworkBinary(filePath, frameworkPath) {
   return basename(filePath) === frameworkName
 }
 
+async function sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath) {
+  const candidateFramework = containingFramework(candidatePath, rootPath)
+  const targetFramework = containingFramework(targetPath, rootPath)
+  if (candidateFramework === undefined || targetFramework === undefined) return false
+  if (!isFrameworkBinary(candidatePath, candidateFramework)) return false
+  if (!isFrameworkBinary(targetPath, targetFramework)) return false
+  return (await realpath(candidateFramework)) === (await realpath(targetFramework))
+}
+
 function sortedTargets(rootPath, targets) {
   return [...targets.values()].sort((left, right) => {
     const depthDifference = pathDepth(rootPath, right.path) - pathDepth(rootPath, left.path)
@@ -147,7 +156,10 @@ export async function discoverSignableCode({ appPath, runFile }) {
       throw new SigningInputError("Signable symlink alias has an ambiguous target type")
     }
     if (visited.has(targetPath)) {
-      if (targets.has(targetPath))
+      if (
+        targets.has(targetPath) &&
+        !(await sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath))
+      )
         throw new SigningInputError("Duplicate signable code path is not allowed")
       return
     }

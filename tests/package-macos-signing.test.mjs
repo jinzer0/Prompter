@@ -39,6 +39,7 @@ async function fixture({
   duplicate = false,
   escapingAlias = false,
   frameworkAliases = false,
+  unexpectedFrameworkBinaryAlias = false,
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "prompter-signing-test-"))
   temporaryDirectories.push(root)
@@ -82,6 +83,10 @@ async function fixture({
     await symlink("Versions/Current/Kit", paths.framework)
     await mkdir(join(versionRoot, "Resources"), { recursive: true })
     await symlink("Versions/Current/Resources", join(frameworkRoot, "Resources"))
+    if (unexpectedFrameworkBinaryAlias) {
+      await mkdir(join(frameworkRoot, "Resources", "Aliases"), { recursive: true })
+      await symlink("../../Kit", join(frameworkRoot, "Resources", "Aliases", "Kit"))
+    }
   }
   if (duplicate)
     await symlink(paths.native, join(appPath, "Contents", "Resources", "app", "fixture-alias.node"))
@@ -225,6 +230,15 @@ test("coalesces only same-framework version aliases and signs their canonical ta
       arguments_.at(-1) === canonicalFrameworkBinary,
   )
   assert.equal(signedFrameworks.length, 1)
+})
+
+test("rejects a framework binary alias outside the conventional framework-root location", async () => {
+  const paths = await fixture({ frameworkAliases: true, unexpectedFrameworkBinaryAlias: true })
+
+  await assert.rejects(
+    discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),
+    /Duplicate signable code path is not allowed/,
+  )
 })
 
 test("rejects a post-sign unsigned native object and suppresses the outer signature", async () => {

@@ -300,7 +300,15 @@ test("re-fetches a tampered accepted receipt without resubmission and keeps erro
       evidenceDir: await evidence(),
       runFile: failing.runFile,
     }),
-    (error) => !JSON.stringify(error).includes(sentinel),
+    (error) => {
+      if (!(error instanceof Error)) return false
+      const serialized = JSON.stringify({
+        name: error.name,
+        message: error.message,
+        fields: Object.fromEntries(Object.entries(error)),
+      })
+      return !error.message.includes(sentinel) && !serialized.includes(sentinel)
+    },
   )
 })
 
@@ -334,6 +342,18 @@ test("rejects accepted resume evidence whose artifact kind or bytes do not match
     /Notarization resume does not match artifact/,
   )
   assert.equal(calls.length, 0)
+})
+
+test("binds a multi-chunk archive to a lowercase streaming SHA-256 digest", async () => {
+  const root = await evidence()
+  const contents = Buffer.concat([Buffer.alloc(65_536, "a"), Buffer.alloc(65_536, "b")])
+  const artifactPath = await artifact(root, "Prompter.zip", contents)
+  const { runFile } = notaryRunner()
+
+  const accepted = await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+
+  assert.equal(accepted.artifactSha256, sha256(contents))
+  assert.match(accepted.artifactSha256, /^[0-9a-f]{64}$/u)
 })
 
 test("retries stapling a bounded three times and uses Gatekeeper's app and disk-image kinds", async () => {

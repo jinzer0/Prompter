@@ -1,5 +1,11 @@
 import { readdir, readFile, realpath, stat } from "node:fs/promises"
-import { basename, extname, isAbsolute, relative, resolve, sep } from "node:path"
+import { extname, isAbsolute, relative, resolve, sep } from "node:path"
+
+import {
+  containingFramework,
+  isFrameworkBinary,
+  sameFrameworkBinaryAlias,
+} from "./framework-alias.mjs"
 
 const codesignCommand = "/usr/bin/codesign"
 const fileCommand = "/usr/bin/file"
@@ -80,17 +86,6 @@ function lexicalCompare(left, right) {
   return 0
 }
 
-function containingFramework(filePath, rootPath) {
-  let currentPath = filePath
-  while (currentPath !== rootPath) {
-    if (currentPath.endsWith(".framework")) return currentPath
-    const parentPath = resolve(currentPath, "..")
-    if (parentPath === currentPath) return undefined
-    currentPath = parentPath
-  }
-  return undefined
-}
-
 function bundleKind(targetPath) {
   if (targetPath.endsWith(".app")) return "helper-app"
   if (targetPath.endsWith(".xpc")) return "xpc-service"
@@ -109,21 +104,6 @@ function rawKind(targetPath, mode, frameworkPath) {
 
 function usesEntitlements(kind) {
   return kind === "helper-app" || kind === "xpc-service" || kind === "executable-host"
-}
-
-function isFrameworkBinary(filePath, frameworkPath) {
-  if (frameworkPath === undefined) return false
-  const frameworkName = basename(frameworkPath, ".framework")
-  return basename(filePath) === frameworkName
-}
-
-async function sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath) {
-  const candidateFramework = containingFramework(candidatePath, rootPath)
-  const targetFramework = containingFramework(targetPath, rootPath)
-  if (candidateFramework === undefined || targetFramework === undefined) return false
-  if (!isFrameworkBinary(candidatePath, candidateFramework)) return false
-  if (!isFrameworkBinary(targetPath, targetFramework)) return false
-  return (await realpath(candidateFramework)) === (await realpath(targetFramework))
 }
 
 function sortedTargets(rootPath, targets) {

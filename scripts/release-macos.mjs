@@ -49,8 +49,8 @@ async function preflight(release, run, state) {
       .stdout !== ""
   )
     fail("Worktree must be clean")
-  state.candidateInitial = await candidate(state.candidateDirectory)
-  if (!state.candidateInitial.empty) fail("Release candidate directory is not empty")
+  if ((await candidate(state.candidateDirectory)).exists)
+    fail("Release candidate directory is unavailable")
   await run("/usr/bin/security", ["show-keychain-info"], {})
   assertIdentity(
     (await run("/usr/bin/security", ["find-identity", "-v", "-p", "codesigning"], {})).stdout,
@@ -70,6 +70,7 @@ export async function runMacOSRelease(options) {
   const { state, zipPath, dmgPath, checksumPath } = createReleaseState(release, run, version)
   try {
     await preflight(release, run, state)
+    await prepareReleaseCandidate(state)
     state.appStageDirectory = await mkdtemp(join(tmpdir(), "prompter-release-app-"))
     const appPath = join(state.appStageDirectory, appBundleName)
     await assembleMacOSApp({
@@ -109,7 +110,6 @@ export async function runMacOSRelease(options) {
       runFile: run,
       ...(release.signal === undefined ? {} : { signal: release.signal }),
     })
-    await prepareReleaseCandidate(state)
     state.assets.push(zipPath)
     const finalZip = await createZipArchive({
       arch: release.arch,

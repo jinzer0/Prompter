@@ -753,6 +753,17 @@ test("orders the complete coordinator release flow and cleans every observed tem
   for (const temporaryRoot of fixture.observedTempRoots) await assert.rejects(access(temporaryRoot))
 })
 
+test("reserves a release candidate atomically so one concurrent invocation reaches signing", async () => {
+  const fixture = await createCoordinatorFixture()
+
+  const outcomes = await Promise.allSettled([fixture.run(), fixture.run()])
+
+  assert.equal(outcomes.filter(({ status }) => status === "fulfilled").length, 1)
+  assert.equal(outcomes.filter(({ status }) => status === "rejected").length, 1)
+  assert.equal(fixture.calls.filter((stage) => stage === "app-sign").length > 0, true)
+  assert.equal((await stat(fixture.candidate)).isDirectory(), true)
+})
+
 test("keeps signed Apple trust gates on absolute paths despite earlier PATH executables", async () => {
   const root = await mkdtemp(join(tmpdir(), "prompter-path-hijack-test-"))
   temporaryDirectories.push(root)

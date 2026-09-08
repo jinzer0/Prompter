@@ -1,8 +1,7 @@
-import { mkdir, rm, rmdir } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { submitAndWait } from "./notarization.mjs"
-import { candidate } from "./release-support.mjs"
 
 function fail(message) {
   throw new Error(message)
@@ -41,14 +40,12 @@ export function createReleaseState(release, run, version) {
 }
 
 export async function prepareReleaseCandidate(state) {
-  await mkdir(dirname(state.candidateDirectory), { recursive: true })
-  const current = await candidate(state.candidateDirectory)
-  if (current.exists !== state.candidateInitial.exists || !current.empty) {
-    fail("Release candidate directory changed during preflight")
-  }
-  if (!current.exists) {
+  try {
+    await mkdir(dirname(state.candidateDirectory), { recursive: true })
     await mkdir(state.candidateDirectory)
     state.candidateCreated = true
+  } catch {
+    fail("Release candidate directory is unavailable")
   }
 }
 
@@ -80,7 +77,7 @@ export async function cleanupRelease(run, state) {
   }
   if (!state.success && state.candidateCreated) {
     try {
-      await rmdir(state.candidateDirectory)
+      await rm(state.candidateDirectory, { recursive: true, force: true })
     } catch {
       failures.push(new Error("macOS release cleanup failed"))
     }

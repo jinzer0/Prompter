@@ -95,11 +95,11 @@ MOUNT_DIR="$(mktemp -d)"
 
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
   const roots = [
-    ".omo/evidence/release-macos/v0.1.1/app",
-    ".omo/evidence/release-macos/v0.1.1/dmg",
+    [".omo/evidence/release-macos/v0.1.1/app", "app"],
+    [".omo/evidence/release-macos/v0.1.1/dmg", "dmg"],
   ]
 
-  for (const root of roots) {
+  for (const [root, artifactKind] of roots) {
     const resume = JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8"))
     if (resume.status !== "Accepted" || !uuid.test(resume.submissionId)) {
       throw new Error(`Invalid notarization resume: ${root}`)
@@ -114,9 +114,13 @@ MOUNT_DIR="$(mktemp -d)"
       }
     }
     if (
-      !["app", "dmg"].includes(resume.artifactKind) ||
+      resume.artifactKind !== artifactKind ||
       !/^[0-9a-f]{64}$/.test(resume.artifactSha256) ||
-      !Array.isArray(receipt.issues)
+      !Array.isArray(receipt.issues) ||
+      JSON.stringify(Object.keys(resume).sort()) !==
+        JSON.stringify(["artifactKind", "artifactSha256", "logPath", "status", "submissionId"]) ||
+      JSON.stringify(Object.keys(receipt).sort()) !==
+        JSON.stringify(["artifactKind", "artifactSha256", "issues", "submissionId"])
     ) {
       throw new Error(`Invalid notarization receipt: ${root}`)
     }

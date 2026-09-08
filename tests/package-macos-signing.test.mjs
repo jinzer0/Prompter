@@ -39,6 +39,7 @@ async function fixture({
   duplicate = false,
   escapingAlias = false,
   frameworkAliases = false,
+  unexpectedFrameworkDirectoryAlias,
   unexpectedFrameworkBinaryAlias,
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "prompter-signing-test-"))
@@ -88,6 +89,9 @@ async function fixture({
         unexpectedFrameworkBinaryAlias === "before-conventional" ? "Aliases" : "Library"
       await mkdir(join(frameworkRoot, aliasDirectory), { recursive: true })
       await symlink("../Versions/A/Kit", join(frameworkRoot, aliasDirectory, "Kit"))
+    }
+    if (unexpectedFrameworkDirectoryAlias !== undefined) {
+      await symlink("Versions/A", join(frameworkRoot, unexpectedFrameworkDirectoryAlias))
     }
   }
   if (duplicate)
@@ -255,6 +259,18 @@ test.each([
   await assert.rejects(
     discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),
     /Duplicate signable code path is not allowed/,
+  )
+})
+
+test.each([
+  "AAAA",
+  "Aliases",
+])("rejects a signable object reached through a non-conventional framework directory alias %s", async (unexpectedFrameworkDirectoryAlias) => {
+  const paths = await fixture({ frameworkAliases: true, unexpectedFrameworkDirectoryAlias })
+
+  await assert.rejects(
+    discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),
+    /Signable directory alias is not allowed/,
   )
 })
 

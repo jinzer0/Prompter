@@ -54,7 +54,8 @@ function notaryRunner({
   const calls = []
   const runFile = async (command, arguments_, options) => {
     calls.push({ command, arguments_, options })
-    if (fail?.(command, arguments_, calls.length)) throw fail(command, arguments_, calls.length)
+    const failure = fail?.(command, arguments_, calls.length)
+    if (failure !== undefined) throw failure
     if (command === "spctl") return { stdout: "", stderr: "" }
     if (arguments_[1] === "history") return { stdout: "{}" }
     if (arguments_[1] === "submit") return { stdout: JSON.stringify(submit) }
@@ -64,6 +65,20 @@ function notaryRunner({
   }
   return { calls, runFile }
 }
+
+test("evaluates a notary runner failure callback once per command", async () => {
+  let evaluations = 0
+  const { runFile } = notaryRunner({
+    fail: () => {
+      evaluations += 1
+      return new Error("synthetic failure")
+    },
+  })
+
+  await assert.rejects(preflightNotaryProfile({ profile, runFile }), /Notarization command failed/)
+
+  assert.equal(evaluations, 1)
+})
 
 test("uses exact option allowlists and rejects raw app submission or ZIP stapling before any runner call", async () => {
   const calls = []

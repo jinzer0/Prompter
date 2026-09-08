@@ -1,4 +1,4 @@
-import { realpath } from "node:fs/promises"
+import { lstat, realpath } from "node:fs/promises"
 import { basename, relative, resolve, sep } from "node:path"
 
 export function containingFramework(filePath, rootPath) {
@@ -31,5 +31,29 @@ export async function sameFrameworkBinaryAlias(candidatePath, targetPath, rootPa
     conventionalBinary(candidatePath, candidateFramework) &&
     conventionalBinary(targetPath, targetFramework) &&
     (await realpath(candidateFramework)) === (await realpath(targetFramework))
+  )
+}
+
+export async function sameFrameworkDirectoryAlias(candidatePath, targetPath, rootPath) {
+  if (!(await lstat(candidatePath)).isSymbolicLink()) return candidatePath === targetPath
+  const candidateFramework = containingFramework(candidatePath, rootPath)
+  const targetFramework = containingFramework(targetPath, rootPath)
+  if (candidateFramework === undefined || targetFramework === undefined) return false
+  if ((await realpath(candidateFramework)) !== (await realpath(targetFramework))) return false
+  const candidateSegments = relative(candidateFramework, candidatePath).split(sep)
+  const targetSegments = relative(targetFramework, targetPath).split(sep)
+  if (
+    candidateSegments.length === 2 &&
+    candidateSegments[0] === "Versions" &&
+    candidateSegments[1] === "Current"
+  ) {
+    return targetSegments.length === 2 && targetSegments[0] === "Versions"
+  }
+  return (
+    candidateSegments.length === 1 &&
+    ["Resources", "Headers", "Modules"].includes(candidateSegments[0]) &&
+    targetSegments.length === 3 &&
+    targetSegments[0] === "Versions" &&
+    targetSegments[2] === candidateSegments[0]
   )
 }

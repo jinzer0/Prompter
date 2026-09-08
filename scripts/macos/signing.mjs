@@ -1,10 +1,11 @@
-import { readdir, readFile, realpath, stat } from "node:fs/promises"
+import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises"
 import { extname, isAbsolute, relative, resolve, sep } from "node:path"
 
 import {
   containingFramework,
   isFrameworkBinary,
   sameFrameworkBinaryAlias,
+  sameFrameworkDirectoryAlias,
 } from "./framework-alias.mjs"
 
 const codesignCommand = "/usr/bin/codesign"
@@ -124,6 +125,7 @@ export async function discoverSignableCode({ appPath, runFile }) {
   const targets = new Map()
 
   async function visit(candidatePath) {
+    const candidateMetadata = await lstat(candidatePath)
     const targetPath = await realpath(candidatePath)
     assertContained(rootPath, targetPath)
     const candidateBundleKind = bundleKind(candidatePath)
@@ -137,6 +139,12 @@ export async function discoverSignableCode({ appPath, runFile }) {
     }
     const metadata = await stat(targetPath)
     if (metadata.isDirectory()) {
+      if (
+        candidateMetadata.isSymbolicLink() &&
+        !(await sameFrameworkDirectoryAlias(candidatePath, targetPath, rootPath))
+      ) {
+        throw new SigningInputError("Signable directory alias is not allowed")
+      }
       if (visited.has(targetPath)) return
       visited.add(targetPath)
       const kind = targetPath === rootPath ? undefined : bundleKind(targetPath)
@@ -149,7 +157,7 @@ export async function discoverSignableCode({ appPath, runFile }) {
       }
       const entries = await readdir(targetPath)
       entries.sort(lexicalCompare)
-      for (const entry of entries) await visit(resolve(targetPath, entry))
+      for (const entry of entries) await visit(resolve(candidatePath, entry))
       return
     }
     if (!metadata.isFile()) return

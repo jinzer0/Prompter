@@ -2,10 +2,10 @@ import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises"
 import { extname, isAbsolute, relative, resolve, sep } from "node:path"
 
 import {
+  assertFrameworkDirectoryAlias,
   containingFramework,
   isFrameworkBinary,
   sameFrameworkBinaryAlias,
-  sameFrameworkDirectoryAlias,
 } from "./framework-alias.mjs"
 
 const codesignCommand = "/usr/bin/codesign"
@@ -82,9 +82,8 @@ function pathDepth(rootPath, targetPath) {
 }
 
 function lexicalCompare(left, right) {
-  if (left < right) return -1
-  if (left > right) return 1
-  return 0
+  if (left === right) return 0
+  return left < right ? -1 : 1
 }
 
 function bundleKind(targetPath) {
@@ -139,12 +138,7 @@ export async function discoverSignableCode({ appPath, runFile }) {
     }
     const metadata = await stat(targetPath)
     if (metadata.isDirectory()) {
-      if (
-        candidateMetadata.isSymbolicLink() &&
-        !(await sameFrameworkDirectoryAlias(candidatePath, targetPath, rootPath))
-      ) {
-        throw new SigningInputError("Signable directory alias is not allowed")
-      }
+      await assertFrameworkDirectoryAlias(candidateMetadata, candidatePath, targetPath, rootPath)
       if (visited.has(targetPath)) return
       visited.add(targetPath)
       const kind = targetPath === rootPath ? undefined : bundleKind(targetPath)

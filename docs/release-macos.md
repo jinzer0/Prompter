@@ -151,7 +151,7 @@ approved release action instead of editing history.
 Before running the signed command:
 
 - Confirm `git status --short` is empty.
-- Confirm `release/v0.1.1/` is absent or empty.
+ - Confirm `release/v0.1.1/` is absent. An empty version-specific candidate directory is unavailable.
 - Confirm full Xcode is selected and `xcodebuild -version` reports Xcode.
 - Confirm exactly one prepared Developer ID Application identity and matching private key are
   available in Keychain.

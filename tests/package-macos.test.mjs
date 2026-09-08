@@ -253,30 +253,33 @@ function commandStage(command, arguments_, counts) {
 async function createCoordinatorFixture({
   failure,
   identityListing = "one",
+  label = "default",
+  reservationBarrier,
+  shared,
   warningLog = false,
 } = {}) {
-  const root = await mkdtemp(join(tmpdir(), "prompter-release-test-"))
-  temporaryDirectories.push(root)
-  const sourceRoot = join(root, "source")
+  const root = shared?.root ?? (await mkdtemp(join(tmpdir(), "prompter-release-test-")))
+  const sourceRoot = shared?.sourceRoot ?? join(root, "source")
   const nativeSourcePath = join(sourceRoot, "node_modules", "native", "build", "addon.node")
-  const releaseRoot = join(root, "release")
-  const evidenceRoot = join(root, "evidence")
-  const electron = await createElectronAppFixture()
-  await mkdir(sourceRoot, { recursive: true })
-  await mkdir(dirname(nativeSourcePath), { recursive: true })
-  await Promise.all([
-    mkdir(releaseRoot, { recursive: true }),
-    mkdir(evidenceRoot, { recursive: true }),
-  ])
-  await Promise.all([
-    ...["dist", "dist-electron", "drizzle", "node_modules"].map((name) =>
-      mkdir(join(sourceRoot, name), { recursive: true }),
-    ),
-    writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.1" })),
-    writeFile(nativeSourcePath, "native"),
-    writeFile(join(releaseRoot, "caller-sentinel"), "retain"),
-    writeFile(join(evidenceRoot, "caller-sentinel"), "retain"),
-  ])
+  const releaseRoot = shared?.releaseRoot ?? join(root, "release")
+  const evidenceRoot = shared?.evidenceRoot ?? join(root, "evidence")
+  const electron = shared?.electron ?? (await createElectronAppFixture())
+  if (shared === undefined) {
+    temporaryDirectories.push(root)
+    await mkdir(sourceRoot, { recursive: true })
+    await mkdir(dirname(nativeSourcePath), { recursive: true })
+    await Promise.all([
+      mkdir(releaseRoot, { recursive: true }),
+      mkdir(evidenceRoot, { recursive: true }),
+      ...["dist", "dist-electron", "drizzle", "node_modules"].map((name) =>
+        mkdir(join(sourceRoot, name), { recursive: true }),
+      ),
+      writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.1" })),
+      writeFile(nativeSourcePath, "native"),
+      writeFile(join(releaseRoot, "caller-sentinel"), "retain"),
+      writeFile(join(evidenceRoot, "caller-sentinel"), "retain"),
+    ])
+  }
   if (failure === "stale-candidate") {
     await mkdir(join(releaseRoot, "v0.1.1"))
     await writeFile(join(releaseRoot, "v0.1.1", "stale"), "stale")
@@ -328,6 +331,7 @@ async function createCoordinatorFixture({
       await mkdir(join(releaseRoot, "v0.1.1"))
       await writeFile(join(releaseRoot, "v0.1.1", "race"), "race")
     }
+    if (stage === "worktree") await reservationBarrier?.wait(label)
     if (stage === "app-submit" && failure === "app-timeout") {
       const error = new Error(syntheticSecret)
       error.code = "ETIMEDOUT"
@@ -395,6 +399,7 @@ async function createCoordinatorFixture({
     candidate: join(releaseRoot, "v0.1.1"),
     evidenceRoot,
     releaseRoot,
+    shared: { root, sourceRoot, releaseRoot, evidenceRoot, electron },
     run: () =>
       runMacOSRelease({
         runFile,
@@ -519,6 +524,21 @@ function assertNoLaterReleaseStages(calls, failure) {
   for (const stage of tail.filter((stage) => releaseStages.includes(stage))) {
     if (!permitted.has(stage))
       assert.equal(tail.includes(stage), false, `unexpected ${stage} after ${failure}`)
+  }
+}
+
+function reservationBarrier() {
+  let arrivals = 0
+  let release
+  const ready = new Promise((resolveReady) => {
+    release = resolveReady
+  })
+  return {
+    async wait() {
+      arrivals += 1
+      if (arrivals === 2) release()
+      await ready
+    },
   }
 }
 
@@ -753,15 +773,35 @@ test("orders the complete coordinator release flow and cleans every observed tem
   for (const temporaryRoot of fixture.observedTempRoots) await assert.rejects(access(temporaryRoot))
 })
 
-test("reserves a release candidate atomically so one concurrent invocation reaches signing", async () => {
-  const fixture = await createCoordinatorFixture()
+test("atomically reserves a candidate before loser assembly, Apple work, evidence, and final mutations", async () => {
+  const barrier = reservationBarrier()
+  const first = await createCoordinatorFixture({ label: "first", reservationBarrier: barrier })
+  const second = await createCoordinatorFixture({
+    label: "second",
+    reservationBarrier: barrier,
+    shared: first.shared,
+  })
 
-  const outcomes = await Promise.allSettled([fixture.run(), fixture.run()])
+  const outcomes = await Promise.allSettled([first.run(), second.run()])
+  const winnerIndex = outcomes.findIndex(({ status }) => status === "fulfilled")
+  const loser = [first, second][winnerIndex === 0 ? 1 : 0]
+  const winner = [first, second][winnerIndex]
 
-  assert.equal(outcomes.filter(({ status }) => status === "fulfilled").length, 1)
+  assert.equal(winnerIndex >= 0, true)
   assert.equal(outcomes.filter(({ status }) => status === "rejected").length, 1)
-  assert.equal(fixture.calls.filter((stage) => stage === "app-sign").length > 0, true)
-  assert.equal((await stat(fixture.candidate)).isDirectory(), true)
+  assert.equal(winner.calls.includes("app-sign"), true)
+  assert.equal((await stat(winner.candidate)).isDirectory(), true)
+  assert.equal(loser.observedTempRoots.size, 0)
+  assert.equal(loser.calls.includes("native-copied"), false)
+  assert.equal(loser.calls.includes("profile"), false)
+  assertNoLaterReleaseStages(loser.calls)
+  assert.equal(
+    loser.rawCalls.some(
+      ({ command, arguments_ }) =>
+        command === "/usr/bin/xcrun" && ["submit", "info", "log"].includes(arguments_[1]),
+    ),
+    false,
+  )
 })
 
 test("keeps signed Apple trust gates on absolute paths despite earlier PATH executables", async () => {

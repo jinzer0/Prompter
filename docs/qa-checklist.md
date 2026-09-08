@@ -30,6 +30,12 @@ EXTRACT_DIR="$(mktemp -d)"
 MOUNT_DIR="$(mktemp -d)"
 ```
 
+- [ ] The version-specific candidate directory is absent before the release starts:
+
+  ```bash
+  test ! -e "${RELEASE_DIR}"
+  ```
+
 - [ ] Full Xcode is selected and visible to the active shell:
 
   ```bash

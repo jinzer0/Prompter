@@ -372,6 +372,48 @@ test("persists an accepted submission before log retrieval and resumes it withou
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 2)
 })
 
+test("keeps an accepted-pending submission unresolved when refreshed Apple status is In Progress", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  let logFails = true
+  const { calls, runFile } = notaryRunner({
+    info: { id, status: "In Progress" },
+    fail: (_command, arguments_) =>
+      logFails && arguments_[1] === "log" ? new Error(sentinel) : undefined,
+  })
+
+  await assert.rejects(submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }))
+  logFails = false
+  const resumed = await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+
+  assert.equal(resumed.status, "accepted")
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 1)
+})
+
+test("rejects an accepted-pending submission when refreshed Apple status is Rejected without resubmitting", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  let logFails = true
+  const { calls, runFile } = notaryRunner({
+    info: { id, status: "Rejected" },
+    fail: (_command, arguments_) =>
+      logFails && arguments_[1] === "log" ? new Error(sentinel) : undefined,
+  })
+
+  await assert.rejects(submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }))
+  logFails = false
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+    /Notarization submission was not accepted/,
+  )
+
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 1)
+})
+
 test("rejects accepted resume evidence with a mismatched artifact kind before notary work", async () => {
   const root = await evidence()
   const dmgPath = await artifact(root, "Prompter.dmg")

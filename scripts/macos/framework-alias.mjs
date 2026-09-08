@@ -57,3 +57,17 @@ export async function sameFrameworkDirectoryAlias(candidatePath, targetPath, roo
     targetSegments[2] === candidateSegments[0]
   )
 }
+
+export async function assertFrameworkDirectoryAlias(
+  candidateMetadata,
+  candidatePath,
+  targetPath,
+  rootPath,
+) {
+  if (
+    candidateMetadata.isSymbolicLink() &&
+    !(await sameFrameworkDirectoryAlias(candidatePath, targetPath, rootPath))
+  ) {
+    throw new Error("Signable directory alias is not allowed")
+  }
+}

@@ -1,0 +1,581 @@
+# Prompter v0.1.1 Developer ID 서명 및 Notarization 구현계획서
+
+수행계획서: [`task_m011_6.md`](task_m011_6.md)
+GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
+종속 릴리스 Issue: [#7](https://github.com/jinzer0/Prompter/issues/7)
+마일스톤: M011
+기준 소스: `origin/master`의 `85aef3c17731d4653d673edd18391610f5491943`
+
+## 단계 개요
+
+| Stage | Prometheus Todo | 제목 | 주요 산출 | 검증 |
+|---|---|---|---|---|
+| 1 | 2 | v0.1.1 패키징 정체성과 unsigned 경계 확립 | `package.json`, `package-lock.json`, `scripts/package-macos.mjs` | 기존 테스트, ESM 구문, unsigned 경로와 이름 계약 |
+| 2 | 3–4 | Developer ID 서명과 Keychain Notarization 기반 구현 | `scripts/macos/entitlements.plist`, `scripts/macos/signing.mjs`, `scripts/macos/notarization.mjs` | plist, export/import, fake runner, fail-closed 및 redaction |
+| 3 | 5 | 이중 제출 릴리스 코디네이터 통합 | `scripts/release-macos.mjs` | injected full trace, 선행 검사, 순서, cleanup, 게시 명령 부재 |
+| 4 | 6–7 | tests-after 회귀 테스트와 유지관리자 문서 확정 | 패키징/서명/Notarization 테스트, `.gitignore`, `docs/`, `README.md` | focused Vitest, secret/protected-path 및 문서-명령 대응 검사 |
+| 5 | 8 | 통합 검증, 보고, 리뷰와 구현 병합 | Stage 보고서, 최종 보고서, orders, implementation PR | 전체 품질 게이트, unsigned 실사용, signed fail-closed, 원격 PR 검증 |
+
+## 구현 전 공통 기준
+
+### 승인 및 baseline characterization
+
+이 구현계획서가 명시적으로 승인된 뒤에만 다음 순서로 진행한다.
+
+1. 현재 governance 산출물을 먼저 고정한다.
+   - `mydocs/orders/20260908.md`와 `mydocs/plans/task_m011_6.md`를
+     `Task #6: 수행 계획서 작성과 오늘할일 갱신`으로 커밋한다.
+   - `mydocs/plans/task_m011_6_impl.md`를 `Task #6: 구현 계획서 작성`으로 커밋한다.
+2. 아래 baseline 명령의 결과를 Stage 1 evidence에 보존한 뒤 제품 파일을 수정한다.
+
+```bash
+GIT_MASTER=1 git status --short --branch
+GIT_MASTER=1 git rev-parse HEAD
+GIT_MASTER=1 git rev-parse origin/master
+npm test -- tests/package-macos.test.mjs tests/electron-contract.test.ts
+npm run typecheck
+GIT_MASTER=1 git diff --check
+```
+
+- baseline 실패는 기존 실패인지 현재 task 영향인지 분류하고, 원인이 불명확하면 Stage 1을
+  시작하지 않는다.
+- Prometheus의 tests-after 지시에 따라 Stage 1–3에서는 제품 모듈과 runner seam을 먼저
+  구현하되 기존 테스트와 import/fixture smoke로 회귀를 막는다. 신규 및 확장 회귀 테스트는
+  Stage 4에서 추가하며, 실패하는 새 테스트를 삭제하거나 완화하지 않는다.
+- 각 Stage는 검증 통과 후 `mydocs/working/task_m011_6_stage{N}.md`를 작성하고 해당 Stage
+  산출물과 함께 커밋한다. 다음 Stage는 단계 보고서 검토와 명시적 승인 후에만 시작한다.
+
+### 공통 injected-runner 계약
+
+- 새 운영 모듈의 모든 외부 프로세스 호출은 shell 문자열이 아니라
+  `runFile(command, args, options)` seam을 사용한다.
+- `command`는 실행 파일 이름, `args`는 문자열 배열, `options`는 최소 `cwd`, `timeoutMs`,
+  `signal`을 선택적으로 갖는 객체다. 기본 adapter는 `node:child_process.execFile` 기반으로
+  구현하고 shell을 사용하지 않는다.
+- 성공 결과는 `{ stdout, stderr }`, 실패는 exit code/signal과 정제된 메시지를 가진
+  `Error`로 통일한다. raw 환경 객체, Keychain profile 값, identity 원문을 로그나 evidence에
+  직렬화하지 않는다.
+- 테스트는 같은 seam에 deterministic fake runner를 주입해 호출 순서, argv, 반환 JSON,
+  delay, signal, throw 지점을 제어한다. 실제 `codesign`, `security`, `xcrun`, `hdiutil`,
+  `spctl`, Apple endpoint, GitHub release API는 구현 이슈 #6 테스트에서 호출하지 않는다.
+- 파일시스템 cleanup 검증은 task가 만든 임시 루트와 version-specific candidate 경로만
+  대상으로 하고 사용자 경로나 기존 산출물을 삭제하지 않는다.
+
+### 공통 보안 및 보호 경계
+
+- 허용되는 설정 이름은 `PROMPTER_SIGNING_IDENTITY`와 `PROMPTER_NOTARY_PROFILE`뿐이며,
+  값, 인증서 식별 세부, key path/content, Apple ID/password/API key를 출력하거나 추적하지 않는다.
+- Notarization은 `--keychain-profile`만 허용하고 Apple ID/password/API-key argv와 plaintext
+  credential 파일 입력을 받지 않는다.
+- `.gitignore`에는 `AuthKey_*.p8`, `*.p12`, `*.mobileprovision`만 추가하고 broad `*.key`는
+  추가하지 않는다.
+- `docs/plan/**`, `docs/draft/**`, `.omo/boulder.json`, Prometheus 계획 체크박스는 보호
+  대상으로 모든 Stage에서 수정 금지다.
+- generated app, ZIP, DMG, mount, submission archive, Notarization log와 `.omo/evidence/**`는
+  커밋하지 않는다.
+- 실제 서명, Notarization 제출, `git tag`, `gh release`, public/draft release 생성 및 게시,
+  release asset 업로드는 구현 이슈 #6에서 제외하고 이슈 #7의 별도 승인 뒤에만 실행한다.
+
+## 문서 위치 확인
+
+| 파일 | 수행계획서상 선택 위치 | Stage 산출물 경로 | 일치 여부 | 비고 |
+|---|---|---|---|---|
+| 유지관리자 릴리스 문서 | `docs/` | `docs/release-macos.md` | OK | 제품별 공식 릴리스 운영 계약 |
+| 릴리스 QA 기준 | `docs/` | `docs/qa-checklist.md` | OK | 반복 실행하는 공식 QA 기준 |
+| 사용자/기여자 안내 | 저장소 루트 | `README.md` | OK | 기존 설치 및 패키징 진실 원천 유지 |
+| 구현계획서 | `mydocs/` | `mydocs/plans/task_m011_6_impl.md` | OK | 내부 승인 산출물 |
+| 단계 보고서 | `mydocs/` | `mydocs/working/task_m011_6_stage{1..5}.md` | OK | Stage별 내부 증거와 승인 경계 |
+| 최종 보고서 | `mydocs/` | `mydocs/report/task_m011_6_report.md` | OK | PR 전 최종 승인 산출물 |
+| 보호 계획/초안 | 수정 금지 | `docs/plan/**`, `docs/draft/**` | OK | 읽기 전용 근거로만 사용 |
+
+## Stage 1 — v0.1.1 패키징 정체성과 unsigned 경계 확립
+
+Prometheus Todo 2를 수행한다.
+
+### 산출물
+
+신규:
+
+- `mydocs/working/task_m011_6_stage1.md` (검증 통과 후)
+
+수정:
+
+- `package.json`
+- `package-lock.json`
+- `scripts/package-macos.mjs`
+
+Evidence:
+
+- `.omo/evidence/task-2-apple-developer-id-notarization-release.txt` (ignored, sanitized)
+
+### 변경 내용
+
+- `package.json`과 `package-lock.json` root package version을 정확히 `0.1.1`로 맞춘다.
+- `scripts/package-macos.mjs`에서 `assembleMacOSApp`, injected-runner를 받는
+  `createZipArchive`, 기존 `createDmgArchive`를 export한다.
+- 메인 plist의 `CFBundleIdentifier`를 `com.jinzer0.prompter`로 두고 helper 식별자는 기존
+  suffix를 이 값에 파생한다.
+- 메인과 helper plist의 `CFBundleShortVersionString`, `CFBundleVersion`을 package version
+  `0.1.1`에서 기록한다.
+- 최종 ZIP 이름을 `Prompter-${version}-mac-${arch}.zip`으로 고정한다. Notarization용 임시
+  ZIP은 OS temp 아래에서만 만들고 `release/`에 두지 않는다.
+- `npm run package`와 `make`는 기존 unsigned 로컬 경로를 유지하고 로그에 `unsigned local`을
+  명시한다. `package:release:macos`는 Stage 3의 coordinator를 가리키되 Apple 입력을 unsigned
+  명령에서 조회하지 않는다.
+- generic local helper의 x64 지원은 제거하지 않는다. ARM64 제한은 signed release
+  coordinator의 preflight에만 적용한다.
+- malformed/missing package version 또는 지원하지 않는 release architecture는 candidate
+  경로 생성 전에 설명 가능한 오류로 중단한다.
+
+### 검증
+
+```bash
+node --check scripts/package-macos.mjs
+npm test -- tests/package-macos.test.mjs tests/electron-contract.test.ts
+npm run typecheck
+rg -n '"version": "0\.1\.1"|com\.jinzer0\.prompter|CFBundleShortVersionString|CFBundleVersion|unsigned local|package:release:macos' package.json package-lock.json scripts/package-macos.mjs
+GIT_MASTER=1 git status --short
+GIT_MASTER=1 git diff --check
+GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json
+```
+
+- 신규 계약의 exhaustive tests는 Stage 4에서 추가한다. 이 Stage에서는 baseline 테스트가
+  계속 통과하고 package/plist assembly helper import가 side effect 없이 가능한지 확인한다.
+- malformed version과 unsupported release arch는 temp fixture와 injected runner로 호출해
+  candidate 파일 생성 전 실패함을 evidence에 기록한다.
+
+### 커밋
+
+```text
+Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가
+```
+
+Stage 1 제품 산출물과 `mydocs/working/task_m011_6_stage1.md`를 함께 커밋한다.
+
+## Stage 2 — Developer ID 서명과 Keychain Notarization 기반 구현
+
+Prometheus Todos 3–4를 수행한다. Stage 1 보고서 승인 후 두 lane을 병렬로 진행할 수 있다.
+
+### 병렬 lane
+
+- **Lane 2A — signing (Todo 3)**: `scripts/macos/entitlements.plist`와
+  `scripts/macos/signing.mjs`만 소유한다.
+- **Lane 2B — notarization (Todo 4)**: `scripts/macos/notarization.mjs`만 소유한다.
+- 두 lane은 공통 `runFile(command, args, options) -> { stdout, stderr }` 계약만 공유하고
+  서로의 파일을 수정하지 않는다. lane 결과를 합친 뒤 Stage 2 통합 import/fake-runner 검증과
+  단일 단계 보고를 수행한다.
+
+### 산출물
+
+신규:
+
+- `scripts/macos/entitlements.plist`
+- `scripts/macos/signing.mjs`
+- `scripts/macos/notarization.mjs`
+- `mydocs/working/task_m011_6_stage2.md` (검증 통과 후)
+
+Evidence:
+
+- `.omo/evidence/task-3-apple-developer-id-notarization-release.json`
+- `.omo/evidence/task-4-apple-developer-id-notarization-release.json`
+
+### 변경 내용 — Lane 2A
+
+- `entitlements.plist`는 ASCII XML이며 `com.apple.security.cs.allow-jit=true`만 포함한다.
+  `allow-unsigned-executable-memory`, `disable-library-validation`, `get-task-allow`는 금지한다.
+- `scripts/macos/signing.mjs`는 다음 object-argument API를 export한다.
+  - `discoverSignableCode({ appPath, runFile })`
+  - `signAppBundle({ appPath, identity, entitlementsPath, runFile })`
+  - `verifyAppSignature({ appPath, runFile })`
+  - `verifyDmgSignature({ dmgPath, runFile })`
+- discovery는 전체 app assembly 완료 뒤에만 실행하며 realpath가 app root 밖인 항목,
+  canonical duplicate, symlink escape를 거부한다.
+- executable Mach-O, `.node`, dylib/framework, XPC, helper app을 분류하고 canonical path의
+  depth 내림차순과 path 오름차순으로 안정 정렬한다.
+- nested raw code/bundle을 먼저, helper app을 그다음, outer app을 마지막에 서명한다.
+  모든 signing call은 exact identity, `--force`, `--timestamp`, `--options runtime`을 사용한다.
+- entitlement는 executable host/helper app signature에만 적용하고 raw library에는 적용하지
+  않는다. signing argv에 `--deep`를 사용하지 않으며 검증에만 `--deep --strict`를 허용한다.
+- nested signing 또는 post-sign discovery가 하나라도 실패하면 outer signing과 모든 후속
+  Notarization을 호출하지 않는다. copied dependency를 prune하거나 미확인 executable을
+  묵시적으로 skip하지 않는다.
+
+### 변경 내용 — Lane 2B
+
+- `scripts/macos/notarization.mjs`는 다음 object-argument API를 export한다.
+  - `preflightNotaryProfile({ profile, runFile })`
+  - `submitAndWait({ artifactPath, profile, evidenceDir, runFile })`
+  - `fetchNotaryLog({ submissionId, profile, evidenceDir, runFile })`
+  - `stapleAndValidate({ artifactPath, artifactKind, runFile })`
+  - `assessGatekeeper({ artifactPath, artifactKind, runFile })`
+- `xcrun notarytool`은 `--keychain-profile`, `--wait`, `--output-format json`만 사용한다.
+  `.app` 직접 upload를 거부하고 submission archive 또는 DMG만 허용하며 ZIP staple을 거부한다.
+- 응답은 exit code 0만으로 성공 처리하지 않고 JSON schema, submission ID, status를 검사한다.
+  `Accepted`가 아니면 중단하고 Accepted여도 log를 항상 받아 error 0개, warning 0개일 때만
+  staple 단계로 진행한다.
+- timeout/interrupt는 `unknown` 상태와 sanitized submission ID만 기록한다. 같은 bytes를
+  자동 재제출하지 않고 `notarytool info`와 `log`로 재개한다.
+- stapler retry는 동일 artifact에 한정한 bounded retry이며 Notarization resubmit을 유발하지
+  않는다.
+- evidence에는 submission ID, status, sanitized log path만 저장하고 profile 값, raw argv,
+  환경 객체, password/key path를 쓰지 않는다.
+
+### 검증
+
+```bash
+plutil -lint scripts/macos/entitlements.plist
+node --check scripts/macos/signing.mjs
+node --check scripts/macos/notarization.mjs
+node --input-type=module -e 'const s=await import("./scripts/macos/signing.mjs"); const n=await import("./scripts/macos/notarization.mjs"); for (const name of ["discoverSignableCode","signAppBundle","verifyAppSignature","verifyDmgSignature"]) if (typeof s[name] !== "function") throw new Error(name); for (const name of ["preflightNotaryProfile","submitAndWait","fetchNotaryLog","stapleAndValidate","assessGatekeeper"]) if (typeof n[name] !== "function") throw new Error(name);'
+rg -n 'allow-unsigned-executable-memory|disable-library-validation|get-task-allow|--apple-id|--password|--deep' scripts/macos
+GIT_MASTER=1 git status --short
+GIT_MASTER=1 git diff --check
+GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json
+```
+
+- forbidden-pattern `rg`는 `--deep`가 검증 argv에만 존재하는지 문맥을 검토하며, 다른 금지
+  문자열은 0건이어야 한다.
+- Stage 4 전에 temporary fake runner smoke로 nested failure가 outer signing을 막고,
+  non-Accepted/invalid JSON/warning/timeout이 staple과 downstream archive를 막는지 기록한다.
+
+### 커밋
+
+```text
+Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가
+```
+
+두 lane 산출물과 `mydocs/working/task_m011_6_stage2.md`를 검증 후 함께 커밋한다.
+
+## Stage 3 — 이중 제출 릴리스 코디네이터 통합
+
+Prometheus Todo 5를 수행한다. Stage 2의 signing/notarization API와 보고서 승인에 의존한다.
+
+### 산출물
+
+신규:
+
+- `scripts/release-macos.mjs`
+- `mydocs/working/task_m011_6_stage3.md` (검증 통과 후)
+
+수정:
+
+- `package.json` (`package:release:macos`가 coordinator를 실행하는지 최종 확인에 필요한 경우만)
+
+Evidence:
+
+- `.omo/evidence/task-5-apple-developer-id-notarization-release.json`
+
+### 변경 내용
+
+- `scripts/release-macos.mjs`는 CLI entry와 테스트 가능한
+  `runMacOSRelease({ runFile, platform, arch, paths, signingIdentity, notaryProfile })`를
+  분리한다. CLI만 non-secret 환경 이름을 읽고 값은 출력하지 않는다.
+- candidate mutation 전에 macOS/ARM64, full selected Xcode tools, clean worktree,
+  version-specific `release/v0.1.1/` 미존재/빈 상태, exact Developer ID Application identity와
+  private key availability, unlocked Keychain, valid notary profile, Apple endpoint connectivity를
+  모두 확인한다.
+- identity는 0개 또는 복수 match이면 실패하며 임의 선택하지 않는다. stale/partial final
+  artifact가 있으면 overwrite 또는 merge하지 않고 실패한다.
+- 성공 순서를 정확히 고정한다.
+  1. npm script에서 build 완료
+  2. complete app assembly와 plist identity/version 기록
+  3. nested sign, helper sign, outer sign
+  4. strict app signature와 Gatekeeper 확인
+  5. OS temp의 submission ZIP 생성
+  6. app submit/wait, log fetch/review, app staple/validate
+  7. final versioned ZIP 생성, clean extraction, extracted app 재검증
+  8. stapled app으로 DMG 생성, `hdiutil verify`, DMG sign/verify
+  9. DMG submit/wait, log fetch/review, DMG staple/validate/Gatekeeper
+  10. read-only mount, contained app 확인, unmount
+  11. final ZIP과 DMG의 SHA-256을 마지막에 생성
+- final allowlist는 `Prompter-0.1.1-mac-arm64.zip`,
+  `Prompter-0.1.1-mac-arm64.dmg`, `SHA256SUMS`뿐이다. local `.app`은 명시적 non-uploadable
+  구성일 때만 final directory 밖 또는 별도 로컬 경로에 둔다.
+- rejected/unknown candidate는 final allowlist에 넣지 않는다. 모든 성공/실패/interrupt 경로는
+  `finally`에서 temp ZIP, extraction, mount/staging, partial final artifact를 정리하고 unknown
+  Notarization의 sanitized resume evidence만 보존한다.
+- coordinator에는 `gh`, `git tag`, release create/upload/publish 호출을 두지 않는다.
+
+### 검증
+
+```bash
+node --check scripts/release-macos.mjs
+node --input-type=module -e 'const m=await import("./scripts/release-macos.mjs"); if (typeof m.runMacOSRelease !== "function") throw new Error("runMacOSRelease")'
+rg -n 'gh[[:space:]]+release|git[[:space:]]+tag|release create|release upload' scripts/release-macos.mjs
+npm run typecheck
+GIT_MASTER=1 git status --short
+GIT_MASTER=1 git diff --check
+GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json
+```
+
+- injected fake runner full trace는 위 11개 순서를 정확히 비교하고, 각 호출 지점에서 throw를
+  주입해 후속 mutation 0건과 cleanup 완료를 확인한다.
+- dirty-worktree fake output, stale version directory, existing final asset, wrong arch, missing/multiple
+  identity, locked Keychain, invalid profile, endpoint failure는 assembly 전 실패해야 한다.
+- 실제 Apple 및 GitHub release 명령은 실행하지 않는다.
+
+### 커밋
+
+```text
+Task #6 Stage 3: 서명과 이중 Notarization 릴리스 오케스트레이션 추가
+```
+
+coordinator와 `mydocs/working/task_m011_6_stage3.md`를 함께 커밋한다.
+
+## Stage 4 — tests-after 회귀 테스트와 유지관리자 문서 확정
+
+Prometheus Todos 6–7을 수행한다. Stage 3 API와 순서가 고정된 뒤 두 lane을 병렬로 진행한다.
+
+### 병렬 lane
+
+- **Lane 4A — tests-after (Todo 6)**: `tests/package-macos.test.mjs`,
+  `tests/package-macos-signing.test.mjs`, `tests/package-macos-notarization.test.mjs`,
+  `tests/electron-contract.test.ts`만 소유한다.
+- **Lane 4B — docs/security (Todo 7)**: `.gitignore`, `docs/release-macos.md`,
+  `docs/qa-checklist.md`, `README.md`만 소유한다.
+- Lane 4B는 Stage 3에서 확정된 command/export/env 이름을 문서화하며 제품 script를 수정하지
+  않는다. Lane 4A는 문서를 수정하지 않는다. 두 lane 완료 뒤 focused test와 문서-명령 대응을
+  함께 검증한다.
+
+### 산출물
+
+신규:
+
+- `tests/package-macos-signing.test.mjs`
+- `tests/package-macos-notarization.test.mjs`
+- `docs/release-macos.md`
+- `mydocs/working/task_m011_6_stage4.md` (검증 통과 후)
+
+수정:
+
+- `tests/package-macos.test.mjs`
+- `tests/electron-contract.test.ts`
+- `.gitignore`
+- `docs/qa-checklist.md`
+- `README.md`
+
+Evidence:
+
+- `.omo/evidence/task-6-apple-developer-id-notarization-release.txt`
+- `.omo/evidence/task-7-apple-developer-id-notarization-release.md`
+
+### 변경 내용 — Lane 4A
+
+- `tests/package-macos.test.mjs`에 version/bundle/plist/helper suffix/versioned ZIP,
+  unsigned local 경로, temp/final cleanup과 coordinator order 계약을 추가한다.
+- `tests/package-macos-signing.test.mjs`는 temp app fixture에 helper app, framework, dylib,
+  `.node`, XPC, executable Mach-O, symlink duplicate를 만들고 canonical deterministic
+  nested-before-outer trace와 entitlement 대상 구분을 검증한다.
+- `tests/package-macos-notarization.test.mjs`는 profile preflight, JSON parse, Accepted+log,
+  warning/error 차단, timeout unknown/resume, bounded staple retry, app/DMG two-submission order,
+  downstream suppression, interruption cleanup과 sentinel redaction을 검증한다.
+- `tests/electron-contract.test.ts`는 unchanged unsigned `package`/`make`, fail-closed
+  `package:release:macos`, renderer/IPC credential surface 부재를 검증한다.
+- 모든 runner는 fake이며 live Keychain, Apple network, `codesign`, `notarytool`, `stapler`,
+  `spctl`, `hdiutil`, GitHub를 호출하지 않는다. fixture secret은 명백한 sentinel만 사용하고
+  실제 credential 형식 값을 쓰지 않는다.
+
+### 변경 내용 — Lane 4B
+
+- `.gitignore`에 `AuthKey_*.p8`, `*.p12`, `*.mobileprovision`만 좁게 추가한다.
+- `docs/release-macos.md`에 full Xcode 선택, 준비된 Developer ID identity, Keychain profile,
+  두 non-secret env 이름, unsigned/release 명령 분리, app/DMG 두 제출, sanitized evidence,
+  timeout resume/no-resubmit, fail-closed/no-publication을 설명한다.
+- `docs/qa-checklist.md`에 app/ZIP/DMG/checksum/signature/notary log/staple/Gatekeeper/
+  read-only mount/extract/smoke를 실제 명령에 매핑한다.
+- `README.md`는 유지관리자용 signed release 명령만 설명한다. 공개 전에는 v0.1.0 설치명과
+  현재 unsigned 사용자 안내를 truthful하게 유지한다. v0.1.1 설치 링크와 signed 사용자
+  문구 변경은 이슈 #7로 미룬다.
+- secret 값, identity 예시 값, key path, raw command environment를 문서화하지 않는다.
+
+### 검증
+
+```bash
+npm test -- tests/package-macos.test.mjs tests/package-macos-signing.test.mjs tests/package-macos-notarization.test.mjs tests/electron-contract.test.ts
+npm run typecheck
+npm run lint
+rg -n 'PROMPTER_SIGNING_IDENTITY|PROMPTER_NOTARY_PROFILE|npm run package|npm run package:release:macos|notarytool|stapler|spctl|hdiutil|SHA256SUMS' docs/release-macos.md docs/qa-checklist.md README.md package.json scripts
+rg -n 'AuthKey_\*\.p8|\*\.p12|\*\.mobileprovision' .gitignore
+rg -n '^\*\.key$|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|--apple-id|--password' .gitignore docs README.md scripts tests
+GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json
+GIT_MASTER=1 git status --short
+GIT_MASTER=1 git diff --check
+```
+
+- 첫 번째 `rg`는 명령/문서 대응을 사람이 검토한다. secret scan은 금지값 0건이어야 한다.
+- Stage 4 완료 조건은 Metis failure class 전체, exact trace order, failure downstream 0건,
+  temp cleanup, sentinel 비노출, protected path 빈 diff가 focused Vitest와 scan에서 모두
+  확인되는 것이다.
+
+### 커밋
+
+```text
+Task #6 Stage 4: macOS 서명 회귀 테스트와 릴리스 운영 문서 추가
+```
+
+두 lane 산출물과 `mydocs/working/task_m011_6_stage4.md`를 검증 후 함께 커밋한다. 이 Stage는
+Prometheus가 명시한 tests-after와 문서 계약을 같은 승인 경계로 고정하므로 하나의 Stage
+커밋으로 관리한다.
+
+## Stage 5 — 통합 검증, 보고, 리뷰와 구현 병합
+
+Prometheus Todo 8을 수행한다. Stage 4 보고서 승인과 모든 제품/테스트/문서 변경 완료에
+의존한다.
+
+### 산출물
+
+신규:
+
+- `mydocs/working/task_m011_6_stage5.md`
+- `mydocs/report/task_m011_6_report.md`
+
+수정:
+
+- `mydocs/orders/20260908.md` (실제 완료 일자의 orders 파일이 달라지면 해당 날짜 파일)
+
+Evidence:
+
+- `.omo/evidence/task-8-apple-developer-id-notarization-release.md`
+
+### 변경 내용
+
+- focused 테스트부터 typecheck, lint, 전체 테스트, build, unsigned package, Electron smoke
+  순서로 실행하고 각각의 exit code와 핵심 결과를 sanitized evidence에 기록한다.
+- Apple 입력을 제공하지 않은 실제 `npm run package`가 성공하고 `unsigned local`을 표시하는지
+  확인한다. 같은 조건의 signed command는 candidate mutation 전에 nonzero로 실패해야 한다.
+- private-key/credential pattern, renderer/IPC secret surface, protected docs, unresolved unsigned
+  claim, generated artifact와 final allowlist 오염을 검사한다.
+- 각 승인된 Stage의 보고서와 커밋을 확인하고 최종 보고서에 수용 기준별 OK/MISS,
+  변경 파일, 잔여 위험, 이슈 #7 진입 조건을 기록한다.
+- 최종 보고서/PR 승인을 받은 뒤에만 `publish/task6`으로 push하고 `master` 대상 PR을 만든다.
+  PR review/merge는 별도 명시 승인과 원격 상태 확인을 거친다.
+- 구현 branch에서는 live Notarization, tag/release create/upload/publish를 실행하지 않는다.
+
+### 검증
+
+```bash
+npm test -- tests/package-macos.test.mjs tests/package-macos-signing.test.mjs tests/package-macos-notarization.test.mjs tests/electron-contract.test.ts
+npm run typecheck
+npm run lint
+npm test
+npm run build
+env -u PROMPTER_SIGNING_IDENTITY -u PROMPTER_NOTARY_PROFILE npm run package
+env -u PROMPTER_SIGNING_IDENTITY -u PROMPTER_NOTARY_PROFILE npm run package:release:macos
+npm run test:smoke
+rg -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|--apple-id|--password' . --glob '!node_modules/**' --glob '!release/**' --glob '!.git/**' --glob '!.omo/**'
+rg -n 'getOpenAIKey|PROMPTER_SIGNING_IDENTITY|PROMPTER_NOTARY_PROFILE' electron renderer tests
+GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json
+GIT_MASTER=1 git status --short
+GIT_MASTER=1 git diff --check
+```
+
+- signed command는 **의도된 nonzero**가 성공 조건이다. 실행 전후 `release/v0.1.1/`과 status를
+  비교해 candidate mutation이 없음을 증명한다. shell에서 nonzero를 삼키지 말고 exit code와
+  변경 없음 결과를 evidence에 별도로 기록한다.
+- unsigned package가 만든 task-owned 산출물은 검증 뒤 hash/path를 기록하고, 다른 작업자의
+  산출물과 구분해 cleanup한다. tracked status에 app/ZIP/DMG/log가 나타나면 실패다.
+- PR 생성 전 `task-final-report` 절차에 따라 최종 보고서와 orders 변경을 제시하고 명시적
+  승인을 받는다. push/PR/merge 후 원격 검증은 별도 evidence에 기록한다.
+
+### 커밋
+
+Stage 5 검증 및 보고서 승인 뒤 마지막 Stage 보고와 최종 보고를 함께 고정한다.
+
+```text
+Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완료
+```
+
+최종 보고서/PR 승인 전에는 이 커밋, push, PR 생성을 실행하지 않는다.
+
+## UltraQA trigger 매핑
+
+| 실패 클래스 | 주입/관찰 방법 | 필수 fail-closed 결과 | Stage/Evidence |
+|---|---|---|---|
+| malformed inputs | malformed/missing package version, malformed plist, invalid notary JSON/status fixture | candidate 생성 전 descriptive failure, downstream 호출 0건 | Stage 1–2, task-2/3/4 evidence |
+| stale artifacts | non-empty `release/v0.1.1/`, 기존 final ZIP/DMG/SHA256SUMS fixture | overwrite/merge 없이 preflight 실패 | Stage 3–4, task-5/6 evidence |
+| dirty worktree | fake runner의 `git status --porcelain`에 tracked/untracked product change 반환 | assembly/sign/submit 0건 | Stage 3–5, task-5/8 evidence |
+| long Apple commands | delayed fake `notarytool --wait`, signal/timeout 주입, bounded stapler retry | premature success 없음, timeout은 unknown, 동일 bytes 자동 재제출 0건 | Stage 2/4, task-4/6 evidence |
+| misleading success | exit 0 + malformed JSON, non-Accepted status, warning-bearing log, missing submission ID | success로 간주하지 않고 staple/archive/hash 차단 | Stage 2/4, task-4/6 evidence |
+| timeout/resume | submit timeout 후 saved submission ID로 `info`/`log` fake trace 실행 | 새 submit 0건, Accepted+warning-free log 전 진행 0건 | Stage 2/4, task-4/6 evidence |
+| interruption cleanup | coordinator 각 호출 지점에서 throw/signal 주입 | temp ZIP/extract/mount/partial final 제거, sanitized resume state만 보존 | Stage 3/4, task-5/6 evidence |
+| symlink/path escape | app 밖 canonical target와 duplicate symlink fixture | discovery/signing 즉시 실패, outer sign/notary 0건 | Stage 2/4, task-3/6 evidence |
+| credential leakage | sentinel profile/password/key path를 fake runner 반환/오류에 삽입 | stdout/stderr/error/evidence snapshot 어디에도 sentinel 없음 | Stage 2/4/5, task-4/6/8 evidence |
+| forbidden publication | fake trace와 static scan에서 `gh release`, `git tag`, upload/publish 탐지 | 구현 이슈 실패 처리, 원격 ref/release 변경 0건 | Stage 3/5, task-5/8 evidence |
+
+## 검증
+
+- 각 Stage 검증 명령은 단계 보고서 작성 전에 실행한다.
+- expected-failure 검증은 nonzero exit와 mutation 0건을 함께 증명해야 하며, 단순 오류 출력만으로
+  통과시키지 않는다.
+- 모든 fake-runner trace는 command/argv 순서를 기록하되 identity/profile 값과 환경 전체를
+  기록하지 않는다.
+- 실패한 검증은 단계 완료, 보고서 작성, 커밋 또는 다음 Stage 진입으로 처리하지 않는다.
+- 계획 변경, file ownership 변경, 문서 위치 변경이 필요하면 구현계획서를 먼저 갱신하고
+  작업지시자 승인을 다시 받는다.
+- `docs/plan`, `docs/draft`, `.omo/boulder.json`, Prometheus 계획 체크박스의 diff는 모든
+  Stage에서 빈 출력이어야 한다.
+- 구현 이슈 #6의 최종 성공은 pipeline의 offline/fake-runner 준비 완료까지이며 실제 Apple
+  서명/Notarization, tag, GitHub release 성공을 주장하지 않는다.
+
+## 커밋
+
+- governance 문서는 이 구현계획서 승인 후 두 개의 독립 커밋으로 먼저 고정한다.
+  - `Task #6: 수행 계획서 작성과 오늘할일 갱신`
+  - `Task #6: 구현 계획서 작성`
+- Stage 산출물과 `mydocs/working/task_m011_6_stage{N}.md`는 같은 Stage 커밋에 둔다.
+- Stage 1: `Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가`
+- Stage 2: `Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가`
+- Stage 3: `Task #6 Stage 3: 서명과 이중 Notarization 릴리스 오케스트레이션 추가`
+- Stage 4: `Task #6 Stage 4: macOS 서명 회귀 테스트와 릴리스 운영 문서 추가`
+- Stage 5: `Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완료`
+- 구현계획서, Stage, 최종 보고서의 각각의 승인 전에는 해당 커밋/push/PR을 실행하지 않는다.
+
+## 단계 의존성
+
+- Stage 1은 이 구현계획서의 명시적 승인과 governance 커밋 완료 뒤 시작한다.
+- Stage 2는 Stage 1 검증, 보고서, 다음 단계 승인을 요구한다.
+- Stage 2의 Todo 3 signing lane과 Todo 4 notarization lane은 공통 runner 계약을 고정한 뒤
+  파일 소유권을 분리해 병렬 진행할 수 있다. 둘 다 통과해야 Stage 2가 끝난다.
+- Stage 3은 Stage 2의 signing/notarization export와 error/result 계약이 확정된 뒤 시작한다.
+- Stage 4는 Stage 3의 coordinator API와 순서가 확정된 뒤 시작한다. Todo 6 test lane과
+  Todo 7 docs/security lane은 파일 소유권을 분리해 병렬 진행할 수 있다.
+- Stage 5는 Stage 4 focused test와 문서/secret/protected-path 검증 및 보고서 승인 후 시작한다.
+- 이슈 #7은 Stage 5 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
+
+## 위험과 대응
+
+- **tests-after의 중간 회귀 위험**: Stage 1 시작 전 baseline을 고정하고 Stage 1–3마다 기존
+  테스트, syntax/import smoke, fake-runner characterization을 실행한 뒤 Stage 4에서 전체 계약을
+  회귀 테스트로 잠근다.
+- **병렬 lane 계약 불일치**: Stage 2는 runner result/error shape, Stage 4는 확정 export/command
+  이름을 먼저 고정하고 lane별 파일 소유권을 겹치지 않게 한다.
+- **Apple 도구의 장시간/모호한 결과**: exit 0만 신뢰하지 않고 JSON/status/log를 파싱하며,
+  timeout은 unknown/resume로 처리하고 자동 재제출하지 않는다.
+- **nested code 누락**: canonical discovery, deterministic ordering, post-sign rediscovery와 fixture
+  coverage로 미서명 Mach-O/native object를 허용하지 않는다.
+- **비밀정보 노출**: allowed env 이름만 공개하고 값/raw argv/env dump를 금지하며 sentinel
+  redaction 테스트와 tracked-file scan을 수행한다.
+- **부분 산출물 오인 게시**: stale artifact preflight, final allowlist, hash-last, finally cleanup을
+  적용하고 구현 branch에 publication command를 두지 않는다.
+- **공식 문서 선행 공개**: README의 v0.1.0 unsigned 사용자 안내를 유지하고 v0.1.1 공개 설치
+  문구는 이슈 #7 publication 뒤에만 갱신한다.
+
+## 승인 요청 사항
+
+다음 항목 전체에 대한 명시적 구현계획서 승인을 요청한다.
+
+- Stage 1→Todo 2, Stage 2→Todos 3–4, Stage 3→Todo 5, Stage 4→Todos 6–7,
+  Stage 5→Todo 8의 다섯 Stage 매핑
+- 각 Stage의 exact file ownership, behavior, validation, evidence, commit message와 단계별 승인 경계
+- `runFile(command, args, options)`와 object-argument export를 포함한 injected-runner seam
+- Stage 2의 signing/notarization 병렬 lane과 Stage 4의 tests/docs 병렬 lane
+- tests-after 진행, baseline characterization, expected-failure의 nonzero+mutation-zero 판정
+- Keychain profile 전용 Notarization, secret non-disclosure, protected paths, final allowlist,
+  timeout/resume/no-resubmit, interruption cleanup 경계
+- `docs/release-macos.md`, `docs/qa-checklist.md`, `README.md`, `mydocs/`의 승인된 문서 위치 유지
+- 실제 signing/Notarization/tag/GitHub release 작업을 이슈 #7로 제외하는 범위
+- 승인 후 governance 문서 두 커밋을 먼저 만들고 Stage 1 제품 구현에 진입하는 순서
+
+이 구현계획서가 명시적으로 승인되기 전에는 governance 문서를 포함한 어떤 커밋도 만들지
+않고, 제품/소스/테스트/공식 문서를 수정하거나 live Apple/GitHub release 명령을 실행하지
+않는다.

@@ -15,6 +15,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 3 | 5 | 이중 제출 릴리스 코디네이터 통합 | `scripts/release-macos.mjs` | injected full trace, 선행 검사, 순서, cleanup, 게시 명령 부재 |
 | 4 | 6–7 | tests-after 회귀 테스트와 유지관리자 문서 확정 | 패키징/서명/Notarization 테스트, `.gitignore`, `docs/`, `README.md` | focused Vitest, secret/protected-path 및 문서-명령 대응 검사 |
 | 5 | 8 | 통합 검증, 보고, 리뷰와 구현 병합 | Stage 보고서, 최종 보고서, orders, implementation PR | 전체 품질 게이트, unsigned 실사용, signed fail-closed, 원격 PR 검증 |
+| 6 | 8 | pre-PR review blocker 교정과 재검증 | macOS release scripts, focused tests, Stage 6 보고서, 최종 보고서 갱신 | blocker 7건 교정, full validation, fresh review 통과 전 PR 차단 |
 
 ## 구현 전 공통 기준
 
@@ -84,7 +85,7 @@ GIT_MASTER=1 git diff --check
 | 릴리스 QA 기준 | `docs/` | `docs/qa-checklist.md` | OK | 반복 실행하는 공식 QA 기준 |
 | 사용자/기여자 안내 | 저장소 루트 | `README.md` | OK | 기존 설치 및 패키징 진실 원천 유지 |
 | 구현계획서 | `mydocs/` | `mydocs/plans/task_m011_6_impl.md` | OK | 내부 승인 산출물 |
-| 단계 보고서 | `mydocs/` | `mydocs/working/task_m011_6_stage{1..5}.md` | OK | Stage별 내부 증거와 승인 경계 |
+| 단계 보고서 | `mydocs/` | `mydocs/working/task_m011_6_stage{1..6}.md` | OK | Stage별 내부 증거와 승인 경계 |
 | 최종 보고서 | `mydocs/` | `mydocs/report/task_m011_6_report.md` | OK | PR 전 최종 승인 산출물 |
 | 보호 계획/초안 | 수정 금지 | `docs/plan/**`, `docs/draft/**` | OK | 읽기 전용 근거로만 사용 |
 
@@ -487,6 +488,161 @@ Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완�
 
 최종 보고서/PR 승인 전에는 이 커밋, push, PR 생성을 실행하지 않는다.
 
+## Stage 6 - pre-PR review blocker 교정과 재검증
+
+Prometheus Todo 8은 완료로 바꾸지 않는다. Stage 5 이후 pre-PR review가 fail 판정을 냈으므로,
+PR publication과 Issue #7 진입은 Stage 6 교정, 보고서 갱신, fresh review 통과 전까지 차단한다.
+이번 Stage는 기존 Stage 1-5 보고서와 commit을 고치지 않고, 관찰된 blocker를 새 교정 Stage로
+투명하게 formalize한다.
+
+### pre-PR review 판정과 blocker 매핑
+
+| Lane | 판정 | Stage 6 의미 |
+|---|---|---|
+| QA | PASS | Stage 5 offline validation은 근거로 보존하되 blocker 교정 뒤 전체 surface를 다시 실행한다. |
+| Goal | FAIL | exact v0.1.1 gate, artifact-bound resume, file ownership variance formalization을 교정한다. |
+| Code quality | FAIL | Electron framework alias, detach failure propagation, timeout/abort, DMG signing argv를 교정한다. |
+| Context | FAIL | prior Stage ownership variance를 승인/관찰 이력으로 기록하고 Stage 6 ownership을 고정한다. |
+| Security | INCONCLUSIVE | reviewer infrastructure 한계로 inconclusive다. Stage 6은 credential redaction, protected path, secret scan을 다시 요구한다. |
+
+| Confirmed blocker | 필수 교정 | 소유 파일 | 필수 테스트 |
+|---|---|---|---|
+| Electron framework aliases | real Electron framework layout에서 duplicate signable path가 생기지 않아야 하며 symlink escape와 ambiguous alias는 계속 거부한다. | `scripts/macos/signing.mjs` | `tests/package-macos-signing.test.mjs`에 real Electron framework layout 회귀, duplicate canonical path 거부, symlink escape 거부, ambiguous alias 거부를 추가한다. |
+| suppressed detach failure | read-only mount 검증 뒤 detach-before-remove를 순차 실행하고 detach 실패를 sanitized error로 전파 또는 보존한다. | `scripts/release-macos.mjs`, `scripts/macos/release-support.mjs` | `tests/package-macos.test.mjs`에 detach 실패 시 remove 선행 금지, sanitized failure propagation, caller-owned evidence 보존을 추가한다. |
+| exact v0.1.1 gate | signed release path는 preflight와 candidate mutation 전에 package version이 정확히 `0.1.1`인지 확인한다. | `scripts/release-macos.mjs`, `scripts/macos/release-support.mjs` | `tests/package-macos.test.mjs`에 wrong version, missing version, mutation-zero expected failure를 추가한다. |
+| artifact-bound resume | Notarization resume record는 artifact kind와 artifact SHA-256 bytes에 묶고 mismatch는 재사용하지 않는다. | `scripts/macos/notarization.mjs`, `scripts/release-macos.mjs` | `tests/package-macos-notarization.test.mjs`와 `tests/package-macos.test.mjs`에 app/DMG kind mismatch, byte hash mismatch, no resubmit before accepted log를 추가한다. |
+| production timeout/abort | long Apple command는 bounded production timeout과 abort/signal handling을 갖고 secret value를 stdout, stderr, error, evidence에 남기지 않는다. | `scripts/macos/notarization.mjs`, `scripts/macos/release-support.mjs` | `tests/package-macos-notarization.test.mjs`에 timeout, AbortError, valid signal, invalid signal, secret sentinel redaction을 추가한다. |
+| DMG runtime option | DMG signing은 승인된 `--force`, `--timestamp`, `--options runtime` argv를 포함한다. | `scripts/macos/signing.mjs`, `scripts/release-macos.mjs` | `tests/package-macos-signing.test.mjs`와 `tests/package-macos.test.mjs`에 DMG signing argv exact assertion을 추가한다. |
+| formal ownership variance | Stage 1 contract tests, Stage 3 release-support split, Stage 4 Biome-only source formatting을 prior approved/observed history로 기록한다. | `mydocs/plans/task_m011_6_impl.md`, `mydocs/working/task_m011_6_stage6.md`, `mydocs/report/task_m011_6_report.md` | governance diff review와 Stage 6 report review에서 prior Stage 보고서를 rewrite하지 않았음을 확인한다. |
+
+### prior ownership variance 기록
+
+- Stage 1은 계획상 product packaging identity stage였지만 `tests/package-macos.test.mjs`와
+  `tests/electron-contract.test.ts`의 직접 contract assertions도 함께 고쳤다. Stage 1 보고서와
+  commit에 이미 보고되고 고정된 승인/관찰 이력이며, Stage 6은 이를 숨기거나 rewrite하지 않는다.
+- Stage 3은 계획상 coordinator가 `scripts/release-macos.mjs` 중심이었지만 Biome와 LOC 상한 때문에
+  `scripts/macos/release-support.mjs`를 내부 support helper로 분리했다. Stage 3 보고서와 commit에
+  이미 보고되고 고정된 승인/관찰 이력이며, Stage 6은 helper ownership을 정식 소유 파일로 포함한다.
+- Stage 4는 tests/docs stage였지만 lint gate를 위해 `scripts/macos/signing.mjs`와
+  `scripts/macos/notarization.mjs`에 Biome-only source formatting을 적용했다. Stage 4 보고서와
+  commit에 이미 보고되고 고정된 승인/관찰 이력이며, Stage 6은 runtime 교정과 formatter-only 이력을
+  분리해 기록한다.
+
+### 산출물
+
+수정:
+
+- `scripts/macos/signing.mjs`
+- `scripts/macos/notarization.mjs`
+- `scripts/macos/release-support.mjs`
+- `scripts/release-macos.mjs`
+- `tests/package-macos-signing.test.mjs`
+- `tests/package-macos-notarization.test.mjs`
+- `tests/package-macos.test.mjs`
+- `vitest.config.ts`는 focused suite include가 실제로 추가로 필요할 때만 수정한다.
+- `mydocs/report/task_m011_6_report.md`
+
+신규:
+
+- `mydocs/working/task_m011_6_stage6.md`
+
+Evidence:
+
+- `.omo/evidence/task-8-stage6-pre-pr-review-remediation.md` (ignored, sanitized)
+
+### 변경 내용
+
+- signing discovery는 real Electron framework layout의 executable, framework binary, symlink alias,
+  version alias를 fixture로 재현하고 duplicate signable path를 정확히 거부한다. 정상 framework layout은
+  한 canonical owner만 처리하며 app root 밖 realpath, symlink escape, ambiguous aliases는 계속
+  fail closed다.
+- cleanup은 mounted DMG verification에서 detach를 먼저 시도하고 detach state와 failure를 별도 보존한다.
+  detach 실패 뒤에는 mount path remove를 먼저 실행하지 않으며, 사용자에게 전파되는 오류와 evidence는
+  profile, identity, password, key path, raw argv를 포함하지 않는다.
+- release coordinator는 package version이 정확히 `0.1.1`인지 signed preflight와 mutation 전에 확인한다.
+  mismatch는 signed preflight, build, app assembly, signing, Notarization, final directory mutation 전에
+  nonzero로 끝난다.
+- Notarization resume은 artifact kind와 SHA-256 bytes를 포함한다. app ZIP resume은 DMG에 재사용할 수
+  없고, 같은 path라도 bytes가 바뀌면 재사용하지 않는다. Accepted log와 warning-free receipt 전에는
+  downstream signing, archive, staple, checksum이 진행되지 않는다.
+- Apple 장시간 명령은 production default timeout을 명시하고 injected runner의 `timeoutMs`와 `signal`을
+  모두 연결한다. timeout, AbortError, 실제 signal recovery는 sanitized unknown으로 남기며 invalid signal,
+  일반 실패, credential sentinel은 resume/evidence가 되지 않는다.
+- DMG signing은 app signing과 같은 approved runtime hardening argv인 `--force`, `--timestamp`,
+  `--options runtime`을 포함한다. 검증에서만 `--deep --strict`를 허용한다.
+- 기존 Stage reports, final report의 historical statements, protected docs, `.omo/boulder.json`, release
+  artifacts, live Apple/GitHub state는 수정하지 않는다. 최종 보고서는 Stage 6 결과와 PR 차단 해제 조건만
+  갱신한다.
+
+### 검증
+
+```bash
+node --check scripts/macos/signing.mjs
+node --check scripts/macos/notarization.mjs
+node --check scripts/macos/release-support.mjs
+node --check scripts/release-macos.mjs
+npm test -- tests/package-macos.test.mjs tests/package-macos-signing.test.mjs tests/package-macos-notarization.test.mjs tests/electron-contract.test.ts
+npm run typecheck
+npm run lint
+npm test
+npm run build
+env -u PROMPTER_SIGNING_IDENTITY -u PROMPTER_NOTARY_PROFILE npm run package
+env -u PROMPTER_SIGNING_IDENTITY -u PROMPTER_NOTARY_PROFILE npm run package:release:macos
+npm run test:smoke
+rg -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|--apple-id|--password' . --glob '!node_modules/**' --glob '!release/**' --glob '!.git/**' --glob '!.omo/**'
+rg -n 'getOpenAIKey|PROMPTER_SIGNING_IDENTITY|PROMPTER_NOTARY_PROFILE' electron renderer tests
+rg -n 'Duplicate signable code path is not allowed|Frameworks|Versions|Current|--options|runtime|timeoutMs|AbortError|sha256|artifactKind|detach' scripts tests mydocs
+GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json
+GIT_MASTER=1 git status --short
+GIT_MASTER=1 git diff --check
+```
+
+- Focused tests must cover the seven blocker rows above. Real Electron framework discovery must use a
+  fixture that reproduces the observed `Duplicate signable code path is not allowed` class without
+  calling live `codesign`.
+- Syntax/import checks must prove exact exports remain side effect free. Config ownership is allowed only
+  if focused tests are otherwise unreachable from the checked-in test command.
+- Typecheck, lint, full test, build, unsigned package, expected signed missing-input mutation-zero,
+  Electron smoke, security scan, protected-path diff, artifact cleanup, and real Electron discovery checks
+  all run again after corrections.
+- The expected signed missing-input command must fail nonzero before preflight mutation and must show
+  unchanged `release/v0.1.1/`, unchanged release evidence path, and clean tracked status.
+- No Apple, Keychain, signing, Notarization, Gatekeeper, tag, release, upload, push, PR, or merge operation
+  may run in Stage 6.
+
+### 보고서와 evidence
+
+- Stage 6 report path: `mydocs/working/task_m011_6_stage6.md`.
+- Stage 6 evidence path: `.omo/evidence/task-8-stage6-pre-pr-review-remediation.md`.
+- The report records each blocker, exact corrected files, focused test names, validation commands, fresh
+  review outcome, residual risks, and PR publication gate.
+- The final report is updated only after validation to state that Stage 6 supersedes the failed pre-PR
+  review. It must not erase Stage 1-5 report history.
+
+### 커밋
+
+먼저 이 governance amendment와 orders 재개만 별도 커밋으로 고정한다.
+
+```text
+Task #6: Stage 6 교정 계획과 오늘할일 재개
+```
+
+그 뒤 제품 교정은 새 atomic correction commit으로 고정한다.
+
+```text
+Task #6 Stage 6: pre-PR blocker 교정
+```
+
+검증, Stage 6 보고서, 최종 보고서 갱신, orders 상태 갱신은 fresh review 통과 뒤 별도 closure
+commit으로 고정한다.
+
+```text
+Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료
+```
+
+Stage 6 review가 PASS하기 전에는 `publish/task6` push, `master` 대상 PR 생성, Issue #7 시작,
+tag/release/publication을 실행하지 않는다.
+
 ## UltraQA trigger 매핑
 
 | 실패 클래스 | 주입/관찰 방법 | 필수 fail-closed 결과 | Stage/Evidence |
@@ -501,6 +657,7 @@ Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완�
 | symlink/path escape | app 밖 canonical target와 duplicate symlink fixture | discovery/signing 즉시 실패, outer sign/notary 0건 | Stage 2/4, task-3/6 evidence |
 | credential leakage | sentinel profile/password/key path를 fake runner 반환/오류에 삽입 | stdout/stderr/error/evidence snapshot 어디에도 sentinel 없음 | Stage 2/4/5, task-4/6/8 evidence |
 | forbidden publication | fake trace와 static scan에서 `gh release`, `git tag`, upload/publish 탐지 | 구현 이슈 실패 처리, 원격 ref/release 변경 0건 | Stage 3/5, task-5/8 evidence |
+| pre-PR review blockers | Electron framework layout, detach failure, exact version, artifact-bound resume, timeout/abort, DMG runtime signing, ownership variance fixture와 review 재실행 | blocker 7건 교정, Stage 6 report 작성, fresh review PASS 전 PR 0건 | Stage 6, task-8-stage6 evidence |
 
 ## 검증
 
@@ -516,19 +673,27 @@ Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완�
   Stage에서 빈 출력이어야 한다.
 - 구현 이슈 #6의 최종 성공은 pipeline의 offline/fake-runner 준비 완료까지이며 실제 Apple
   서명/Notarization, tag, GitHub release 성공을 주장하지 않는다.
+- pre-PR review blocker가 확인된 뒤에는 Stage 6 검증과 fresh review PASS 전까지 Stage 5 final
+  closure와 PR publication을 완료로 취급하지 않는다.
 
 ## 커밋
 
 - governance 문서는 이 구현계획서 승인 후 두 개의 독립 커밋으로 먼저 고정한다.
   - `Task #6: 수행 계획서 작성과 오늘할일 갱신`
   - `Task #6: 구현 계획서 작성`
+- pre-PR review 실패 뒤 governance amendment와 orders 재개는 제품 교정 전에 별도 커밋으로 고정한다.
+  - `Task #6: Stage 6 교정 계획과 오늘할일 재개`
 - Stage 산출물과 `mydocs/working/task_m011_6_stage{N}.md`는 같은 Stage 커밋에 둔다.
 - Stage 1: `Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가`
 - Stage 2: `Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가`
 - Stage 3: `Task #6 Stage 3: 서명과 이중 Notarization 릴리스 오케스트레이션 추가`
 - Stage 4: `Task #6 Stage 4: macOS 서명 회귀 테스트와 릴리스 운영 문서 추가`
 - Stage 5: `Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완료`
+- Stage 6 제품 교정: `Task #6 Stage 6: pre-PR blocker 교정`
+- Stage 6 검증 및 보고서: `Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료`
 - 구현계획서, Stage, 최종 보고서의 각각의 승인 전에는 해당 커밋/push/PR을 실행하지 않는다.
+- Stage 6 correction commit 뒤 fresh review PASS와 closure commit 전에는 `publish/task6` push와
+  `master` 대상 PR 생성을 실행하지 않는다.
 
 ## 단계 의존성
 
@@ -540,7 +705,9 @@ Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완�
 - Stage 4는 Stage 3의 coordinator API와 순서가 확정된 뒤 시작한다. Todo 6 test lane과
   Todo 7 docs/security lane은 파일 소유권을 분리해 병렬 진행할 수 있다.
 - Stage 5는 Stage 4 focused test와 문서/secret/protected-path 검증 및 보고서 승인 후 시작한다.
-- 이슈 #7은 Stage 5 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
+- Stage 6은 failed pre-PR review의 confirmed blocker 7건을 고친 뒤 Stage 6 report, final report
+  갱신, fresh review PASS를 요구한다.
+- 이슈 #7은 Stage 6 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
 
 ## 위험과 대응
 
@@ -559,13 +726,15 @@ Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완�
   적용하고 구현 branch에 publication command를 두지 않는다.
 - **공식 문서 선행 공개**: README의 v0.1.0 unsigned 사용자 안내를 유지하고 v0.1.1 공개 설치
   문구는 이슈 #7 publication 뒤에만 갱신한다.
+- **pre-PR review blocker 재발**: Stage 6에서 blocker 7건을 exact file ownership과 focused tests로
+  잠그고, fresh review PASS 전에는 PR publication과 Issue #7 진입을 차단한다.
 
 ## 승인 요청 사항
 
 다음 항목 전체에 대한 명시적 구현계획서 승인을 요청한다.
 
 - Stage 1→Todo 2, Stage 2→Todos 3–4, Stage 3→Todo 5, Stage 4→Todos 6–7,
-  Stage 5→Todo 8의 다섯 Stage 매핑
+  Stage 5→Todo 8, Stage 6→Todo 8 review remediation의 여섯 Stage 매핑
 - 각 Stage의 exact file ownership, behavior, validation, evidence, commit message와 단계별 승인 경계
 - `runFile(command, args, options)`와 object-argument export를 포함한 injected-runner seam
 - Stage 2의 signing/notarization 병렬 lane과 Stage 4의 tests/docs 병렬 lane
@@ -575,6 +744,8 @@ Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완�
 - `docs/release-macos.md`, `docs/qa-checklist.md`, `README.md`, `mydocs/`의 승인된 문서 위치 유지
 - 실제 signing/Notarization/tag/GitHub release 작업을 이슈 #7로 제외하는 범위
 - 승인 후 governance 문서 두 커밋을 먼저 만들고 Stage 1 제품 구현에 진입하는 순서
+- pre-PR review 실패 이후 Stage 6 교정 계획, exact ownership, required tests, validation, evidence,
+  report, correction commit, closure commit 및 PR 차단 조건
 
 이 구현계획서가 명시적으로 승인되기 전에는 governance 문서를 포함한 어떤 커밋도 만들지
 않고, 제품/소스/테스트/공식 문서를 수정하거나 live Apple/GitHub release 명령을 실행하지

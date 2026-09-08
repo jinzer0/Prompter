@@ -19,6 +19,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.2 | 8 | failed fresh review blocker 교정 addendum | Stage 6.2 governance, release pre-build validator, helper ownership, tests/docs/evidence 갱신 | fresh blocker 전건 교정, checked-in regression matrix, five-lane PASS 전 closure 차단 |
 | 6.3 | 8 | latest fresh-review failure 교정 addendum | Stage 6.3 governance, alias provenance, candidate ownership, state-machine/schema regressions | code-quality blocker 2건과 regression gap 전건 교정, fresh five-lane PASS 전 closure 차단 |
 | 6.4 | 8 | latest failed fresh-review 교정 addendum | Stage 6.4 governance, Electron 43 alias/version binding, preflight-before-candidate ordering, pending-state/schema regressions | five-lane FAIL blocker 전건 교정, direct security review 포함 fresh five-lane PASS 전 closure 차단 |
+| 6.5 | 8 | latest fresh review blocker 교정 addendum | Stage 6.5 governance, arbitrary framework alias rejection, Notarization severity fail-closed regressions | blocker 2건 교정, fresh five-lane direct reproduction PASS 전 closure 차단 |
 
 ## 구현 전 공통 기준
 
@@ -1049,6 +1050,80 @@ Stage 6.2와 Stage 6.3에서 고정한 fixes와 250 production pure LOC 상한�
 review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Stage 6 closure reports, orders completion,
 `publish/task6` push, PR, Todo 8 completion, Issue #7 entry는 blocked 상태다.
 
+## Stage 6.5 - latest fresh review blocker 교정 addendum
+
+최신 fresh five-lane review 결과는 Goal FAIL, QA PASS, Code quality FAIL, Context PASS, Security FAIL이다.
+QA와 Context의 PASS는 Stage 6.4 검증 성공과 historical review 보존 경계가 유지됨을 뜻한다. Goal,
+Code quality, Security는 두 concrete blocker를 직접 재현했으므로 Stage 6.5를 product code, tests,
+official docs, evidence, report draft 수정 전에 governance와 orders note만 먼저 고정한다. 아래 blocker를
+모두 교정하고 fresh reviewers가 두 direct reproduction을 테스트에만 의존하지 않고 다시 실행해 전부 PASS하기
+전까지 closure reports, orders completion, `publish/task6` push, PR, Todo 8 completion, Issue #7 entry는
+blocked 상태다. Stage 6.4의 focused/full/static/build/package/smoke 성공과 모든 historical review record는
+그대로 보존한다. `mydocs/report/task_m011_6_report.md`와 `mydocs/working/task_m011_6_stage6.md` draft는
+byte-for-byte 보존하고 이번 governance commit에 포함하지 않는다.
+
+### latest fresh review lane 판정
+
+| Lane | 판정 | Stage 6.5 의미 |
+|---|---|---|
+| Goal | FAIL | arbitrary `Versions/<non-current>/<FrameworkBinary>` symlink acceptance가 목표 계약을 막는다. |
+| QA | PASS | Stage 6.4 validation success는 보존하되 Stage 6.5 교정 뒤 전체 surface를 다시 실행한다. |
+| Code quality | FAIL | framework binary alias predicate와 Notarization severity validation이 fail-open이다. |
+| Context | PASS | Stage 6.4 success, preserved drafts, historical review record 경계는 계속 유효하다. |
+| Security | FAIL | unknown/malformed Notarization issue severity acceptance가 release gate를 fail-open한다. |
+
+### Stage 6.5 blocker 매핑
+
+| Blocking finding | 재현된 동작 | 필수 교정 | 소유 파일 | 필수 테스트와 증거 |
+|---|---|---|---|---|
+| arbitrary framework binary alias acceptance | `Versions/Current -> A`이고 symlink `Versions/B/Kit -> ../A/Kit`가 있으면 현재 `Versions/<name>/Kit` 3-segment candidate가 conventional로 간주되어 accepted된다. | 허용 framework binary alias는 conventional root framework binary symlink가 Current version binary를 가리키는 경우뿐이다. Canonical regular version binaries는 계속 traversable이지만, `Versions/*` 아래 arbitrary symlink alias는 fail closed한다. | `scripts/macos/framework-alias.mjs`, `tests/package-macos-signing.test.mjs` | checked-in filesystem regression으로 `Versions/B/Kit -> ../A/Kit`와 최소 하나의 arbitrary `Versions/A/<binary alias>` variant를 만들고 discovery/signing이 codesign/notary 전에 중단됨을 증명한다. Valid installed Electron 43 discovery, Current root binary, conventional directory aliases, canonical descendant traversal, mixed-version root rejection, one-time inspection은 유지한다. |
+| Notarization issue severity fail-open | live-log review와 final-evidence validator가 exact lowercase `warning` 또는 `error` 이외의 arbitrary string을 허용한다. Empty string, uppercase, `critical`, unknown values가 모두 통과할 수 있다. | safe issue severity taxonomy는 lowercase `info` 하나뿐이다. Empty issues array는 valid이며, 그 밖의 모든 severity value는 fail closed한다. Live Apple log review와 final-evidence validation은 하나의 shared severity predicate 또는 parser를 사용해 drift를 막는다. | `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-evidence.mjs`, `tests/package-macos-notarization.test.mjs`, `tests/package-macos.test.mjs` only if coordinator downstream proof requires it | checked-in regressions은 `info` acceptance와 empty string, uppercase `INFO`, `Warning`, `ERROR`, `critical`, arbitrary strings, non-string values, extra issue fields, malformed issue objects rejection을 모두 포함한다. Coordinator-level proof는 unknown live severity가 staple, Gatekeeper, final archive, DMG, checksum, publication-adjacent work를 차단함을 보여야 한다. |
+
+### Stage 6.5 ownership and source policy
+
+- Approved implementation ownership is narrow: `scripts/macos/framework-alias.mjs`,
+  `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-evidence.mjs`,
+  `tests/package-macos-signing.test.mjs`, `tests/package-macos-notarization.test.mjs`, and
+  `tests/package-macos.test.mjs` only if coordinator downstream proof requires it.
+- Do not edit source, tests, official docs, reports, stage reports, README, package metadata, protected paths,
+  evidence, Boulder, or report drafts in this governance task.
+- Do not change docs unless current docs need one sentence clarifying that only informational issues are allowed.
+  If needed, the docs change belongs to the later Stage 6.5 implementation commit, not this governance commit.
+- Do not weaken Current binding, arbitrary alias rejection, preflight order, candidate ownership, no-resubmit,
+  strict evidence, secret, or publication contracts.
+- Every production module must remain at or below 250 pure nonblank, non-comment LOC.
+
+### Stage 6.5 validation matrix
+
+| Check class | Required commands or proof | PASS condition |
+|---|---|---|
+| targeted alias | checked-in filesystem tests for `Versions/B/Kit -> ../A/Kit` and an arbitrary `Versions/A/<binary alias>` variant | arbitrary aliases stop discovery/signing before codesign/notary; valid Electron 43, Current root binary, conventional directory aliases, canonical descendants, mixed-version rejection, one-time inspection remain intact |
+| targeted severity | shared severity parser tests for `info`, empty issues array, malformed values, extra fields, malformed issue objects | only lowercase `info` and empty issues array pass; every other issue object or severity value fails closed |
+| coordinator severity | coordinator-level proof using unknown live severity | staple, Gatekeeper, final archive, DMG, checksum, and publication-adjacent work are not reached |
+| focused | `npm test -- tests/package-macos.test.mjs tests/package-macos-signing.test.mjs tests/package-macos-notarization.test.mjs tests/electron-contract.test.ts` | focused suite passes with checked-in regressions |
+| full | `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` | all exit 0 or pre-existing environment limits are classified |
+| package and smoke | unsigned package, signed missing-input mutation-zero, Electron smoke | unsigned succeeds; signed path fails before mutation when inputs are absent; smoke passes |
+| cleanup | generated release, dist, build, smoke, temp, mount, and candidate ownership paths are reviewed | only task-owned generated outputs are removed; report drafts stay byte-for-byte unchanged |
+| protected and secret | protected-path diff, whitespace, artifact scan, secret scan, publication scan | no protected diff, no whitespace issue, no tracked generated artifact, no secret leakage, no publication command |
+| fresh review | Goal, QA, Code quality, Context, Security lanes rerun the two direct reproductions | all five lanes PASS before closure report, orders completion, push, PR, Todo 8, or Issue #7 |
+
+### Stage 6.5 커밋 경계
+
+이 addendum과 orders latest fresh review blocker note만 먼저 고정한다.
+
+```text
+Task #6: Stage 6.5 재검토 교정 계획
+```
+
+제품과 테스트 교정은 다음 implementation commit으로만 고정한다.
+
+```text
+Task #6 [Stage 6.5]: alias와 Notarization severity fail-closed 교정
+```
+
+Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `publish/task6` push,
+`master` PR, Todo 8 completion, Issue #7 entry는 이 governance commit 뒤에도 순차적으로 blocked다.
+
 ## UltraQA trigger 매핑
 
 | 실패 클래스 | 주입/관찰 방법 | 필수 fail-closed 결과 | Stage/Evidence |
@@ -1066,6 +1141,7 @@ review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Sta
 | pre-PR review blockers | Electron framework layout, detach failure, exact version, artifact-bound resume, timeout/abort, DMG runtime signing, ownership variance fixture와 review 재실행 | blocker 7건 교정, Stage 6 report 작성, fresh review PASS 전 PR 0건 | Stage 6, task-8-stage6 evidence |
 | failed fresh review blockers | pre-build version entrypoint, traversal-order alias, accepted-log retry, absolute Apple tools, helper ownership, checked-in regression gaps, docs/evidence wording을 재현 | blocker 전건 교정, Stage 6.2 report 작성, five-lane PASS 전 closure 0건 | Stage 6.2, task-8-stage6-2 evidence |
 | latest failed fresh review blockers | Electron 43 Helpers/Libraries alias, same-Current mixed-version binding, accepted alias descendant traversal, preflight-before-candidate ordering, accepted-pending coordinator boundary, executable evidence schema, docs temporal wording을 재현 | blocker 전건 교정, Stage 6.4 report 작성, direct security review 포함 five-lane PASS 전 closure 0건 | Stage 6.4, task-8-stage6-4 evidence |
+| latest fresh review blockers | arbitrary `Versions/<non-current>/<FrameworkBinary>` symlink alias와 unknown/malformed Notarization issue severity acceptance를 재현 | blocker 2건 교정, Stage 6.5 report 작성, direct reproduction 포함 five-lane PASS 전 closure 0건 | Stage 6.5, task-8-stage6-5 evidence |
 
 ## 검증
 
@@ -1088,6 +1164,9 @@ review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Sta
 - latest failed fresh review blocker가 확인된 뒤에는 Stage 6.4 검증과 fresh five-lane PASS 전까지 Stage
   6 closure report commit, final report commit, orders 완료 처리, PR publication, Todo 8 완료, Issue #7
   진입을 완료로 취급하지 않는다.
+- latest fresh review blocker가 확인된 뒤에는 Stage 6.5 검증과 fresh five-lane PASS 전까지 Stage 6
+  closure report commit, final report commit, orders 완료 처리, PR publication, Todo 8 완료, Issue #7
+  진입을 완료로 취급하지 않는다.
 
 ## 커밋
 
@@ -1100,6 +1179,8 @@ review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Sta
   - `Task #6: Stage 6.2 재검토 교정 계획`
 - latest failed fresh review 뒤 Stage 6.4 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
   - `Task #6: Stage 6.4 재검토 교정 계획`
+- latest fresh review 뒤 Stage 6.5 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
+  - `Task #6: Stage 6.5 재검토 교정 계획`
 - Stage 산출물과 `mydocs/working/task_m011_6_stage{N}.md`는 같은 Stage 커밋에 둔다.
 - Stage 1: `Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가`
 - Stage 2: `Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가`
@@ -1110,11 +1191,14 @@ review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Sta
 - Stage 6.1 후속 보강: `Task #6 [Stage 6.1]: Stage 6 교정 후속 보강`
 - Stage 6.2 제품 교정: `Task #6 [Stage 6.2]: fresh review blocker 교정`
 - Stage 6.4 제품 교정: `Task #6 [Stage 6.4]: Electron alias와 preflight 계약 교정`
+- Stage 6.5 제품 교정: `Task #6 [Stage 6.5]: alias와 Notarization severity fail-closed 교정`
 - Stage 6 검증 및 보고서: `Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료`
 - 구현계획서, Stage, 최종 보고서의 각각의 승인 전에는 해당 커밋/push/PR을 실행하지 않는다.
 - Stage 6.2 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push와
   `master` 대상 PR 생성을 실행하지 않는다.
 - Stage 6.4 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push,
+  `master` 대상 PR 생성, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
+- Stage 6.5 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push,
   `master` 대상 PR 생성, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
 
 ## 단계 의존성
@@ -1135,6 +1219,9 @@ review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Sta
 - Stage 6.4는 latest failed fresh review의 blocking finding 전건을 고친 뒤 Electron 43 installed
   discovery probe, root preflight-before-candidate ordering, coordinator pending-state, executable final-evidence
   schema, docs wording, Stage 6 report 갱신, final report 갱신, fresh five-lane PASS를 요구한다.
+- Stage 6.5는 latest fresh review의 blocker 2건을 고친 뒤 arbitrary framework binary alias rejection,
+  shared lowercase-info severity validation, coordinator downstream suppression proof, Stage 6 report 갱신,
+  final report 갱신, fresh five-lane PASS를 요구한다.
 - 이슈 #7은 Stage 6 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
 
 ## 위험과 대응
@@ -1163,6 +1250,9 @@ review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Sta
   alias binding, preflight-before-candidate ordering, concurrent loser scope, accepted-pending coordinator
   boundary, executable evidence schema, docs temporal wording을 소유 파일과 검증 lane에 연결하고,
   five-lane PASS 전에는 closure, PR publication, Todo 8 완료, Issue #7 진입을 차단한다.
+- **latest fresh review blocker 재발**: Stage 6.5에서 arbitrary `Versions/<non-current>/<FrameworkBinary>`
+  symlink alias와 unknown/malformed Notarization issue severity를 소유 파일과 검증 lane에 연결하고,
+  direct reproduction 포함 five-lane PASS 전에는 closure, PR publication, Todo 8 완료, Issue #7 진입을 차단한다.
 
 ## 승인 요청 사항
 
@@ -1188,6 +1278,9 @@ review가 모두 PASS하고 작업지시자가 별도 승인하기 전까지 Sta
   same-current-version binding, preflight-before-candidate ordering, coordinator pending-state regression,
   executable final-evidence schema, docs wording correction, governance commit, implementation commit,
   direct security review 포함 fresh five-lane PASS 전 closure 차단 조건
+- latest fresh review 이후 Stage 6.5 교정 계획, arbitrary framework binary alias fail-closed,
+  Notarization severity lowercase-info taxonomy, shared severity parser, coordinator downstream suppression,
+  governance commit, implementation commit, direct reproduction 포함 fresh five-lane PASS 전 closure 차단 조건
 
 이 구현계획서가 명시적으로 승인되기 전에는 governance 문서를 포함한 어떤 커밋도 만들지
 않고, 제품/소스/테스트/공식 문서를 수정하거나 live Apple/GitHub release 명령을 실행하지

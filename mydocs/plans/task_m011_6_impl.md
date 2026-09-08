@@ -17,6 +17,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 5 | 8 | 통합 검증, 보고, 리뷰와 구현 병합 | Stage 보고서, 최종 보고서, orders, implementation PR | 전체 품질 게이트, unsigned 실사용, signed fail-closed, 원격 PR 검증 |
 | 6 | 8 | pre-PR review blocker 교정과 재검증 | macOS release scripts, focused tests, Stage 6 보고서, 최종 보고서 갱신 | blocker 7건 교정, full validation, fresh review 통과 전 PR 차단 |
 | 6.2 | 8 | failed fresh review blocker 교정 addendum | Stage 6.2 governance, release pre-build validator, helper ownership, tests/docs/evidence 갱신 | fresh blocker 전건 교정, checked-in regression matrix, five-lane PASS 전 closure 차단 |
+| 6.3 | 8 | latest fresh-review failure 교정 addendum | Stage 6.3 governance, alias provenance, candidate ownership, state-machine/schema regressions | code-quality blocker 2건과 regression gap 전건 교정, fresh five-lane PASS 전 closure 차단 |
 
 ## 구현 전 공통 기준
 
@@ -791,6 +792,153 @@ Task #6 [Stage 6.2]: fresh review blocker 교정
 Stage 6 report, final report, orders 완료 처리, closure report commit은 fresh five-lane review가 모두
 PASS하고 작업지시자가 별도 승인하기 전까지 차단한다. 기존 Stage 6 report draft와 final report draft는
 현재 uncommitted 상태로 보존하며 이 governance commit에 포함하지 않는다.
+
+## Stage 6.3 - latest fresh-review failure 교정 addendum
+
+최신 fresh five-lane review 결과는 Goal PASS, QA PASS, Code quality FAIL, Context PASS,
+Security INCONCLUSIVE다. Security lane은 team-mode 전용 `security-review` skill이 현재 사용할 수
+없어 독립 판정을 내리지 못했다. 이 기록은 숨기지 않으며 PASS로 간주하지 않는다. Stage 6 report와
+final report draft는 byte-preserved draft로 보존하고, Stage 6.3은 product code 수정 전 governance와
+orders note만 먼저 고정한다. 아래 blocker와 regression gap을 모두 교정하고 fresh five-lane review가
+전부 PASS하기 전까지 Stage 6 closure report commit, orders 완료 처리, `publish/task6` push, PR,
+Issue #7 진입을 차단한다.
+
+### latest fresh-review lane 판정
+
+| Lane | 판정 | Stage 6.3 의미 |
+|---|---|---|
+| Goal | PASS | Stage 6.2의 목표 범위는 충족됐지만 새 code-quality blocker가 closure를 차단한다. |
+| QA | PASS | 검증 증거는 보존하되 Stage 6.3 교정 뒤 전체 surface를 다시 실행한다. |
+| Code quality | FAIL | parent-directory framework alias provenance와 candidate pre-reservation race를 교정한다. |
+| Context | PASS | Stage 6.2 ownership과 preserved draft 경계는 통과로 보존한다. |
+| Security | INCONCLUSIVE | team-mode-only skill unavailable 때문에 판정 불가다. Stage 6.3은 team-mode skill 없이 fresh security lane을 다시 요구한다. |
+
+### code-quality blocker 매핑
+
+| Blocking finding | 재현된 동작 | 소유 파일 | 필수 테스트 | 필수 검증 |
+|---|---|---|---|---|
+| parent-directory framework alias provenance bypass | `Kit.framework/Aliases -> Versions/A`가 있으면 `Aliases/Kit`이 canonical `Versions/A/Kit` binary에 도달한다. 현재 discovery는 `realpath` 뒤 lexical provenance를 잃어 non-conventional parent directory alias를 conventional binary alias처럼 통과시킬 수 있다. | `scripts/macos/framework-alias.mjs`, `scripts/macos/signing.mjs` | `tests/package-macos-signing.test.mjs`에 invalid parent directory alias가 root binary alias보다 먼저 정렬되는 경우, `Versions`보다 먼저 정렬되는 경우, real Electron framework compatibility를 checked-in regression으로 추가한다. | targeted alias tests, focused signing suite, installed Electron discovery, syntax/import/export, typecheck, lint, protected diff, five-lane review |
+| pre-reservation duplicate Apple submission race | 현재 candidate ownership이 first app notarization 뒤에 잡히므로 병렬 invocation 둘이 모두 app staging, assembly, signing, temp ZIP, evidence write, Apple submit에 도달하고 shared evidence를 race할 수 있다. | `scripts/release-macos.mjs`, `scripts/macos/release-lifecycle.mjs` | `tests/package-macos.test.mjs`에 deterministic concurrent 또는 two-invocation regression을 추가해 loser가 assembly, submit, evidence write, downstream mutation을 0건 수행하고 winner만 candidate ownership을 유지함을 증명한다. | targeted concurrency test, focused coordinator suite, unsigned package, signed missing-input mutation-zero, cleanup/protected/artifact checks, five-lane review |
+
+### framework alias provenance fail-closed 요구사항
+
+- signing discovery는 `realpath` 전에 `lstat` 또는 동등한 directory entry inspection을 수행하고,
+  candidate entry의 lexical provenance를 보존해야 한다.
+- signable object가 non-conventional parent directory alias를 통해 도달하면 canonical target이 app root
+  내부이고 Mach-O여도 fail closed한다.
+- 허용 alias는 좁은 allowlist로 제한한다. 표준 framework directory alias인 `Versions/Current`, root의
+  `Resources`, `Headers`, `Modules`, root binary alias만 허용 후보이며, 모두 같은 framework와 같은
+  version layout으로 해소될 때만 허용한다.
+- canonical traversal은 real target을 정확히 한 번만 inspect한다. 허용 alias는 같은 canonical owner로
+  coalesce할 수 있지만, alias provenance 검증 자체를 생략할 수 없다.
+- invalid parent directory aliases는 `Kit.framework/Aliases -> Versions/A`, `Kit.framework/Aliases/Kit`,
+  `Kit.framework/AAAA -> Versions/A`, `Kit.framework/AAAA/Kit` 같은 lexical-before-root-binary와
+  lexical-before-`Versions` fixtures로 재현한다.
+- real Electron framework fixture는 `Electron Framework.framework/Versions/Current`, root binary alias,
+  root resources/header/module aliases가 기존 compatible layout에서 계속 통과함을 증명한다.
+
+### candidate ownership concurrency 요구사항
+
+- release coordinator는 모든 non-mutating preflight가 끝난 직후, app staging, app assembly, signing,
+  temp ZIP, evidence write, Notarization submit, final archive, checksum보다 먼저 candidate ownership을
+  atomic and exclusive하게 예약해야 한다.
+- 기존 candidate directory는 empty directory여도 fail closed한다. 더 안전한 explicit lock design을
+  선택하려면 구현계획서에 owner token, lifetime, stale 처리, cleanup 권한, crash recovery를 먼저
+  명시해야 하며 ambiguous shared ownership은 허용하지 않는다.
+- 실패 cleanup은 task가 만든 empty 또는 partial candidate만 제거한다. user-owned 또는 caller-owned
+  candidate path, evidence root, release root, preserved reports는 삭제하지 않는다.
+- deterministic concurrent 또는 two-invocation regression은 loser가 app assembly, signing, temp ZIP,
+  app submit, log/info, evidence write, DMG create/sign/submit, checksum, final asset mutation을 하나도
+  수행하지 않음을 확인해야 한다. winner는 ownership을 유지하고 성공 또는 의도된 failure path를 독립
+  소유로 끝내야 한다.
+- official docs는 candidate-absence semantics가 바뀌면 같이 갱신한다. Empty directory가 더 이상
+  available candidate가 아니라면 `docs/release-macos.md`와 `docs/qa-checklist.md`에 그대로 적는다.
+
+### 추가 state-machine, runner, QA schema regression 요구사항
+
+- `tests/package-macos-notarization.test.mjs`는 accepted-pending state 뒤 `info -> In Progress` 흐름과
+  `info -> Rejected` 흐름을 추가한다. 두 흐름 모두 total submit은 1회여야 하며 downstream operation은
+  0건이어야 한다.
+- accepted-pending `In Progress`는 unresolved로 남고 staple, Gatekeeper, final archive, checksum으로
+  진행하지 않는다. accepted-pending `Rejected`는 terminal failure로 끝나며 재제출하지 않는다.
+- notarization test runner의 stateful failure callback은 command 하나당 한 번만 호출해야 한다. 현재처럼
+  같은 command에서 predicate/effect를 두 번 평가할 수 있으면 test가 실제 state machine을 왜곡하므로
+  helper를 교정하고 회귀로 고정한다.
+- QA evidence validation은 app evidence root가 `artifactKind: app`, DMG evidence root가
+  `artifactKind: dmg`임을 엄격히 확인해야 한다.
+- resume schema와 receipt schema는 예상 밖 field를 reject해야 하며 required fields는 정확히 유지한다.
+  Required fields는 resume의 `submissionId`, `status`, `artifactKind`, `artifactSha256`, accepted 상태의
+  `logPath`, receipt의 `submissionId`, `artifactKind`, `artifactSha256`, `issues`다.
+
+### 유지해야 할 Stage 6.2 동작
+
+- signed npm entrypoint preflight-first order는 유지한다.
+- Apple trust tool absolute command path와 signing prefix는 유지한다.
+- accepted status/log refresh와 no-local-receipt-trust behavior는 유지한다.
+- artifact kind/hash binding, AbortSignal handling, timeout redaction, secret redaction, protected path,
+  no-publication scans, helper ownership formalization은 유지한다.
+
+### Stage 6.3 validation matrix
+
+| Check class | Required commands or proof | PASS condition |
+|---|---|---|
+| targeted | exact new tests for parent-directory alias provenance, real Electron framework compatibility, candidate ownership race, accepted-pending `In Progress`, accepted-pending `Rejected`, single failure-callback evaluation, exact QA schema rejection | all named regressions pass and prove fail-closed behavior |
+| focused | `npm test -- tests/package-macos.test.mjs tests/package-macos-signing.test.mjs tests/package-macos-notarization.test.mjs tests/electron-contract.test.ts` | full focused suite passes with checked-in regressions |
+| full | `npm test` | all tests exit 0 or pre-existing environment limits are classified |
+| typecheck | `npm run typecheck` | TypeScript exits 0 |
+| lint | `npm run lint` | Biome exits 0 |
+| build | `npm run build` | build exits 0 after Stage 6.3 corrections |
+| unsigned package | `env -u PROMPTER_SIGNING_IDENTITY -u PROMPTER_NOTARY_PROFILE npm run package` | unsigned local package succeeds and task-owned outputs are cleaned after evidence capture |
+| signed missing-input | `env -u PROMPTER_SIGNING_IDENTITY -u PROMPTER_NOTARY_PROFILE npm run package:release:macos` | expected nonzero occurs before mutation, candidate, evidence, app assembly, and submit remain 0 |
+| smoke | `npm run test:smoke` | Electron smoke exits 0 before closure |
+| cleanup | generated release, dist, build, smoke, temp, mount, and candidate ownership paths are reviewed | only task-owned empty/partial paths are removed; caller-owned paths and drafts are preserved |
+| protected | `GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json` and `GIT_MASTER=1 git diff --check` | protected diff and whitespace check are clean |
+| secret | private-key, Apple credential, renderer/IPC secret surface, raw argv/env scans | no secret value leakage and no plaintext key bridge |
+| five-lane review | fresh Goal, QA, Code quality, Context, Security lanes | all five lanes PASS; Security must not load the team-mode-only security skill and must return PASS or FAIL independently |
+
+### Stage 6.3 산출물
+
+수정:
+
+- `scripts/macos/framework-alias.mjs`
+- `scripts/macos/signing.mjs`
+- `scripts/release-macos.mjs`
+- `scripts/macos/release-lifecycle.mjs`
+- `scripts/macos/notarization.mjs`
+- `scripts/macos/notarization-command.mjs` only if runner helper evaluation changes are needed
+- `scripts/macos/notarization-contract.mjs` only if schema rejection changes are needed
+- `scripts/macos/notarization-evidence.mjs` only if resume or receipt schema changes are needed
+- `tests/package-macos-signing.test.mjs`
+- `tests/package-macos.test.mjs`
+- `tests/package-macos-notarization.test.mjs`
+- `docs/release-macos.md` only if candidate-absence semantics or evidence schema wording changes
+- `docs/qa-checklist.md` for exact app/DMG artifact kind and unexpected-field validation
+- `mydocs/working/task_m011_6_stage6.md` only after Stage 6.3 validation
+- `mydocs/report/task_m011_6_report.md` only after fresh five-lane PASS and closure approval
+- `mydocs/orders/20260908.md` remains `진행중` until closure approval
+
+Evidence:
+
+- `.omo/evidence/task-8-stage6-3-fresh-review-remediation.md` (ignored, sanitized)
+
+### Stage 6.3 커밋 경계
+
+이 addendum과 orders latest fresh-review remediation note만 먼저 고정한다.
+
+```text
+Task #6: Stage 6.3 재검토 교정 계획
+```
+
+제품, 테스트, 공식 문서 교정은 다음 implementation commit으로만 고정한다.
+
+```text
+Task #6 [Stage 6.3]: 동시 실행과 alias provenance 교정
+```
+
+Stage 6 closure report commit, final report commit, orders 완료 처리, `publish/task6` push, PR,
+Issue #7 진입은 fresh Goal, QA, Code quality, Context, Security lanes가 모두 PASS하고 작업지시자가
+별도 승인하기 전까지 차단한다. 기존 Stage 6/final report drafts는 uncommitted 상태로 byte-preserved
+보존하며 이 governance commit에 포함하지 않는다.
 
 ## UltraQA trigger 매핑
 

@@ -16,6 +16,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 4 | 6–7 | tests-after 회귀 테스트와 유지관리자 문서 확정 | 패키징/서명/Notarization 테스트, `.gitignore`, `docs/`, `README.md` | focused Vitest, secret/protected-path 및 문서-명령 대응 검사 |
 | 5 | 8 | 통합 검증, 보고, 리뷰와 구현 병합 | Stage 보고서, 최종 보고서, orders, implementation PR | 전체 품질 게이트, unsigned 실사용, signed fail-closed, 원격 PR 검증 |
 | 6 | 8 | pre-PR review blocker 교정과 재검증 | macOS release scripts, focused tests, Stage 6 보고서, 최종 보고서 갱신 | blocker 7건 교정, full validation, fresh review 통과 전 PR 차단 |
+| 6.2 | 8 | failed fresh review blocker 교정 addendum | Stage 6.2 governance, release pre-build validator, helper ownership, tests/docs/evidence 갱신 | fresh blocker 전건 교정, checked-in regression matrix, five-lane PASS 전 closure 차단 |
 
 ## 구현 전 공통 기준
 
@@ -643,6 +644,154 @@ Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료
 Stage 6 review가 PASS하기 전에는 `publish/task6` push, `master` 대상 PR 생성, Issue #7 시작,
 tag/release/publication을 실행하지 않는다.
 
+## Stage 6.2 - failed fresh review blocker 교정 addendum
+
+Fresh five-lane review 결과는 QA PASS, Goal FAIL, Code quality FAIL, Context FAIL, Security FAIL이다.
+Stage 6 report와 final report draft는 현재 작업 이력으로 보존하되, closure 근거로 사용하지 않는다.
+Stage 6.2는 product code를 수정하기 전 governance로 먼저 고정하며, 아래 blocker를 모두 교정하고
+새 five-lane review가 전부 PASS하기 전까지 Stage 6 closure report commit, orders 완료 처리,
+`publish/task6` push, PR, Issue #7 진입을 차단한다.
+
+### fresh review blocker 매핑
+
+| Lane | Blocking finding | 필수 교정 | 소유 파일 | 필수 테스트와 증거 |
+|---|---|---|---|---|
+| Goal | 실제 `npm run package:release:macos`가 exact `0.1.1` 검증 전에 `npm run build`를 실행한다. | signed npm entrypoint가 `npm run build` 또는 candidate mutation, native rebuild, bundling, Apple preflight 같은 외부 작업 전에 exact `0.1.1`을 검증한다. | `scripts/macos/release-version-preflight.mjs` 신규, `package.json`, `tests/electron-contract.test.ts`, `docs/release-macos.md`, `docs/qa-checklist.md` | checked-in wrong-version 및 missing-version entrypoint tests가 build, downstream runner, candidate/evidence mutation 0건을 증명한다. Evidence에는 실제 entrypoint와 zero mutation 결과만 기록한다. |
+| Code quality | framework alias 허용이 traversal order에 의존해 invalid alias가 canonical entry보다 먼저 오면 bypass된다. | alias owner를 first encounter에서 검증하고, conventional framework root alias와 canonical version binary만 허용한다. invalid alias가 canonical 또는 conventional entry보다 lexical sort상 먼저 와도 실패한다. | `scripts/macos/framework-alias.mjs`, `scripts/macos/signing.mjs`, `tests/package-macos-signing.test.mjs` | invalid alias sorting-before-canonical, sorting-before-conventional, duplicate canonical, symlink escape regression을 checked-in tests로 고정한다. |
+| Code quality | `Accepted` submit 뒤 log fetch가 실패하면 accepted state가 저장되지 않아 다음 invocation이 재제출한다. | submission이 `Accepted`를 반환하는 즉시 artifact kind/hash-bound state를 저장하고, log retrieval은 저장 뒤 수행한다. 다음 invocation은 `info`와 `log` refresh만 실행하고 submit total은 1이어야 한다. | `scripts/macos/notarization.mjs`, `scripts/macos/notarization-evidence.mjs`, `scripts/macos/notarization-command.mjs`, `tests/package-macos-notarization.test.mjs` | two-invocation accepted-log-failure regression이 submit 1회, info/log refresh, downstream 0건을 증명한다. |
+| Context | `58c9d4e`가 승인된 Stage 6 ownership 밖의 helper 5개를 추가했다. | Stage 6.1 helper ownership을 정식 승인 범위로 추가하고 기존 report draft는 rewrite하지 않는다. | `scripts/macos/framework-alias.mjs`, `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-contract.mjs`, `scripts/macos/notarization-evidence.mjs`, `scripts/macos/release-lifecycle.mjs`, `mydocs/plans/task_m011_6_impl.md` | governance diff에서 helper 5개가 Stage 6.1 소유 파일로 명시되어야 한다. Stage 6.2 report는 `67ec682`, `58c9d4e`, Stage 6.2 implementation commit을 구분한다. |
+| Context | checked-in regression matrix가 incomplete다. | missing-version, kind-only mismatch, hash-only mismatch, valid production AbortSignal recovery, exact app signing prefix, docs evidence-field validation을 모두 checked-in tests/docs로 추가한다. | `tests/package-macos.test.mjs`, `tests/package-macos-signing.test.mjs`, `tests/package-macos-notarization.test.mjs`, `tests/electron-contract.test.ts`, `docs/release-macos.md`, `docs/qa-checklist.md` | 각 테스트 이름과 증거를 Stage 6.2 report에 파일별로 기록한다. ignored temp driver만으로 통과 처리하지 않는다. |
+| Security | Apple trust tools가 bare `xcrun`과 `spctl`로 실행되어 inherited `PATH` hijack으로 Apple gates가 우회된다. | production runner는 `/usr/bin/xcrun`과 `/usr/sbin/spctl` 절대 경로만 사용한다. relevant environment/search path를 감사하고, fake earlier `PATH` entry가 실행되지 않는 regression을 추가한다. | `scripts/macos/notarization-command.mjs`, `scripts/release-macos.mjs`, `scripts/macos/release-support.mjs`, `tests/package-macos-notarization.test.mjs`, `tests/package-macos.test.mjs` | path-hijack regression이 fake `xcrun`/`spctl` 실행 0건, absolute command 호출, downstream gate 유지, secret redaction을 증명한다. |
+| Security | local cached accepted receipt만 신뢰하면 forged log로 status/log refresh를 우회할 수 있다. | accepted cache는 evidence로만 취급하고, release 진행 시 accepted status와 log를 항상 refresh한다. final PASS를 위한 필수 hardening이다. | `scripts/macos/notarization.mjs`, `scripts/macos/notarization-evidence.mjs`, `tests/package-macos-notarization.test.mjs`, `docs/release-macos.md`, `docs/qa-checklist.md` | forged accepted receipt regression은 submit 없이 `info`와 `log` refresh가 일어나고 warning/error receipt가 downstream을 차단함을 증명한다. |
+
+### Stage 6.1 helper ownership formalization
+
+`58c9d4e`의 helper split은 Stage 6.2에서 정식 소유 범위로 승인한다. 목적은 기존 public export와
+runtime behavior를 유지하면서 Stage 6 LOC, parsing, evidence, lifecycle 책임을 분리하는 것이다.
+
+| Helper | 공식 소유 목적 | 연결 동작 | 연결 테스트 |
+|---|---|---|---|
+| `scripts/macos/framework-alias.mjs` | Electron framework canonical alias 판정 | traversal-order-independent alias validation | `tests/package-macos-signing.test.mjs` |
+| `scripts/macos/notarization-command.mjs` | absolute Apple command path, timeout, AbortSignal, log/status parsing | `/usr/bin/xcrun`, `/usr/sbin/spctl`, accepted status/log refresh | `tests/package-macos-notarization.test.mjs`, `tests/package-macos.test.mjs` |
+| `scripts/macos/notarization-contract.mjs` | strict input/result/error contract | kind/hash fields, signal validation, sanitized failures | `tests/package-macos-notarization.test.mjs` |
+| `scripts/macos/notarization-evidence.mjs` | artifact-bound resume and receipt persistence | `artifactKind`, `artifactSha256`, accepted-before-log state save | `tests/package-macos-notarization.test.mjs`, `docs/qa-checklist.md` |
+| `scripts/macos/release-lifecycle.mjs` | candidate lifecycle and cleanup ownership | detach-before-remove, cleanup aggregation, preserved mount on detach failure | `tests/package-macos.test.mjs` |
+
+### release-version preflight ownership
+
+- Stage 6.2 approves a minimal `scripts/macos/release-version-preflight.mjs` file. It reads the root
+  `package.json`, requires exact `0.1.1`, prints no secret values, and performs no build, native
+  rebuild, bundling, signing, Notarization, Gatekeeper, candidate directory, or evidence mutation.
+- `package.json` signed release script must become preflight-first:
+
+```text
+node scripts/macos/release-version-preflight.mjs && npm run build && node scripts/release-macos.mjs
+```
+
+- `scripts/release-macos.mjs` keeps its internal exact-version check as defense in depth. The new
+  preflight only closes the actual npm entrypoint ordering gap.
+- `tests/electron-contract.test.ts` owns the package script contract. `tests/package-macos.test.mjs`
+  owns wrong-version and missing-version entrypoint regressions that prove zero build invocation,
+  zero downstream command invocation, zero candidate mutation, and zero evidence mutation.
+
+### 추가 checked-in regression requirements
+
+- `tests/package-macos-signing.test.mjs` must assert the exact app signing prefix on every mutating
+  `codesign` call: `/usr/bin/codesign`, `--force`, `--timestamp`, `--options`, `runtime`, `--sign`,
+  identity, target. Verification-only `--deep --strict` remains separate.
+- `tests/package-macos-notarization.test.mjs` must split resume mismatch tests into kind-only and
+  hash-only cases. Each case proves no submit, no staple, no downstream archive, and sanitized error.
+- `tests/package-macos-notarization.test.mjs` must add valid child-process AbortSignal recovery through
+  the production runner, not only a fake runner or invalid signal rejection.
+- `tests/package-macos-notarization.test.mjs` must add accepted-before-log persistence and two-invocation
+  log-failure retry coverage with exactly one total submit.
+- `tests/package-macos-notarization.test.mjs` must add forged accepted receipt coverage requiring fresh
+  accepted status/log retrieval before release continuation.
+- `tests/package-macos.test.mjs` must add PATH-hijack coverage for signed flow integration and absolute
+  Apple tool commands.
+- `tests/electron-contract.test.ts`, `docs/release-macos.md`, and `docs/qa-checklist.md` must reflect
+  preflight-first signed script order plus resume/receipt `artifactKind` and `artifactSha256` checks.
+
+### evidence와 docs wording correction
+
+- Stage 6 evidence wording must claim only validation that is checked in or separately recorded in
+  ignored evidence with exact command, fixture, and result. Temporary driver-only proof is not enough
+  unless it is named as separate, non-checked-in evidence and repeated after Stage 6.2.
+- QA checklist must parse both app and DMG `notarization-resume.json` and receipt JSON for matching
+  `submissionId`, `artifactKind`, `artifactSha256`, accepted status, and warning/error-free issues.
+- Release guide must state that accepted local receipts are not trusted alone. Maintainers refresh
+  accepted status and log through Apple before any staple, Gatekeeper, final archive, checksum, or
+  publication-adjacent step.
+- Optional no-follow evidence write hardening may be adopted if implementation chooses it. If adopted,
+  record `lstat`, canonical containment, restrictive permissions, atomic write, and no-follow behavior
+  in source, tests, evidence, and docs. If not adopted, do not treat it as an unplanned Stage 6.2 blocker.
+
+### Stage 6.2 validation matrix
+
+| Check class | Required commands or proof | PASS condition |
+|---|---|---|
+| targeted | exact new tests for version preflight, alias order, accepted-log retry, PATH hijack, kind/hash mismatch, AbortSignal, app signing prefix | all named tests pass and fail for the intended reason before fix |
+| focused | `npm test -- tests/package-macos.test.mjs tests/package-macos-signing.test.mjs tests/package-macos-notarization.test.mjs tests/electron-contract.test.ts` | full focused suite passes with checked-in regressions |
+| full | `npm test` plus `npm run typecheck` and `npm run lint` | all exit 0 or pre-existing environment limits are classified |
+| build | `npm run build` | exit 0 after preflight-first contract is installed |
+| package | `env -u PROMPTER_SIGNING_IDENTITY -u PROMPTER_NOTARY_PROFILE npm run package` and signed missing-input expected failure | unsigned succeeds; signed path fails before mutation when inputs are absent |
+| smoke | `npm run test:smoke` | Electron smoke passes before closure |
+| security | secret/private-key scan, renderer/IPC surface scan, no publication command scan | no product secret leakage, no plaintext key bridge, no release/tag/upload command |
+| path-hijack | fake earlier `PATH` entries for `xcrun` and `spctl` | fake tools are never executed; absolute Apple commands are used |
+| artifact | release/dist/build/smoke output and mount/process cleanup review | only task-owned generated outputs are removed; no tracked artifact remains |
+| protected | `GIT_MASTER=1 git diff --exit-code origin/master -- docs/plan docs/draft .omo/boulder.json` and `GIT_MASTER=1 git diff --check` | protected diff and whitespace check are clean |
+| fresh review | five lanes: QA, goal, code quality, context, security | all five lanes PASS before closure report commit |
+
+### Stage 6.2 산출물
+
+수정:
+
+- `package.json`
+- `scripts/macos/framework-alias.mjs`
+- `scripts/macos/signing.mjs`
+- `scripts/macos/notarization-command.mjs`
+- `scripts/macos/notarization-contract.mjs` if strict schema changes are needed
+- `scripts/macos/notarization-evidence.mjs`
+- `scripts/macos/notarization.mjs`
+- `scripts/macos/release-support.mjs` if runner environment handling changes are needed
+- `scripts/macos/release-lifecycle.mjs` if lifecycle evidence wording requires behavior support
+- `scripts/release-macos.mjs`
+- `tests/package-macos.test.mjs`
+- `tests/package-macos-signing.test.mjs`
+- `tests/package-macos-notarization.test.mjs`
+- `tests/electron-contract.test.ts`
+- `docs/release-macos.md`
+- `docs/qa-checklist.md`
+- `mydocs/working/task_m011_6_stage6.md` only after Stage 6.2 validation
+- `mydocs/report/task_m011_6_report.md` only after fresh five-lane PASS and closure approval
+- `mydocs/orders/20260908.md` remains `진행중` until closure approval
+
+신규:
+
+- `scripts/macos/release-version-preflight.mjs`
+
+Evidence:
+
+- `.omo/evidence/task-8-stage6-2-fresh-review-remediation.md` (ignored, sanitized)
+
+### Stage 6.2 커밋 경계
+
+이 addendum과 orders fresh-review remediation note만 먼저 고정한다.
+
+```text
+Task #6: Stage 6.2 재검토 교정 계획
+```
+
+제품, 테스트, 공식 문서 교정은 다음 implementation commit으로만 고정한다.
+
+```text
+Task #6 [Stage 6.2]: fresh review blocker 교정
+```
+
+Stage 6 report, final report, orders 완료 처리, closure report commit은 fresh five-lane review가 모두
+PASS하고 작업지시자가 별도 승인하기 전까지 차단한다. 기존 Stage 6 report draft와 final report draft는
+현재 uncommitted 상태로 보존하며 이 governance commit에 포함하지 않는다.
+
 ## UltraQA trigger 매핑
 
 | 실패 클래스 | 주입/관찰 방법 | 필수 fail-closed 결과 | Stage/Evidence |
@@ -658,6 +807,7 @@ tag/release/publication을 실행하지 않는다.
 | credential leakage | sentinel profile/password/key path를 fake runner 반환/오류에 삽입 | stdout/stderr/error/evidence snapshot 어디에도 sentinel 없음 | Stage 2/4/5, task-4/6/8 evidence |
 | forbidden publication | fake trace와 static scan에서 `gh release`, `git tag`, upload/publish 탐지 | 구현 이슈 실패 처리, 원격 ref/release 변경 0건 | Stage 3/5, task-5/8 evidence |
 | pre-PR review blockers | Electron framework layout, detach failure, exact version, artifact-bound resume, timeout/abort, DMG runtime signing, ownership variance fixture와 review 재실행 | blocker 7건 교정, Stage 6 report 작성, fresh review PASS 전 PR 0건 | Stage 6, task-8-stage6 evidence |
+| failed fresh review blockers | pre-build version entrypoint, traversal-order alias, accepted-log retry, absolute Apple tools, helper ownership, checked-in regression gaps, docs/evidence wording을 재현 | blocker 전건 교정, Stage 6.2 report 작성, five-lane PASS 전 closure 0건 | Stage 6.2, task-8-stage6-2 evidence |
 
 ## 검증
 
@@ -675,6 +825,8 @@ tag/release/publication을 실행하지 않는다.
   서명/Notarization, tag, GitHub release 성공을 주장하지 않는다.
 - pre-PR review blocker가 확인된 뒤에는 Stage 6 검증과 fresh review PASS 전까지 Stage 5 final
   closure와 PR publication을 완료로 취급하지 않는다.
+- failed fresh review blocker가 확인된 뒤에는 Stage 6.2 검증과 fresh five-lane PASS 전까지 Stage 6
+  closure report commit, orders 완료 처리, PR publication, Issue #7 진입을 완료로 취급하지 않는다.
 
 ## 커밋
 
@@ -683,6 +835,8 @@ tag/release/publication을 실행하지 않는다.
   - `Task #6: 구현 계획서 작성`
 - pre-PR review 실패 뒤 governance amendment와 orders 재개는 제품 교정 전에 별도 커밋으로 고정한다.
   - `Task #6: Stage 6 교정 계획과 오늘할일 재개`
+- failed fresh review 뒤 Stage 6.2 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
+  - `Task #6: Stage 6.2 재검토 교정 계획`
 - Stage 산출물과 `mydocs/working/task_m011_6_stage{N}.md`는 같은 Stage 커밋에 둔다.
 - Stage 1: `Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가`
 - Stage 2: `Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가`
@@ -690,9 +844,11 @@ tag/release/publication을 실행하지 않는다.
 - Stage 4: `Task #6 Stage 4: macOS 서명 회귀 테스트와 릴리스 운영 문서 추가`
 - Stage 5: `Task #6 Stage 5 + 최종 보고서: 서명 릴리스 파이프라인 검증 완료`
 - Stage 6 제품 교정: `Task #6 Stage 6: pre-PR blocker 교정`
+- Stage 6.1 후속 보강: `Task #6 [Stage 6.1]: Stage 6 교정 후속 보강`
+- Stage 6.2 제품 교정: `Task #6 [Stage 6.2]: fresh review blocker 교정`
 - Stage 6 검증 및 보고서: `Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료`
 - 구현계획서, Stage, 최종 보고서의 각각의 승인 전에는 해당 커밋/push/PR을 실행하지 않는다.
-- Stage 6 correction commit 뒤 fresh review PASS와 closure commit 전에는 `publish/task6` push와
+- Stage 6.2 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push와
   `master` 대상 PR 생성을 실행하지 않는다.
 
 ## 단계 의존성
@@ -707,6 +863,9 @@ tag/release/publication을 실행하지 않는다.
 - Stage 5는 Stage 4 focused test와 문서/secret/protected-path 검증 및 보고서 승인 후 시작한다.
 - Stage 6은 failed pre-PR review의 confirmed blocker 7건을 고친 뒤 Stage 6 report, final report
   갱신, fresh review PASS를 요구한다.
+- Stage 6.2는 failed fresh review의 blocking finding 전건을 고친 뒤 checked-in regression matrix,
+  corrected Stage 6 evidence wording, Stage 6 report 갱신, final report 갱신, fresh five-lane PASS를
+  요구한다.
 - 이슈 #7은 Stage 6 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
 
 ## 위험과 대응
@@ -728,6 +887,9 @@ tag/release/publication을 실행하지 않는다.
   문구는 이슈 #7 publication 뒤에만 갱신한다.
 - **pre-PR review blocker 재발**: Stage 6에서 blocker 7건을 exact file ownership과 focused tests로
   잠그고, fresh review PASS 전에는 PR publication과 Issue #7 진입을 차단한다.
+- **fresh review blocker 재발**: Stage 6.2에서 실제 npm entrypoint, traversal-order alias,
+  accepted-log retry, absolute Apple tool path, helper ownership, checked-in matrix, docs/evidence wording을
+  모두 소유 파일과 검증 lane에 연결하고, five-lane PASS 전에는 closure와 PR publication을 차단한다.
 
 ## 승인 요청 사항
 
@@ -746,6 +908,9 @@ tag/release/publication을 실행하지 않는다.
 - 승인 후 governance 문서 두 커밋을 먼저 만들고 Stage 1 제품 구현에 진입하는 순서
 - pre-PR review 실패 이후 Stage 6 교정 계획, exact ownership, required tests, validation, evidence,
   report, correction commit, closure commit 및 PR 차단 조건
+- failed fresh review 이후 Stage 6.2 교정 계획, Stage 6.1 helper ownership, release-version preflight,
+  checked-in regression matrix, docs/evidence wording correction, governance commit, implementation commit,
+  fresh five-lane PASS 전 closure 차단 조건
 
 이 구현계획서가 명시적으로 승인되기 전에는 governance 문서를 포함한 어떤 커밋도 만들지
 않고, 제품/소스/테스트/공식 문서를 수정하거나 live Apple/GitHub release 명령을 실행하지

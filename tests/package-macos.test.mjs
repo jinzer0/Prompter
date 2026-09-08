@@ -259,6 +259,7 @@ async function createCoordinatorFixture({
   reservationBarrier,
   shared,
   warningLog = false,
+  notaryLog,
 } = {}) {
   const root = shared?.root ?? (await mkdtemp(join(tmpdir(), "prompter-release-test-")))
   const sourceRoot = shared?.sourceRoot ?? join(root, "source")
@@ -382,7 +383,9 @@ async function createCoordinatorFixture({
       }
       if (arguments_[1] === "log")
         return {
-          stdout: warningLog ? '{"issues":[{"severity":"warning"}]}' : '{"issues":[]}',
+          stdout: JSON.stringify(
+            notaryLog ?? (warningLog ? { issues: [{ severity: "warning" }] } : { issues: [] }),
+          ),
           stderr: "",
         }
       return { stdout: "", stderr: "" }
@@ -1019,6 +1022,25 @@ test("blocks warning-bearing app receipts without leaking synthetic secrets", as
   assertNoLaterReleaseStages(fixture.calls, "app-log")
   assert.equal(fixture.calls.includes("app-staple"), false)
   assert.equal(fixture.calls.includes("dmg-create"), false)
+})
+
+test("blocks an unknown live severity before downstream coordinator mutation", async () => {
+  const fixture = await createCoordinatorFixture({
+    notaryLog: { issues: [{ severity: "unexpected" }] },
+  })
+
+  await assert.rejects(fixture.run(), assertSanitizedReleaseFailure)
+
+  assertNoLaterReleaseStages(fixture.calls, "app-log")
+  for (const stage of ["app-staple", "gatekeeper-2", "final-zip", "dmg-create", "checksum"]) {
+    assert.equal(fixture.calls.includes(stage), false)
+  }
+  assert.equal(
+    fixture.rawCalls.some(
+      ({ command, arguments_ }) => command === "/usr/bin/xcrun" && arguments_[0] === "stapler",
+    ),
+    false,
+  )
 })
 
 test("rejects unsupported macOS architectures", () => {

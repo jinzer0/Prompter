@@ -60,13 +60,7 @@ export function createFrameworkAliasPolicy(rootPath) {
       const frameworkName = basename(framework.candidateFramework, ".framework")
       const rootBinary = resolve(framework.candidateFramework, frameworkName)
       const versionBinary = resolve(framework.versionPath, frameworkName)
-      const candidateSegments = relative(framework.candidateFramework, candidatePath).split(sep)
-      const conventionalCandidate =
-        candidatePath === rootBinary ||
-        (candidateSegments.length === 3 &&
-          candidateSegments[0] === "Versions" &&
-          candidateSegments[2] === frameworkName)
-      return conventionalCandidate && targetPath === versionBinary
+      return candidatePath === rootBinary && targetPath === versionBinary
     },
     async directory(candidatePath, targetPath) {
       const framework = await sameFramework(candidatePath, targetPath)

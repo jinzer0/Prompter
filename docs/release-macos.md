@@ -102,7 +102,7 @@ The temporary app ZIP is never stapled. The raw `.app` bundle is never uploaded 
 and the DMG each require an `Accepted` status and a reviewed notary log with no warnings and no
 errors before the next release step can run.
 
-Each submission gate is strict: `Accepted`, no warnings and no errors.
+Each submission gate is strict: `Accepted` plus an empty issues array or only exact lowercase `info` issue records.
 
 Evidence is stored under ignored local paths beneath `.omo/evidence/release-macos/v0.1.1/app` and
 `.omo/evidence/release-macos/v0.1.1/dmg`. Each resume and final receipt binds `submissionId`,

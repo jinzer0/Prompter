@@ -16,6 +16,21 @@ import {
 
 const resumeFileName = "notarization-resume.json"
 
+export function hasSafeNotarizationIssues(value) {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (issue) =>
+        issue !== null &&
+        typeof issue === "object" &&
+        !Array.isArray(issue) &&
+        Reflect.ownKeys(issue).length === 1 &&
+        Object.hasOwn(issue, "severity") &&
+        issue.severity === "info",
+    )
+  )
+}
+
 function json(output, label) {
   if (typeof output !== "string" || output.trim() === "") {
     failNotarization(`Invalid ${label}`)
@@ -190,17 +205,7 @@ export async function validateFinalNotarizationEvidence(options) {
       artifactKind: receipt.artifactKind,
       artifactSha256: receipt.artifactSha256,
     }) ||
-    !receipt.issues.every(
-      (issue) =>
-        issue !== null &&
-        typeof issue === "object" &&
-        !Array.isArray(issue) &&
-        Reflect.ownKeys(issue).length === 1 &&
-        Object.hasOwn(issue, "severity") &&
-        typeof issue.severity === "string" &&
-        issue.severity !== "warning" &&
-        issue.severity !== "error",
-    )
+    !hasSafeNotarizationIssues(receipt.issues)
   ) {
     failNotarization("Invalid final notarization evidence")
   }

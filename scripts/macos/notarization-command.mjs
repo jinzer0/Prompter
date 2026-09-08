@@ -8,6 +8,7 @@ import {
   staplingArtifact,
   submissionArtifactKind,
 } from "./notarization-contract.mjs"
+import { hasSafeNotarizationIssues } from "./notarization-evidence.mjs"
 
 const appleCommandTimeoutMs = 10 * 60 * 1000
 const retryDelaysMs = [0, 100, 250]
@@ -32,10 +33,10 @@ function json(output, label) {
 }
 
 function api(payload) {
-  if (
-    (typeof payload.statusCode === "number" && payload.statusCode >= 400) ||
-    Object.hasOwn(payload, "error")
-  ) {
+  if (typeof payload.statusCode === "number" && payload.statusCode >= 400) {
+    failNotarization("Notarization service rejected the request")
+  }
+  if (Object.hasOwn(payload, "error")) {
     failNotarization("Notarization service rejected the request")
   }
 }
@@ -68,14 +69,8 @@ function timeoutId(error) {
 
 function reviewedLog(payload, submissionId) {
   api(payload)
-  if (
-    !Array.isArray(payload.issues) ||
-    !payload.issues.every((issue) => issue && typeof issue.severity === "string")
-  ) {
+  if (!hasSafeNotarizationIssues(payload.issues)) {
     failNotarization("Invalid notarization log")
-  }
-  if (payload.issues.some((issue) => issue.severity === "error" || issue.severity === "warning")) {
-    failNotarization("Notarization log blocks publication")
   }
   return {
     submissionId,

@@ -46,6 +46,8 @@ async function fixture({
   unexpectedFrameworkBinaryAlias,
   mixedFrameworkBinaryAlias = false,
   mixedFrameworkDirectoryAlias,
+  versionedFrameworkBinaryAlias = false,
+  currentVersionBinaryAlias = false,
 } = {}) {
   const root = await mkdtemp(join(tmpdir(), "prompter-signing-test-"))
   temporaryDirectories.push(root)
@@ -123,6 +125,14 @@ async function fixture({
     }
     if (unexpectedFrameworkDirectoryAlias !== undefined) {
       await symlink("Versions/A", join(frameworkRoot, unexpectedFrameworkDirectoryAlias))
+    }
+    if (versionedFrameworkBinaryAlias) {
+      const otherVersionRoot = join(frameworkRoot, "Versions", "B")
+      await mkdir(otherVersionRoot, { recursive: true })
+      await symlink("../A/Kit", join(otherVersionRoot, "Kit"))
+    }
+    if (currentVersionBinaryAlias) {
+      await symlink("Kit", join(versionRoot, "Kit-alias"))
     }
   }
   if (duplicate)
@@ -316,6 +326,29 @@ test("rejects root framework binary aliases bound to a version other than Curren
   await assert.rejects(
     discoverSignableCode({ appPath: paths.appPath, runFile: runner() }),
     /Signable .* alias is not allowed/,
+  )
+})
+
+test.each([
+  ["Versions/B/Kit", { versionedFrameworkBinaryAlias: true }],
+  ["Versions/A/Kit-alias", { currentVersionBinaryAlias: true }],
+])("rejects the arbitrary %s binary alias before signing mutation", async (_alias, options) => {
+  const paths = await fixture({ frameworkAliases: true, ...options })
+  const calls = []
+
+  await assert.rejects(
+    signAppBundle({
+      appPath: paths.appPath,
+      identity,
+      entitlementsPath: paths.entitlements,
+      runFile: runner({ calls }),
+    }),
+    /Signable binary alias is not allowed/,
+  )
+
+  assert.equal(
+    calls.some(({ command }) => command === "/usr/bin/codesign"),
+    false,
   )
 })
 

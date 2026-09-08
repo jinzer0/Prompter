@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { promisify } from "node:util"
@@ -23,6 +23,19 @@ const id = "123e4567-e89b-42d3-a456-426614174000"
 const sentinel = "SYNTHETIC_SECRET_SENTINEL"
 const temporaryDirectories = []
 const executeFile = promisify(execFile)
+const unsafeIssueSets = [
+  ["empty severity", [{ severity: "" }]],
+  ["uppercase info severity", [{ severity: "INFO" }]],
+  ["warning severity", [{ severity: "Warning" }]],
+  ["error severity", [{ severity: "ERROR" }]],
+  ["critical severity", [{ severity: "critical" }]],
+  ["arbitrary severity", [{ severity: "unexpected" }]],
+  ["non-string severity", [{ severity: 1 }]],
+  ["missing severity", [{}]],
+  ["null issue", [null]],
+  ["array issue", [[]]],
+  ["extra issue field", [{ severity: "info", extra: "unexpected" }]],
+]
 
 afterEach(async () =>
   Promise.all(
@@ -120,7 +133,7 @@ test("uses exact option allowlists and rejects raw app submission or ZIP staplin
   assert.equal(calls.length, 0)
 })
 
-test("requires valid profile JSON, Accepted status, and a warning-free reviewed receipt", async () => {
+test("requires valid profile JSON and an Accepted reviewed receipt", async () => {
   const root = await evidence()
   const artifactPath = await artifact(root, "Prompter.zip")
   for (const response of ["", "[]", '{"statusCode":401}', `{"error":"${sentinel}"}`]) {
@@ -170,6 +183,41 @@ test("requires valid profile JSON, Accepted status, and a warning-free reviewed 
     false,
   )
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+})
+
+test.each([
+  ["empty", []],
+  ["lowercase info", [{ severity: "info" }]],
+])("accepts %s live notarization issues", async (_label, issues) => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const { runFile } = notaryRunner({ log: { issues } })
+
+  await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+
+  assert.deepEqual(
+    JSON.parse(await readFile(join(root, `notary-${id}.json`), "utf8")).issues,
+    issues,
+  )
+})
+
+test.each(
+  unsafeIssueSets,
+)("rejects %s from a live notarization log before accepted evidence persists", async (_label, issues) => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const { calls, runFile } = notaryRunner({ log: { issues } })
+
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+    /Invalid notarization log/,
+  )
+
+  await assert.rejects(access(join(root, `notary-${id}.json`)))
+  assert.equal(
+    calls.some(({ arguments_ }) => arguments_[1] === "stapler"),
+    false,
+  )
 })
 
 test("fails closed for malformed, unauthorized, Invalid, and Rejected submission or resume states", async () => {
@@ -326,7 +374,7 @@ test("refreshes Apple status and log for a forged accepted receipt before blocki
   })
   await assert.rejects(
     submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
-    /Notarization log blocks publication/,
+    /Invalid notarization log/,
   )
   assert.equal(
     calls.some(({ arguments_ }) => arguments_[1] === "submit"),
@@ -535,14 +583,16 @@ test("uses absolute Apple trust command paths", async () => {
 })
 
 test.each([
-  "app",
-  "dmg",
-])("accepts complete warning-free final %s notarization evidence", async (artifactKind) => {
+  ["empty", []],
+  ["lowercase info", [{ severity: "info" }]],
+])("accepts %s final notarization evidence", async (_label, issues) => {
   const root = await evidence()
-  const { resume } = await writeFinalEvidence(root, artifactKind)
+  const { receipt, resume } = await writeFinalEvidence(root, "app")
+  receipt.issues = issues
+  await writeFile(join(root, resume.logPath), JSON.stringify(receipt))
 
   assert.deepEqual(
-    await validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind }),
+    await validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind: "app" }),
     resume,
   )
 })
@@ -595,6 +645,10 @@ test.each([
       receipt.issues = [{ severity: "error" }]
     },
   ],
+  ...unsafeIssueSets.map(([label, issues]) => [
+    label,
+    (_resume, receipt) => (receipt.issues = issues),
+  ]),
 ])("rejects final notarization evidence with %s", async (_label, mutate) => {
   const root = await evidence()
   const { receipt, resume } = await writeFinalEvidence(root, "app")

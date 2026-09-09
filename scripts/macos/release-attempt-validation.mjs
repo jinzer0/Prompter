@@ -18,10 +18,11 @@ function fail() {
   throw new Error("Invalid retained notarization attempt")
 }
 
-function invalidAttemptError(attempt) {
+function invalidAttemptError(attempt, dependentArtifactKind) {
   const error = new Error("Invalid retained notarization attempt")
   error.artifactKind = attempt.artifactKind
   error.discardEvidence = true
+  if (dependentArtifactKind !== undefined) error.dependentArtifactKind = dependentArtifactKind
   return error
 }
 
@@ -151,10 +152,10 @@ export async function inspectReleaseAttempts(attempts) {
       savedEvidenceStatus(attempts.dmg),
     ])
     if (app !== undefined && dmg !== undefined) {
-      if (app.saved.status !== "Accepted") fail()
       return Object.freeze({ ...dmg, appAttempt: app.attempt })
     }
     if (app !== undefined && dmgEvidenceStatus !== undefined) fail()
+    if (dmg !== undefined && app === undefined) throw invalidAttemptError(dmg.attempt, "app")
     if (dmg !== undefined && appEvidenceStatus !== "Accepted") fail()
     if (app === undefined && dmg === undefined && (appEvidenceStatus || dmgEvidenceStatus)) fail()
     if (app === undefined && appEvidenceStatus === "pending") fail()
@@ -193,14 +194,17 @@ export async function cleanupReleaseAttempts(attempts, error, attemptHandlingSta
     let discardEvidence = false
     if (error !== undefined) {
       const affectedAttempt = error?.artifactKind === attempt.artifactKind
+      const dependentAttempt = error?.dependentArtifactKind === attempt.artifactKind
+      const invalidatedAttempt = affectedAttempt || dependentAttempt
       const terminalError = error?.blocksPublication || terminalAttemptErrors.has(error?.message)
-      discardEvidence = affectedAttempt && (error?.discardEvidence === true || terminalError)
+      discardEvidence = invalidatedAttempt && (error?.discardEvidence === true || terminalError)
       try {
         const retained = await readBoundAttempt(attempt)
         retain =
           retained !== undefined &&
-          (!affectedAttempt ||
+          (!invalidatedAttempt ||
             (!terminalError &&
+              error?.discardEvidence !== true &&
               (retained.saved.status === "Accepted" ||
                 retained.saved.status === "accepted" ||
                 resumableErrors.has(error.message))))

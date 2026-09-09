@@ -40,7 +40,8 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.18 / `dc108f9` | Stage 6 cumulative report, final report | `7fdd85f` Context가 확인한 stale publication lifecycle wording 부분 교정 | governance/reporting only |
 | 6.19 / `a96eabb` | Stage 6 cumulative report, final report | Stage 6.18에 남은 future tense를 completed-state wording으로 교정 | governance/reporting only |
 | 6.20 / `169eeef` | Stage 6 cumulative report, final report | Stage 6.14–6.17 publication history의 active future tense를 completed-state wording으로 교정 | governance/reporting only |
-| 6.21 / completed remediation lineage | release-attempt validation/preparation/coordinator, DMG/cached/signing recovery tests, direct DMG app-refresh regression, Vitest config, reports | `169eeef` Context discussion `3971543713` DMG-resume app-refresh bypass 교정 | signed-release offline contracts |
+| 6.21 / `800222a` | release-attempt validation/preparation/coordinator, DMG/cached/signing recovery tests, direct DMG app-refresh regression, Vitest config, reports | `169eeef` Context discussion `3971543713` DMG-resume app-refresh bypass 교정 | signed-release offline contracts |
+| 6.22 / completed remediation lineage | release-attempt validation/preparation, direct DMG app-refresh regression, reports | `800222a` discussions `3971745639`/`3971745648` dependent DMG invalidation과 orphan recovery 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -112,6 +113,14 @@ fresh review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 �
 [3971543713](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971543713)이 확인한 DMG-resume
 app-refresh bypass는 현재 Stage 6.21 remediation 계보에서 교정됐다. 이 closure는 자신의 아직 알 수 없는
 exact SHA를 재귀적으로 기록하지 않는다.
+Stage 6.21 source/test/config/report publication head도 `800222a95a49b65ffae28f02ad73601968a0fa0b`이며
+정상 push, PR #8 immutable link 교정, temp detached exact-head review worktree 생성까지 완료됐다. 그
+head review는 Goal, Code Quality, Security, Context REJECT와 QA timeout을 기록했고, QA는 timeout 전에
+independent full Vitest 959/959를 통과했다. discussions
+[3971745639](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745639)와
+[3971745648](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745648)이 확인한 dependent DMG
+invalidation과 orphan recovery blocker는 현재 Stage 6.22 remediation 계보에서 교정됐다. 이 closure는
+자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다.
 
 ## 변경 전·후 정량 비교
 
@@ -119,7 +128,7 @@ exact SHA를 재귀적으로 기록하지 않는다.
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
 | focused release regression | Stage 1 40 tests | Stage 6.14 cached-Accepted direct rerun 17/17 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.21 146 files, 959/959 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.22 146 files, 961/961 tests passed |
 | ARM64 Mach-O integrity | asset 이름만 arm64 | 모든 canonical Mach-O에 exact `arm64` slice 강제; universal x86_64+arm64 허용 |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
 | installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
@@ -195,7 +204,11 @@ exact SHA를 재귀적으로 기록하지 않는다.
 | `169eeef` fresh review lanes | REJECT RECORDED — Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context discussion [3971543713](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971543713)은 retained DMG resume가 retained app의 fresh status/log를 확인하지 않고 DMG work로 진행하는 blocker를 확인했다. |
 | Stage 6.21 remediation | OK — inspected DMG resume가 retained app attempt를 전달하고 DMG acceptance 전에 app status/log를 refresh한다. fresh app warning/error/Rejected는 DMG info, staple, attach, checksum 전에 차단되고, Accepted는 app info/log 뒤 DMG info 순서를 지키며 app/DMG resubmission 없이 완료된다. |
 | Stage 6.21 verification | OK — direct DMG app-refresh regression, adjusted DMG/cached/signing recovery tests와 suite registration을 포함해 full Vitest 146 files/959 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.21에서 재실행했다고 주장하지 않는다. LSP는 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
-| Stage 6.21 review gate | PENDING FOR NEW EXACT HEAD — implementation/test/config/report publication 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
+| Stage 6.21 publication gate | FULFILLED AT `800222a` — implementation/test/config/report commit을 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
+| `800222a` fresh review lanes | REJECT/TIMEOUT RECORDED — Goal, Code Quality, Security, Context REJECT와 QA timeout을 기록했다. QA는 timeout 전에 independent full Vitest 146 files/959 tests를 통과했다. Context discussions [3971745639](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745639)와 [3971745648](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745648)은 terminal app refresh의 dependent DMG invalidation 누락과 orphan retained DMG recovery 누락을 확인했다. |
+| Stage 6.22 remediation | OK — terminal app refresh는 affected app과 dependent DMG evidence를 함께 폐기한다. orphan retained DMG는 typed discard 뒤 third run에서 app/DMG를 fresh rebuild한다. transient In Progress는 두 attempt를 보존하고 Accepted는 resubmission 없이 resume한다. |
+| Stage 6.22 verification | OK — expanded direct DMG app-refresh regression을 포함해 full Vitest 146 files/961 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.22에서 재실행했다고 주장하지 않는다. LSP는 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
+| Stage 6.22 review gate | PENDING FOR NEW EXACT HEAD — source/test/report publication 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 당시 pending이었다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -247,6 +260,9 @@ exact SHA를 재귀적으로 기록하지 않는다.
 - Stage 6.21: `169eeef` Goal/QA/Code Quality/Security approval과 Context discussion `3971543713`을
   기록하고, resumed DMG의 retained app status/log refresh, warning/error/Rejected blocking, Accepted
   no-resubmission happy path, direct regression, full 959/959와 LSP refusal을 추가했다.
+- Stage 6.22: `800222a` Goal/Code Quality/Security/Context rejection과 QA timeout, discussions
+  `3971745639`/`3971745648`, dependent DMG invalidation, orphan typed discard/third-run rebuild,
+  In Progress dual retention, Accepted no-resubmission, full 961/961와 LSP refusal을 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -279,7 +295,12 @@ exact SHA를 재귀적으로 기록하지 않는다.
   QA, Code Quality, Security APPROVE와 Context REJECT를 기록했으며 discussion `3971543713`의 DMG-resume
   app-refresh bypass만 blocker였다.
 - Stage 6.21 DMG-resume app-status refresh remediation과 direct regression은 완료됐다.
-- Stage 6.21 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.21 remediation은 `800222a95a49b65ffae28f02ad73601968a0fa0b`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal, Code
+  Quality, Security, Context REJECT와 QA timeout을 기록했고 discussions `3971745639`/`3971745648`만
+  product blocker였다.
+- Stage 6.22 dependent DMG invalidation과 orphan recovery remediation은 완료됐다.
+- Stage 6.22 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 작업지시자 승인 기록 및 요청
@@ -295,5 +316,9 @@ exact SHA를 재귀적으로 기록하지 않는다.
 - 작업지시자의 최신 명시 지시에 따라 `169eeef` Context discussion `3971543713`의 DMG-resume
   app-refresh bypass는 Stage 6.21 implementation/test/config와 두 report에서 교정됐다. 이 closure는
   자신의 exact SHA를 재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
-- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.21 exact-head review, PR merge,
+- 작업지시자의 최신 명시 지시에 따라 `800222a` discussions `3971745639`/`3971745648`의 dependent
+  DMG invalidation과 orphan recovery blocker는 Stage 6.22 source/test와 두 report에서 교정됐다. 이
+  closure는 자신의 exact SHA를 재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음
+  gate다.
+- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.22 exact-head review, PR merge,
   `origin/master` containment verification은 pending이고 Todo 8은 완료로 주장하지 않는다.

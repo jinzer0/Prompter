@@ -110,6 +110,24 @@ async function acceptAttempt(attempt, state) {
   }
 }
 
+function invalidDmgAttemptError() {
+  const error = new Error("Invalid retained notarization attempt")
+  error.artifactKind = "dmg"
+  error.discardEvidence = true
+  error.dependentArtifactKind = "app"
+  return error
+}
+
+async function refreshAppAttemptForDmg(appAttempt, state) {
+  if (appAttempt === undefined) throw invalidDmgAttemptError()
+  try {
+    await acceptAttempt(appAttempt, state)
+  } catch (error) {
+    if (error instanceof Error) error.dependentArtifactKind = "dmg"
+    throw error
+  }
+}
+
 export async function prepareReleaseApp({ attempt, release, resumed, state }) {
   state.appStageDirectory = await mkdtemp(join(tmpdir(), "prompter-release-app-"))
   const appPath = join(state.appStageDirectory, "Prompter.app")
@@ -197,7 +215,7 @@ export async function prepareReleaseDmg({
     await verifyDmgSignature({ dmgPath: artifactPath, runFile: state.run })
     await verifyPreparedAttempt(attempt, artifactPath)
   }
-  if (resumed) await acceptAttempt(appAttempt, state)
+  if (resumed) await refreshAppAttemptForDmg(appAttempt, state)
   await acceptAttempt(attempt, state)
   if (resumed) {
     await verifyDmgSignature({

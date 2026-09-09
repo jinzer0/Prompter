@@ -19,6 +19,7 @@ export async function createCoordinatorFixture({
   pendingAppStatus,
   pendingDmgStatus,
   reservationBarrier,
+  appSubmissionBarrier,
   shared,
   warningLog = false,
   notaryLog,
@@ -122,6 +123,7 @@ export async function createCoordinatorFixture({
       error.stdout = JSON.stringify({ id: appSubmissionId })
       throw error
     }
+    if (stage === "app-submit") await appSubmissionBarrier?.wait()
     if (stage === "dmg-submit" && failure === "dmg-timeout") {
       const error = new Error(syntheticSecret)
       error.code = "ETIMEDOUT"

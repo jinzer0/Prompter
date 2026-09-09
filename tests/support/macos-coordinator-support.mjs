@@ -158,3 +158,22 @@ export function reservationBarrier() {
     },
   }
 }
+
+export function submissionBarrier() {
+  let markEntered
+  let release
+  const entered = new Promise((resolve) => {
+    markEntered = resolve
+  })
+  const ready = new Promise((resolve) => {
+    release = resolve
+  })
+  return {
+    entered,
+    release,
+    async wait() {
+      markEntered()
+      await ready
+    },
+  }
+}

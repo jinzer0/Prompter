@@ -83,6 +83,17 @@ export async function validateAttemptEvidenceDirectory(attempt) {
   return evidenceCanonical
 }
 
+export async function validateReleaseAttemptDirectories(attempts) {
+  try {
+    await Promise.all([
+      validateAttemptEvidenceDirectory(attempts.app),
+      validateAttemptEvidenceDirectory(attempts.dmg),
+    ])
+  } catch {
+    fail()
+  }
+}
+
 async function readBoundAttempt(attempt) {
   const artifactIdentity = await identifyRetainedAttempt(attempt)
   if (artifactIdentity === undefined) return undefined
@@ -157,6 +168,7 @@ export async function removeAttempt(attempt) {
 }
 
 export async function cleanupReleaseAttempts(attempts, error, attemptHandlingStarted) {
+  if (!attemptHandlingStarted) return
   for (const attempt of [attempts.app, attempts.dmg]) {
     let retain = false
     if (error !== undefined) {
@@ -164,9 +176,7 @@ export async function cleanupReleaseAttempts(attempts, error, attemptHandlingSta
         const retained = await readBoundAttempt(attempt)
         retain =
           retained !== undefined &&
-          (retained.saved.status === "Accepted" ||
-            !attemptHandlingStarted ||
-            resumableErrors.has(error?.message))
+          (retained.saved.status === "Accepted" || resumableErrors.has(error?.message))
       } catch {
         retain = false
       }

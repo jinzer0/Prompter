@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { access, stat } from "node:fs/promises"
+import { access, readFile, stat } from "node:fs/promises"
 
 import { afterEach, test } from "vitest"
 
@@ -7,8 +7,10 @@ import { createCoordinatorFixture } from "./support/macos-coordinator-fixtures.m
 import {
   assertNoLaterReleaseStages,
   assertSanitizedReleaseFailure,
+  notarizationAttempt,
   releaseStages,
   reservationBarrier,
+  submissionBarrier,
 } from "./support/macos-coordinator-support.mjs"
 import { createTemporaryDirectoryTracker } from "./support/macos-package-fixtures.mjs"
 
@@ -132,6 +134,33 @@ test("atomically reserves a candidate before loser assembly, Apple work, evidenc
     ),
     false,
   )
+})
+
+test("keeps a winner's in-progress attempt untouched by a concurrent pre-ownership loser", async () => {
+  const barrier = submissionBarrier()
+  const winner = await fixture({ appSubmissionBarrier: barrier })
+  const winnerAttempt = notarizationAttempt(winner, "app")
+  const winnerRun = winner.run()
+
+  await barrier.entered
+  const attemptContents = await readFile(winnerAttempt.artifactPath, "utf8")
+  const loser = await fixture({ shared: winner.shared })
+  await assert.rejects(loser.run(), assertSanitizedReleaseFailure)
+
+  assert.equal(await readFile(winnerAttempt.artifactPath, "utf8"), attemptContents)
+  assert.equal(loser.observedTempRoots.size, 0)
+  assertNoLaterReleaseStages(loser.calls)
+  assert.equal(
+    loser.rawCalls.some(
+      ({ command, arguments_ }) =>
+        command === "/usr/bin/xcrun" && ["submit", "info", "log"].includes(arguments_[1]),
+    ),
+    false,
+  )
+
+  barrier.release()
+  await winnerRun
+  await assert.rejects(access(winnerAttempt.directory))
 })
 
 test("completes every non-mutating preflight before reserving the candidate directory", async () => {

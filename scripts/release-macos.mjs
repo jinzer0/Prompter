@@ -11,6 +11,7 @@ import {
   prepareReleaseApp,
   prepareReleaseDmg,
 } from "./macos/release-attempt.mjs"
+import { validateReleaseAttemptDirectories } from "./macos/release-attempt-validation.mjs"
 import {
   cleanupRelease,
   createReleaseState,
@@ -87,9 +88,11 @@ export async function runMacOSRelease(options) {
   const { state, zipPath, dmgPath, checksumPath } = createReleaseState(release, run, version)
   try {
     await validateReleaseRoot(state)
-    const resumed = await inspectReleaseAttempts(state.attempts)
+    await validateReleaseAttemptDirectories(state.attempts)
     await preflight(release, run, state)
     await prepareReleaseCandidate(state)
+    state.attemptHandlingStarted = true
+    const resumed = await inspectReleaseAttempts(state.attempts)
     const resumedDmg = resumed?.attempt.artifactKind === "dmg"
     let finalZip
     let appPath

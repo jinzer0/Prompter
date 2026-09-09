@@ -149,6 +149,8 @@ export function identityListing(entries = [signingIdentity], count = entries.len
 }
 
 export function createSigningRunner({
+  architectureOutputs = new Map(),
+  architectureOutputsAfterSigning = new Map(),
   listing = identityListing(),
   calls = [],
   unsignedAfterSigning = false,
@@ -159,13 +161,13 @@ export function createSigningRunner({
 } = {}) {
   return async (command, arguments_) => {
     calls.push({ command, arguments_ })
+    const signed = calls.some(
+      ({ command: entry, arguments_: args }) =>
+        entry === "/usr/bin/codesign" && args[0] === "--force",
+    )
     if (command === "/usr/bin/security") return { stdout: listing }
     if (command === "/usr/bin/plutil") return { stdout: "" }
     if (command === "/usr/bin/file") {
-      const signed = calls.some(
-        ({ command: entry, arguments_: args }) =>
-          entry === "/usr/bin/codesign" && args[0] === "--force",
-      )
       if (signed && machOAfterSigningPaths.includes(arguments_[1])) {
         return { stdout: "Mach-O 64-bit executable" }
       }
@@ -177,6 +179,10 @@ export function createSigningRunner({
       }
       if (textPaths.includes(arguments_[1])) return { stdout: "JavaScript source, ASCII text" }
       return { stdout: unsignedAfterSigning && signed ? "text" : "Mach-O 64-bit executable" }
+    }
+    if (command === "/usr/bin/lipo") {
+      const outputs = signed ? architectureOutputsAfterSigning : architectureOutputs
+      return { stdout: outputs.get(arguments_[1]) ?? "arm64" }
     }
     return { stdout: "" }
   }

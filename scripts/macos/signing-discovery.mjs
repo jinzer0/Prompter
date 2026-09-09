@@ -8,6 +8,7 @@ import {
 } from "./framework-alias.mjs"
 
 const fileCommand = "/usr/bin/file"
+const lipoCommand = "/usr/bin/lipo"
 const machOMagic = new Set([
   "bebafeca",
   "bfbafeca",
@@ -148,6 +149,12 @@ export async function discoverSignableCode({ appPath, runFile }) {
       throw new SigningInputError("Signable binary alias is not allowed")
     }
     if (visited.has(targetPath)) return
+    const architectures = (await runFile(lipoCommand, ["-archs", targetPath], {})).stdout.split(
+      /\s+/u,
+    )
+    if (!architectures.includes("arm64")) {
+      throw new SigningInputError("Mach-O payload does not contain an arm64 slice")
+    }
     visited.add(targetPath)
     const kind = rawKind(targetPath, metadata.mode, frameworkPath, description)
     targets.set(targetPath, {

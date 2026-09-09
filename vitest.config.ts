@@ -12,6 +12,7 @@ export default defineConfig({
       "tests/package-macos-coordinator-cached-accepted.test.mjs",
       "tests/package-macos-signing-flow.test.mjs",
       "tests/package-macos-signing-discovery.test.mjs",
+      "tests/package-macos-signing-architecture.test.mjs",
       "tests/package-macos-notarization-submission.test.mjs",
       "tests/package-macos-notarization-log-review.test.mjs",
       "tests/package-macos-notarization-timeout.test.mjs",

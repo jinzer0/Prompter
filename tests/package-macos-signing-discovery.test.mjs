@@ -111,17 +111,14 @@ test("discovers the installed Electron 43 framework with only a read-only file r
     appPath,
     runFile: async (command, arguments_) => {
       calls.push({ command, arguments_ })
-      assert.equal(command, "/usr/bin/file")
-      assert.deepEqual(arguments_.slice(0, 1), ["-b"])
-      return { stdout: "Mach-O 64-bit executable" }
+      assert.equal(["/usr/bin/file", "/usr/bin/lipo"].includes(command), true)
+      assert.deepEqual(arguments_.slice(0, 1), command === "/usr/bin/file" ? ["-b"] : ["-archs"])
+      return { stdout: command === "/usr/bin/file" ? "Mach-O 64-bit executable" : "arm64" }
     },
   })
   assert.equal(targets.length, 23)
-  assert.equal(calls.length, 15)
-  assert.equal(
-    calls.every(({ command }) => command === "/usr/bin/file"),
-    true,
-  )
+  assert.equal(calls.length, 30)
+  assert.equal(calls.filter(({ command }) => command === "/usr/bin/file").length, 15)
 })
 
 test("accepts a contained executable npm-bin alias when its canonical target is text", async () => {

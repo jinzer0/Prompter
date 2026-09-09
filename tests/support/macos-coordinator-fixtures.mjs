@@ -133,8 +133,11 @@ export async function createCoordinatorFixture({
     if (command === "/usr/bin/xcode-select")
       return { stdout: "/Applications/Xcode.app/Contents/Developer", stderr: "" }
     if (command === "/usr/bin/xcodebuild") return { stdout: "Xcode 16", stderr: "" }
-    if (["/usr/bin/git", "/usr/bin/security", "/usr/bin/file"].includes(command))
-      return { stdout: command === "/usr/bin/file" ? "Mach-O" : "", stderr: "" }
+    if (["/usr/bin/git", "/usr/bin/security", "/usr/bin/file", "/usr/bin/lipo"].includes(command))
+      return {
+        stdout: command === "/usr/bin/file" ? "Mach-O" : command === "/usr/bin/lipo" ? "arm64" : "",
+        stderr: "",
+      }
     if (command === "/usr/bin/xcrun")
       return xcrunResult(arguments_, pendingAppStatus, pendingDmgStatus, warningLog, notaryLog)
     if (command === "/usr/bin/ditto" && arguments_[0] === "-c")

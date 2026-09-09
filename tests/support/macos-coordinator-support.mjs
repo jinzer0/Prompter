@@ -15,7 +15,7 @@ export function commandStage(command, arguments_) {
   if (command === "/usr/bin/security" && arguments_[0] === "show-keychain-info") return "keychain"
   if (command === "/usr/bin/security") return "identity"
   if (command === "/usr/bin/plutil") return "entitlements"
-  if (command === "/usr/bin/file") return "inspect-binary"
+  if (command === "/usr/bin/file" || command === "/usr/bin/lipo") return "inspect-binary"
   if (command === "/usr/bin/xcrun" && arguments_[1] === "history") return "profile"
   if (command === "/usr/bin/xcrun" && arguments_[1] === "submit")
     return arguments_[2].endsWith(".dmg") ? "dmg-submit" : "app-submit"

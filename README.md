@@ -47,6 +47,17 @@ npm run package
 
 The packaged app is written to `release/`.
 
+Maintainers preparing the signed ARM64 macOS release use the separate release path after setting
+the required signing identity and notary Keychain profile in their local shell:
+
+```bash
+npm run package:release:macos
+```
+
+That command is for release maintainers only. It signs and notarizes the v0.1.1 candidate, but it
+does not publish a GitHub Release, create or rewrite tags, or change the public download notice.
+Public installation remains on the v0.1.0 unsigned release until the release issue completes.
+
 ## Basic Use
 
 1. Create a project or select an existing one.

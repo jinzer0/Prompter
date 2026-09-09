@@ -9,7 +9,7 @@ Use this checklist after Phase 10 and later release-candidate changes before pac
 - [ ] `npm test` exits 0.
 - [ ] `npm run build` exits 0.
 - [ ] `npm run package` creates `release/Prompter-darwin-${process.arch}/Prompter.app`.
-- [ ] `npm run package` creates `release/Prompter-darwin-${process.arch}.zip`.
+- [ ] `npm run package` creates `release/Prompter-0.1.1-mac-${process.arch}.zip`.
 - [ ] Packaged `Prompter.app` opens without a missing-executable error.
 - [ ] `npm run test:smoke` exits 0, or the exact blocker is recorded.
 

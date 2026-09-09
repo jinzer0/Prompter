@@ -90,6 +90,16 @@ The command fails closed. A failure means no publication, no partial allowlist, 
 and no release command. Immutable release tags are never rewritten to hide or replace a failed
 candidate.
 
+### Trusted path anchor
+
+The parent directory of the configured source root is the trusted path anchor for local release
+and notarization evidence directories. The coordinator resolves that anchor once, then requires
+every path component below it to be a real directory rather than a symbolic link before creating
+or recursively removing data. A symbolic link at or above the trusted anchor, including the macOS
+`/var` to `/private/var` platform alias, is resolved and does not by itself invalidate the release.
+Configured release or evidence paths outside the anchor, or beneath a symbolic-link component
+inside the owned tree, fail before Apple commands or outside-tree mutation.
+
 ## Notarization Flow
 
 The coordinator submits two different artifacts to Apple:

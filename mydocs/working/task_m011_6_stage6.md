@@ -11,9 +11,12 @@ Stage 5 뒤 pre-PR review와 이어진 Stage 6.2부터 6.5 fresh review가 찾�
 `1185a7365f441dee3dc9b7b19acd9be5c4bfe7c6` 기준 review가 추가 결함을 확인했다. 그
 remediation 뒤 exact head `9e561e5529ef9c12ae6abf3a60f2f64cb2d3118b` review에서 Quality와 Context
 lane이 각각 경로 ancestor 검증과 npm-bin symlink packaging/signing blocker를 확인했다.
-이번 보고는 두 blocker의 failing-first 교정과 현재 검증 근거를 Stage 6.7 성격으로
-덧붙인다. 실제 Developer ID signing, Apple Notarization, tag, GitHub Release, upload는
-실행하지 않았다.
+Stage 6.7은 두 blocker의 failing-first 교정과 검증 근거를 추가했고 report-inclusive head
+`4c720cc031219732f1210587c5d91939b5ad1909`로 게시됐다. 그 head의 fresh review에서 Goal,
+QA, Security는 APPROVE였지만 Code Quality와 Context가 각각 oversized Electron contract suite와
+report/PR immutable-link chronology를 REJECT했다. Stage 6.8은 그 결과를 숨기지 않고 test split과
+report/link remediation으로 이어간다. 실제 Developer ID signing, Apple Notarization, tag,
+GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
 
@@ -25,10 +28,10 @@ lane이 각각 경로 ancestor 검증과 npm-bin symlink packaging/signing block
 | `scripts/macos/owned-directory.mjs`, release lifecycle/attempt modules | source-root parent를 canonical trusted anchor로 삼고 그 아래 모든 component의 no-symlink directory ownership을 creation과 recursive cleanup 전에 검증한다. anchor 위 macOS platform alias는 허용한다. |
 | `scripts/package-macos.mjs`, `scripts/macos/app-bundle.mjs`, `scripts/macos/signing.mjs`, `scripts/macos/signing-discovery.mjs` | package/app-bundle과 signing/discovery 책임을 분리했다. source copy는 npm-bin relative link text를 보존하고, discovery는 실제 file type이 Mach-O인 target만 선택한다. 초기 ELF/PE/text native payload는 package에 남기되 signing 대상에서 제외하고, Mach-O alias/path/duplicate 검증과 signing 전후 target-set 불변성은 fail closed로 유지한다. |
 | `scripts/macos/release-version-preflight.mjs`, `package.json` | signed npm entrypoint가 build와 candidate mutation 전에 exact version preflight를 실행하게 했다. |
-| `tests/package-macos*.mjs`, `tests/electron-contract.test.ts` | Stage 6.2부터 6.7 blocker 회귀와 PR #8 remediation 회귀를 focused suite 14 files, 149 tests로 고정했다. |
+| `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.8 blocker 회귀를 contract 13 files/35 tests, focused release 15 files/151 tests로 고정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
-| `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, fresh review PASS, 잔여 위험, existing PR #8 update 경계를 기록한다. |
+| `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록한다. |
 | `mydocs/report/task_m011_6_report.md` | Stage 1-5와 failed-review chronology를 보존한 최종 보고서로 갱신한다. |
 
 ## 본문 변경 정도 / 본문 무손실 여부
@@ -42,6 +45,18 @@ source, direct regression tests, `docs/release-macos.md`, `docs/qa-checklist.md`
 `fc3fb088c8b76cac44aef8be8dc714f107b71104`, docs
 `3adaf6b2deddc6123fde62ff76b97b9a15ad4192`로 구분했다. 이 문서는 그 reporting portion이며
 `.omo` evidence와 notepad는 ignored 상태로 남기고 커밋하지 않는다.
+
+Stage 6.7 report/final-report closure는 `3b6477db464a398ed26d2f36aa91ef463fbb2d47`와
+`4c720cc031219732f1210587c5d91939b5ad1909`로 게시됐다. 이어진 Stage 6.8 test split은 공통
+기반 `b7ab93518687e78294b67968245fc3f2fc0ec81d`, bridge
+`d6692d44fa6a743707c38cfb147d8474ec18d079`, schema
+`64bf4a81c5226d8afb3e67747e41e001e7c21f9d`, Phase 15
+`9d260c239236e2ea2b0c5b490014b32aa7c8bcd3`, shell/menu
+`619d0d8e3e56b63c45954afbfce2111b0d2af7ce`, quality guardrail
+`8678bf18e6dd3ef5d3b237cdacdf4ee1742aa723`, registration switch
+`d8a79ae4cd207bee5a95bac0089236114ed3b3cd`의 일곱 atomic commits로 구분했다. 기존
+33 contract tests와 macOS release 2 tests의 title multiset을 보존하면서 monolith를 13개 direct
+test modules로 교체했다.
 
 ## 검증 결과
 
@@ -111,8 +126,9 @@ npm run test:smoke
 - OK: dead framework-alias wrappers를 제거했고 oversized package/coordinator, signing,
   notarization test modules를 split했다. removed large-suite paths는 checked-in Vitest include에서
   빠졌고 title inventory는 보존됐다.
-- OK: focused split release suite는 14 files, 149 tests passed다. full Vitest는 130 files,
-  919 tests passed다.
+- OK: Stage 6.7 publication 당시 focused split release suite는 14 files/149 tests, full Vitest는
+  130 files/919 tests였다. Stage 6.8 뒤 contract split은 13 files/35 tests, focused release는
+  15 files/151 tests, full Vitest는 142 files/919 tests로 통과해 전체 title 수를 보존했다.
 - OK: `npm run typecheck`, `npm run lint`, `git diff --check`, `npm run build`, unsigned
   `npm run package`, `npm run test:smoke` 49/49가 통과했다.
 - OK(expected nonzero): missing-input `npm run package:release:macos`는 candidate/evidence mutation 없이
@@ -127,13 +143,31 @@ npm run test:smoke
 - DISCLOSURE: historical commits `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재
   git-master 기준의 Sisyphus footer 또는 co-author marker 일부가 없다. published history를
   rewrite하지 않고 이 보고서에 누락을 additive하게 공개한다.
-- OK: latest committed-head fresh review lanes는 Goal PASS, QA PASS, Code quality PASS, Context PASS,
-  Security PASS다.
+- OK: Stage 6.7 implementation/docs head fresh review lanes는 Goal PASS, QA PASS, Code quality PASS,
+  Context PASS, Security PASS다.
   session IDs는 Goal `ses_f7cca8a57ffejMEXr61Xruwj52`, QA `ses_f7cca88e4ffe2yI4Z44axRYvDn`,
   Quality `ses_f7cca879effe940uVoPb6Ot5P4`, Context `ses_f7cca86b8ffe4QfW7J2ICb2ZRv`,
   Security `ses_f7cca85cbffeNNAhxJAIpUjEkZ`다. Stage 6.7 implementation/docs head는
-  `3adaf6b2deddc6123fde62ff76b97b9a15ad4192`이며, report-inclusive publication head의 fresh
-  exact-head review는 아직 실행하거나 완료했다고 주장하지 않는다.
+  `3adaf6b2deddc6123fde62ff76b97b9a15ad4192`였다.
+- REJECT RECORDED: Stage 6.7 report-inclusive publication head
+  `4c720cc031219732f1210587c5d91939b5ad1909`의 fresh review는 Goal APPROVE
+  `ses_f7baecb91ffdFbZNAEbhVZvCLz`, QA APPROVE `ses_f7baed188ffex5HWsR7ajFEi2a`, Security
+  APPROVE `ses_f7baece48ffegT2N0VGNftiaxR`, Code Quality REJECT
+  `ses_f7baecfa3ffeeSbQIS0p9G3uT8`, Context REJECT
+  `ses_f7baeccefffe9erDRJ7G9qQhIn`이었다.
+- REJECT DETAIL: Code Quality는 PR에서 변경된 `tests/electron-contract.test.ts`가 1,867 pure LOC인
+  oversized suite라는 blocker를 확인했다. Context는 Stage 2, 4, 5의 short label과 연결된 full commit
+  SHA가 실제 object와 달라 발생한 broken immutable links 3건과, Stage 6.7 commit/publication이 여전히
+  pending이라고 적은 stale report closure claims를 blocker로 확인했다. historical governance amendment
+  gap은 공개된 chronology상 nonblocking으로 분류했다. 세 link의 올바른 commit은 Stage 2
+  `bd0d3d4591290462ec81e36ba9bf099aade49347`, Stage 4
+  `052c1f4dd3c8b3c4f95e3ebf448e23de5c114069`, Stage 5
+  `872c3bfa6b3ebb70fb787a175518fffdb0147e36`이다.
+- OK: Stage 6.8은 oversized suite의 35 tests를 13 direct modules로 분리하고 모든 changed/new module을
+  250 pure LOC 이하, 최대 209 pure LOC로 낮췄다. Atlas는 contract 35/35, focused release 151/151,
+  full 919/919, typecheck, lint, `git diff --check`를 독립 재현했다. Context report/link blocker는 본
+  additive report 갱신과 final head 고정 PR link 교정으로 처리하며, report-inclusive final head의 fresh
+  five-lane review는 아직 pending이다.
 - MISS(환경 제한): sibling worktree markdown LSP diagnostics는 request-root 제한으로 실행하지 못했다.
   typecheck, lint, markdown/template section review, syntax/import, tests, build, package, smoke,
   whitespace check를 대체 근거로 사용했다.
@@ -149,16 +183,17 @@ npm run test:smoke
 
 ## 다음 단계 영향
 
-- Stage 6.7 implementation/docs는 `e940e29`, `a81fe86`, `fc3fb08`, `3adaf6b`로 commit했다.
-  본 보고서와 최종 보고서를 별도 commit하고 `publish/task6`를 update한 뒤 exact-head
-  independent review를 다시 실행한다.
+- Stage 6.7 implementation/docs와 reports는 `e940e29`부터 `4c720cc`까지 commit하고
+  `publish/task6`에 게시했다. Stage 6.8 split도 `b7ab935`부터 `d8a79ae`까지 게시했다. 본 보고서와
+  최종 보고서의 Context remediation commit을 같은 publication branch에 추가한 뒤 그 report-inclusive
+  exact head에서 fresh five-lane review를 다시 실행한다.
 - PR #8 review/merge와 `origin/master` containment verification은 명시적으로 pending이다. Todo 8은
   아직 완료로 표시하지 않는다.
-- Issue #7은 Task #6 PR이 merge되고 `origin/master`에 포함된 뒤에만 시작한다. live Apple operations,
-  tag, release, upload는 그 범위에서만 수행한다.
+- Issue #6 close와 Issue #7 진입은 Task #6 PR이 merge되고 `origin/master`에 포함된 뒤에만 진행한다.
+  live Apple operations, tag, release, upload는 Issue #7 범위에서만 수행한다.
 
 ## 승인 요청
 
-- 작업지시자의 최신 명시 continuation에 따라 Stage 6.7 implementation/docs commit과 기존 PR #8
-  publication을 진행한다. exact-head re-review, PR merge, issue close, Issue #7 진입,
-  tag/release/upload는 수행하지 않는다.
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.8 report remediation commit, 정상 publication push,
+  기존 PR #8 immutable-link 교정을 진행한다. report-inclusive exact-head re-review, PR merge,
+  containment verification, Issue #6 close, Issue #7 진입, tag/release/upload는 수행하지 않는다.

@@ -1,0 +1,144 @@
+import assert from "node:assert/strict"
+import { access, chmod, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+
+import { afterEach, test } from "vitest"
+
+import { runner } from "../scripts/macos/release-support.mjs"
+import { createCoordinatorFixture } from "./support/macos-coordinator-fixtures.mjs"
+import {
+  assertReleaseEntrypointRejectsBeforeMutation,
+  createTemporaryDirectoryTracker,
+} from "./support/macos-package-fixtures.mjs"
+
+const temporaryDirectories = createTemporaryDirectoryTracker()
+afterEach(() => temporaryDirectories.cleanup())
+
+async function fixture(options) {
+  return temporaryDirectories.track(await createCoordinatorFixture(options))
+}
+
+test("keeps signed Apple trust gates on absolute paths despite earlier PATH executables", async () => {
+  const release = await fixture()
+  const root = release.shared.root
+  const binDirectory = join(root, "bin")
+  const markerPath = join(root, "hijacked")
+  await mkdir(binDirectory)
+  await Promise.all(
+    ["xcrun", "spctl"].map(async (command) => {
+      const fakePath = join(binDirectory, command)
+      await writeFile(fakePath, `#!/bin/sh\ntouch "${markerPath}"\n`)
+      await chmod(fakePath, 0o755)
+    }),
+  )
+  const originalPath = process.env.PATH
+  process.env.PATH = `${binDirectory}:${originalPath ?? ""}`
+  try {
+    await release.run()
+  } finally {
+    process.env.PATH = originalPath
+  }
+  await assert.rejects(access(markerPath))
+  assert.equal(
+    release.rawCalls
+      .filter(({ command }) => command.endsWith("xcrun"))
+      .every(({ command }) => command === "/usr/bin/xcrun"),
+    true,
+  )
+  assert.equal(
+    release.rawCalls
+      .filter(({ command }) => command.endsWith("spctl"))
+      .every(({ command }) => command === "/usr/sbin/spctl"),
+    true,
+  )
+})
+
+test("rejects every signed release version except 0.1.1 before the first external command", async () => {
+  const release = await fixture()
+  await writeFile(
+    join(release.releaseRoot, "..", "source", "package.json"),
+    JSON.stringify({ version: "0.1.2" }),
+  )
+  await assert.rejects(release.run(), /Invalid package version/)
+  assert.deepEqual(release.calls, [])
+})
+
+test("rejects a wrong package version at the npm release entrypoint before build or downstream mutation", async () => {
+  await assertReleaseEntrypointRejectsBeforeMutation("0.1.2")
+})
+
+test("rejects a missing package version at the npm release entrypoint before build or downstream mutation", async () => {
+  await assertReleaseEntrypointRejectsBeforeMutation(undefined)
+})
+
+test("maps bounded timeout and an AbortSignal to production execFile options", async () => {
+  const controller = new AbortController()
+  let options
+  const run = runner(async (_command, _arguments, receivedOptions) => {
+    options = receivedOptions
+    return { stdout: "", stderr: "" }
+  })
+  await run("xcrun", ["notarytool"], { timeoutMs: 1000, signal: controller.signal })
+  assert.deepEqual(options, { timeout: 1000, signal: controller.signal })
+  await assert.rejects(
+    run("xcrun", ["notarytool"], { signal: {} }),
+    /Invalid macOS release command options/,
+  )
+})
+
+test("rejects a symlinked release root before external commands or outside mutation", async () => {
+  const release = await fixture()
+  const outsideDirectory = join(release.shared.root, "outside-release-root")
+  await mkdir(outsideDirectory)
+  await rm(release.releaseRoot, { recursive: true })
+  await symlink(outsideDirectory, release.releaseRoot)
+
+  await assert.rejects(release.run(), /Release root is unavailable/)
+
+  assert.deepEqual(release.calls, [])
+  await assert.rejects(access(join(outsideDirectory, "v0.1.1")))
+})
+
+test("creates a missing release root only after non-mutating preflight", async () => {
+  const release = await fixture()
+  await rm(release.releaseRoot, { recursive: true })
+
+  await release.run()
+
+  assert.equal(release.calls.indexOf("profile") < release.calls.indexOf("native-copied"), true)
+  await access(release.candidate)
+})
+
+const testEvidenceEscape = test.each(["root", "app", "dmg"])
+
+testEvidenceEscape(
+  "rejects a symlinked %s evidence directory without deleting outside data",
+  async (escapedDirectory) => {
+    const release = await fixture()
+    const artifactKind = escapedDirectory === "dmg" ? "dmg" : "app"
+    const extension = artifactKind === "app" ? "zip" : "dmg"
+    const outsideDirectory = join(release.shared.root, `outside-${escapedDirectory}`)
+    const outsideEvidenceDirectory =
+      escapedDirectory === "root"
+        ? join(outsideDirectory, "v0.1.1", artifactKind)
+        : outsideDirectory
+    const outsideAttemptDirectory = join(outsideEvidenceDirectory, "notarization-attempt")
+    const outsideArtifact = join(outsideAttemptDirectory, `Prompter-0.1.1-mac-arm64.${extension}`)
+    await mkdir(outsideAttemptDirectory, { recursive: true })
+    await writeFile(outsideArtifact, "outside-sentinel")
+    if (escapedDirectory === "root") {
+      await rm(release.evidenceRoot, { recursive: true })
+      await symlink(outsideDirectory, release.evidenceRoot)
+    } else {
+      const versionDirectory = join(release.evidenceRoot, "v0.1.1")
+      await mkdir(versionDirectory, { recursive: true })
+      await symlink(outsideDirectory, join(versionDirectory, artifactKind))
+    }
+
+    await assert.rejects(release.run())
+
+    assert.deepEqual(release.calls, [])
+    await assert.rejects(access(release.candidate))
+    assert.equal(await readFile(outsideArtifact, "utf8"), "outside-sentinel")
+  },
+)

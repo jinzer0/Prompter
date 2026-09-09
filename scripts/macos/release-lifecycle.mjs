@@ -1,47 +1,59 @@
-import { mkdir, rm } from "node:fs/promises"
+import { lstat, mkdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
-import { submitAndWait } from "./notarization.mjs"
+import { cleanupReleaseAttempts, createReleaseAttempts } from "./release-attempt.mjs"
 
 function fail(message) {
   throw new Error(message)
 }
 
-export async function acceptNotarization({ artifactPath, evidenceDirectory, state }) {
-  const result = await submitAndWait({
-    artifactPath,
-    profile: state.notaryProfile,
-    evidenceDir: evidenceDirectory,
-    runFile: state.run,
-    ...(state.signal === undefined ? {} : { signal: state.signal }),
-  })
-  if (result?.status === "unknown") fail("Notarization submission is unresolved")
-  if (result?.status !== "Accepted" || typeof result.logPath !== "string") {
-    fail("Notarization submission was not accepted")
-  }
-}
-
 export function createReleaseState(release, run, version) {
   const candidateDirectory = join(release.paths.releaseRoot, `v${version}`)
+  const appEvidenceDirectory = join(release.paths.notarizationEvidenceRoot, `v${version}`, "app")
+  const dmgEvidenceDirectory = join(release.paths.notarizationEvidenceRoot, `v${version}`, "dmg")
+  const zipName = `Prompter-${version}-mac-arm64.zip`
+  const dmgName = `Prompter-${version}-mac-arm64.dmg`
   return {
     state: {
       candidateDirectory,
-      appEvidenceDirectory: join(release.paths.notarizationEvidenceRoot, `v${version}`, "app"),
-      dmgEvidenceDirectory: join(release.paths.notarizationEvidenceRoot, `v${version}`, "dmg"),
+      appEvidenceDirectory,
+      dmgEvidenceDirectory,
       notaryProfile: release.notaryProfile,
       signal: release.signal,
       run,
       assets: [],
+      attemptHandlingStarted: false,
+      attempts: createReleaseAttempts({
+        evidenceRoot: release.paths.notarizationEvidenceRoot,
+        appEvidenceDirectory,
+        dmgEvidenceDirectory,
+        zipName,
+        dmgName,
+      }),
     },
-    zipPath: join(candidateDirectory, `Prompter-${version}-mac-arm64.zip`),
-    dmgPath: join(candidateDirectory, `Prompter-${version}-mac-arm64.dmg`),
+    zipPath: join(candidateDirectory, zipName),
+    dmgPath: join(candidateDirectory, dmgName),
     checksumPath: join(candidateDirectory, "SHA256SUMS"),
   }
 }
 
-export async function prepareReleaseCandidate(state) {
+export async function validateReleaseRoot(state) {
+  const releaseRoot = dirname(state.candidateDirectory)
   try {
-    await mkdir(dirname(state.candidateDirectory), { recursive: true })
+    const metadata = await lstat(releaseRoot)
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) fail("Release root is unavailable")
+    return true
+  } catch (error) {
+    if (error?.code === "ENOENT") return false
+    fail("Release root is unavailable")
+  }
+}
+
+export async function prepareReleaseCandidate(state) {
+  const releaseRoot = dirname(state.candidateDirectory)
+  try {
+    if (!(await validateReleaseRoot(state))) await mkdir(releaseRoot)
+    if (!(await validateReleaseRoot(state))) fail("Release root is unavailable")
     await mkdir(state.candidateDirectory)
     state.candidateCreated = true
   } catch {
@@ -49,7 +61,7 @@ export async function prepareReleaseCandidate(state) {
   }
 }
 
-export async function cleanupRelease(run, state) {
+export async function cleanupRelease(run, state, error) {
   const failures = []
   let detached = !state.mountAttached
   if (state.mountAttached) {
@@ -75,8 +87,14 @@ export async function cleanupRelease(run, state) {
       failures.push(new Error("macOS release cleanup failed"))
     }
   }
+  try {
+    await cleanupReleaseAttempts(state.attempts, error, state.attemptHandlingStarted)
+  } catch {
+    failures.push(new Error("macOS release cleanup failed"))
+  }
   if (!state.success && state.candidateCreated) {
     try {
+      if (!(await validateReleaseRoot(state))) fail("Release root is unavailable")
       await rm(state.candidateDirectory, { recursive: true, force: true })
     } catch {
       failures.push(new Error("macOS release cleanup failed"))

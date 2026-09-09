@@ -233,6 +233,9 @@ export function createNotarizationClient(options) {
             "--assess",
             "--type",
             assessment.artifactKind === "app" ? "execute" : "open",
+            ...(assessment.artifactKind === "dmg"
+              ? ["--context", "context:primary-signature"]
+              : []),
             "--verbose=4",
             assessment.artifactPath,
           ],

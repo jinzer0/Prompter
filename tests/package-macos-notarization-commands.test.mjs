@@ -33,10 +33,18 @@ test("retries stapling a bounded three times and uses Gatekeeper's app and disk-
   await assessGatekeeper({ artifactPath: "Prompter.app", artifactKind: "app", runFile })
   await assessGatekeeper({ artifactPath: "Prompter.dmg", artifactKind: "dmg", runFile })
   assert.deepEqual(
-    calls.slice(-2).map(({ arguments_ }) => arguments_.slice(0, 4)),
+    calls.slice(-2).map(({ arguments_ }) => arguments_),
     [
-      ["--assess", "--type", "execute", "--verbose=4"],
-      ["--assess", "--type", "open", "--verbose=4"],
+      ["--assess", "--type", "execute", "--verbose=4", "Prompter.app"],
+      [
+        "--assess",
+        "--type",
+        "open",
+        "--context",
+        "context:primary-signature",
+        "--verbose=4",
+        "Prompter.dmg",
+      ],
     ],
   )
 })

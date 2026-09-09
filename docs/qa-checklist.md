@@ -158,7 +158,7 @@ MOUNT_DIR="$(mktemp -d)"
   /usr/bin/hdiutil verify "${DMG_PATH}"
   /usr/bin/codesign --verify --strict "${DMG_PATH}"
   /usr/bin/xcrun stapler validate "${DMG_PATH}"
-  /usr/sbin/spctl --assess --type open --verbose=4 "${DMG_PATH}"
+  /usr/sbin/spctl --assess --type open --context context:primary-signature --verbose=4 "${DMG_PATH}"
   ```
 
 - [ ] The DMG mounts read-only and contains `Prompter.app`:

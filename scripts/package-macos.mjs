@@ -1,19 +1,11 @@
 import { execFile } from "node:child_process"
-import {
-  access,
-  cp,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rename,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises"
+import { access, cp, mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
+
+import { renameElectronApp as renameAppBundle } from "./macos/app-bundle.mjs"
 
 const runFile = promisify(execFile)
 
@@ -21,121 +13,28 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const appName = "Prompter"
 const appBundleName = "Prompter.app"
 const bundleIdentifier = "com.jinzer0.prompter"
-const electronHelperNames = [
-  "Electron Helper",
-  "Electron Helper (Renderer)",
-  "Electron Helper (GPU)",
-  "Electron Helper (Plugin)",
-]
+const bundleExecutableKey = "CFBundleExecutable"
 const electronApp = join(root, "node_modules", "electron", "dist", "Electron.app")
 const outputRoot = join(root, "release")
 const packageRoot = join(outputRoot, `${appName}-darwin-${process.arch}`)
 const packagedApp = join(packageRoot, appBundleName)
 const releaseInputNames = ["PROMPTER_SIGNING_IDENTITY", "PROMPTER_NOTARY_PROFILE"]
 
+export async function renameElectronApp(appPath = packagedApp, version) {
+  return renameAppBundle({ appName, appPath, bundleExecutableKey, bundleIdentifier, version })
+}
+
 async function copyAppSource(resourcesPath, sourceRoot = root) {
   await mkdir(resourcesPath, { recursive: true })
   await Promise.all([
     ...["dist", "dist-electron", "drizzle", "node_modules"].map((name) =>
-      cp(join(sourceRoot, name), join(resourcesPath, name), { recursive: true }),
+      cp(join(sourceRoot, name), join(resourcesPath, name), {
+        recursive: true,
+        verbatimSymlinks: true,
+      }),
     ),
     cp(join(sourceRoot, "package.json"), join(resourcesPath, "package.json")),
   ])
-}
-
-function setPlistString(source, key, value, insertIfMissing = false) {
-  const pattern = new RegExp(`(<key>${key}</key>\\s*<string>)[^<]*(</string>)`)
-  if (pattern.test(source)) {
-    return source.replace(pattern, `$1${value}$2`)
-  }
-  if (!insertIfMissing) {
-    throw new Error(`Missing Info.plist string key: ${key}`)
-  }
-
-  const dictEndIndex = source.lastIndexOf("</dict>")
-  if (dictEndIndex === -1) {
-    throw new Error("Missing Info.plist dictionary")
-  }
-
-  return `${source.slice(0, dictEndIndex)}\n<key>${key}</key>\n<string>${value}</string>\n${source.slice(dictEndIndex)}`
-}
-
-async function updatePlist(plistPath, values, version) {
-  let plist = await readFile(plistPath, "utf8")
-  for (const [key, value, insertIfMissing] of values) {
-    plist = setPlistString(plist, key, value, insertIfMissing)
-  }
-  if (version !== undefined) {
-    plist = setPlistString(plist, "CFBundleShortVersionString", version, true)
-    plist = setPlistString(plist, "CFBundleVersion", version, true)
-  }
-  await writeFile(plistPath, plist)
-}
-
-function readPlistString(source, key) {
-  const pattern = new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`)
-  const match = source.match(pattern)
-  if (match === null || match[1] === undefined) {
-    throw new Error(`Missing Info.plist string key: ${key}`)
-  }
-
-  return match[1]
-}
-
-const renamedHelperName = (helperName) => helperName.replace("Electron", appName)
-
-function renamedHelperIdentifier(currentIdentifier) {
-  const helperSuffixIndex = currentIdentifier.indexOf(".helper")
-  return `${bundleIdentifier}${
-    helperSuffixIndex === -1 ? ".helper" : currentIdentifier.slice(helperSuffixIndex)
-  }`
-}
-
-async function renameElectronHelper(frameworksPath, helperName, version) {
-  const renamedName = renamedHelperName(helperName)
-  const helperPath = join(frameworksPath, `${helperName}.app`)
-  const renamedHelperPath = join(frameworksPath, `${renamedName}.app`)
-  await rename(helperPath, renamedHelperPath)
-  await rename(
-    join(renamedHelperPath, "Contents", "MacOS", helperName),
-    join(renamedHelperPath, "Contents", "MacOS", renamedName),
-  )
-
-  const helperInfoPlist = join(renamedHelperPath, "Contents", "Info.plist")
-  const currentIdentifier = readPlistString(
-    await readFile(helperInfoPlist, "utf8"),
-    "CFBundleIdentifier",
-  )
-  await updatePlist(
-    helperInfoPlist,
-    [
-      ["CFBundleIdentifier", renamedHelperIdentifier(currentIdentifier), false],
-      ["CFBundleName", renamedName, false],
-      ["CFBundleExecutable", renamedName, true],
-      ["CFBundleDisplayName", renamedName, true],
-    ],
-    version,
-  )
-}
-
-export async function renameElectronApp(appPath = packagedApp, version) {
-  const contentsPath = join(appPath, "Contents")
-  await rename(join(contentsPath, "MacOS", "Electron"), join(contentsPath, "MacOS", appName))
-  await updatePlist(
-    join(contentsPath, "Info.plist"),
-    [
-      ["CFBundleIdentifier", bundleIdentifier, false],
-      ["CFBundleExecutable", appName, false],
-      ["CFBundleName", appName, false],
-      ["CFBundleDisplayName", appName, false],
-    ],
-    version,
-  )
-
-  const frameworksPath = join(contentsPath, "Frameworks")
-  for (const helperName of electronHelperNames) {
-    await renameElectronHelper(frameworksPath, helperName, version)
-  }
 }
 
 export function resolveMacOSArchitecture(architecture = process.arch) {

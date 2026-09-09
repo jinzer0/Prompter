@@ -1,10 +1,22 @@
 import assert from "node:assert/strict"
-import { access, readdir, readFile, readlink, stat, symlink, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import {
+  access,
+  cp,
+  mkdir,
+  readdir,
+  readFile,
+  readlink,
+  stat,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { afterEach, test } from "vitest"
 
 import {
+  assembleMacOSApp,
   createDmgArchive,
   createZipArchive,
   renameElectronApp,
@@ -22,6 +34,7 @@ import {
 } from "./support/macos-package-fixtures.mjs"
 
 const temporaryDirectories = createTemporaryDirectoryTracker()
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 afterEach(() => temporaryDirectories.cleanup())
 
 async function packageFixture() {
@@ -64,6 +77,40 @@ test("renames the main executable and all Electron helper bundles into a runnabl
   }
   assert.equal(await readFile(fixture.frameworkBinaryPath, "utf8"), "framework binary")
   assert.equal(await readlink(fixture.frameworkLinkPath), "Versions/Current/Electron Framework")
+})
+
+test("assembleMacOSApp preserves installed npm-bin relative link text", async () => {
+  const electron = await electronFixture()
+  const output = await packageFixture()
+  const installedLink = join(repositoryRoot, "node_modules", ".bin", "vite")
+  const sourceRoot = join(output.outputDirectory, "source")
+  const sourceLink = join(sourceRoot, "node_modules", ".bin", "vite")
+  await Promise.all(
+    ["dist", "dist-electron", "drizzle", "node_modules/.bin", "node_modules/vite/bin"].map(
+      (directory) => mkdir(join(sourceRoot, directory), { recursive: true }),
+    ),
+  )
+  await Promise.all([
+    cp(installedLink, sourceLink, { verbatimSymlinks: true }),
+    cp(
+      join(repositoryRoot, "node_modules", "vite", "bin", "vite.js"),
+      join(sourceRoot, "node_modules", "vite", "bin", "vite.js"),
+    ),
+    writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.1" })),
+  ])
+  await assembleMacOSApp({
+    appPath: output.appPath,
+    electronAppPath: electron.appPath,
+    packageJsonPath: join(sourceRoot, "package.json"),
+    sourceRoot,
+  })
+
+  assert.equal(
+    await readlink(
+      join(output.appPath, "Contents", "Resources", "app", "node_modules", ".bin", "vite"),
+    ),
+    await readlink(sourceLink),
+  )
 })
 
 test("uses versioned arm64 and x64 DMG names", async () => {

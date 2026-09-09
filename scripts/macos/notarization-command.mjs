@@ -70,6 +70,12 @@ function timeoutId(error) {
 function reviewedLog(payload, submissionId) {
   api(payload)
   const issues = payload.issues === null ? [] : payload.issues
+  if (
+    Array.isArray(issues) &&
+    issues.some((issue) => issue?.severity === "warning" || issue?.severity === "error")
+  ) {
+    failNotarization("Invalid notarization log", true)
+  }
   if (!hasSafeNotarizationIssues(issues)) {
     failNotarization("Invalid notarization log")
   }

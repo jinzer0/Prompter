@@ -8,8 +8,10 @@ class NotarizationError extends Error {
   }
 }
 
-export function failNotarization(message) {
-  throw new NotarizationError(message)
+export function failNotarization(message, blocksPublication = false) {
+  const error = new NotarizationError(message)
+  if (blocksPublication) error.blocksPublication = true
+  throw error
 }
 
 export function isNotarizationError(error) {

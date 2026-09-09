@@ -68,6 +68,50 @@ test.each([
   assert.equal(second.calls.at(-1), "checksum")
 })
 
+test.each([
+  ["malformed", { issues: {} }, /Invalid notarization log/],
+  ["service-error", { error: "synthetic failure" }, /service rejected/],
+])("retains accepted-pending DMG bytes after a zero-exit %s log without rebuilding or resubmitting", async (_kind, logPayload, rejection) => {
+  let logCalls = 0
+  const first = await fixture({
+    notaryLog: {
+      toJSON() {
+        logCalls += 1
+        return logCalls === 1 ? { issues: [] } : logPayload
+      },
+    },
+  })
+  await assert.rejects(first.run(), rejection)
+  const attempt = notarizationAttempt(first, "dmg")
+  const pendingEvidence = JSON.parse(
+    await readFile(join(attempt.evidenceDirectory, "notarization-resume.json"), "utf8"),
+  )
+  const submittedBytes = await readFile(attempt.artifactPath)
+  assert.equal(pendingEvidence.status, "accepted")
+  assert.equal(first.calls.includes("dmg-log"), true)
+
+  const second = await fixture({ pendingDmgStatus: "Accepted", shared: first.shared })
+  const result = await second.run()
+
+  assert.equal(submissionCount([first, second], "app"), 1)
+  assert.equal(submissionCount([first, second], "dmg"), 1)
+  assert.equal(second.calls.includes("dmg-info"), true)
+  assert.equal(second.calls.includes("dmg-log"), true)
+  assert.equal(second.calls.includes("dmg-create"), false)
+  assert.equal(
+    second.rawCalls.some(
+      ({ command, arguments_ }) => command === "/usr/bin/codesign" && arguments_.includes("--sign"),
+    ),
+    false,
+  )
+  assert.deepEqual(
+    await readFile(join(second.candidate, "Prompter-0.1.1-mac-arm64.dmg")),
+    submittedBytes,
+  )
+  await assert.rejects(access(attempt.directory))
+  assert.deepEqual((await readdir(second.candidate)).sort(), result.artifacts)
+})
+
 test("preserves submitted DMG bytes when a mutating staple is followed by validate exhaustion", async () => {
   const first = await fixture({ failure: "dmg-mutating-validate-exhaustion" })
   await assert.rejects(first.run(), /Notarization command failed/)

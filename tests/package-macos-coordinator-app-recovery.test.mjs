@@ -80,6 +80,49 @@ test.each([
   assert.equal(second.calls.at(-1), "checksum")
 })
 
+test.each([
+  ["malformed", { notaryLog: { issues: {} } }, /Invalid notarization log/],
+  ["service-error", { notaryLog: { error: "synthetic failure" } }, /service rejected/],
+])("retains accepted-pending app bytes after a zero-exit %s log without rebuilding or resubmitting", async (_kind, logFailure, rejection) => {
+  const first = await fixture(logFailure)
+  await assert.rejects(first.run(), rejection)
+  const attempt = notarizationAttempt(first, "app")
+  const pendingEvidence = JSON.parse(
+    await readFile(join(attempt.evidenceDirectory, "notarization-resume.json"), "utf8"),
+  )
+  const submittedBytes = await readFile(attempt.artifactPath)
+  assert.equal(pendingEvidence.status, "accepted")
+  assert.equal(first.calls.includes("app-log"), true)
+
+  const second = await fixture({ pendingAppStatus: "Accepted", shared: first.shared })
+  await second.run()
+
+  assert.equal(submissionCount([first, second], "app"), 1)
+  assert.equal(second.calls.includes("app-info"), true)
+  assert.equal(second.calls.includes("app-log"), true)
+  assert.equal(second.calls.includes("temporary-zip"), false)
+  assert.equal(
+    second.rawCalls.some(
+      ({ command, arguments_ }) =>
+        command === "/usr/bin/codesign" &&
+        arguments_.includes("--sign") &&
+        !arguments_.at(-1).endsWith(".dmg"),
+    ),
+    false,
+  )
+  assert.equal(
+    second.rawCalls.some(
+      ({ command, arguments_ }) =>
+        command === "/usr/bin/ditto" &&
+        arguments_[0] === "-x" &&
+        arguments_[2] === attempt.artifactPath,
+    ),
+    true,
+  )
+  assert.equal(submittedBytes.length > 0, true)
+  await assert.rejects(access(attempt.directory))
+})
+
 test("retains an accepted app ZIP until a fresh invocation successfully retries stapling", async () => {
   const first = await fixture({ failure: "app-staple-exhaustion" })
   await assert.rejects(first.run(), /Notarization command failed/)

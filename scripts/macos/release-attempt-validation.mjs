@@ -12,6 +12,7 @@ const resumableErrors = new Set([
   "Notarization command failed",
   "Notarization submission is unresolved",
 ])
+const terminalAttemptErrors = new Set(["Notarization submission was not accepted"])
 
 function fail() {
   throw new Error("Invalid retained notarization attempt")
@@ -176,7 +177,11 @@ export async function cleanupReleaseAttempts(attempts, error, attemptHandlingSta
         const retained = await readBoundAttempt(attempt)
         retain =
           retained !== undefined &&
-          (retained.saved.status === "Accepted" || resumableErrors.has(error?.message))
+          (retained.saved.status === "Accepted" ||
+            (retained.saved.status === "accepted" &&
+              !error?.blocksPublication &&
+              !terminalAttemptErrors.has(error?.message)) ||
+            resumableErrors.has(error?.message))
       } catch {
         retain = false
       }

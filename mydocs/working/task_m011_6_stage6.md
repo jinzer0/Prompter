@@ -51,7 +51,11 @@ report-inclusive head `12f59ba1b9c24294d2b094bcbfdb56eb8096793e`로 게시됐다
 review는 Goal, QA, Security APPROVE와 Code Quality, Context REJECT를 기록했다. 두 REJECT는 wrong-signer
 또는 deterministic malformed identity evidence가 retained되어 이후 invocation도 같은 failure를 반복하는
 retry blocker를 확인했다. Stage 6.17은 deterministic identity error를 affected-kind evidence cleanup에
-연결하고 transient codesign execution error는 resumable하게 보존한다.
+연결하고 transient codesign execution error는 resumable하게 보존해 report-inclusive head
+`7fdd85ff467862c64a673f47216743a9f3ec7348`로 게시됐다. 그 exact-head review는 Goal, QA,
+Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context는 구현 결함이 아니라 이미 완료된
+Stage 6.17 publication, PR link 교정, detached review worktree 생성을 향후 작업으로 남긴 stale report
+wording만 blocker로 확인했다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -424,6 +428,10 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.17에서 재실행했다고 주장하지 않는다.
 - MISS(환경 제한): Stage 6.17 two source/test paths와 두 report의 LSP diagnostics는 sibling-worktree
   request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
+- REJECT RECORDED: report-inclusive head `7fdd85ff467862c64a673f47216743a9f3ec7348`의 fresh
+  exact-head review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context
+  blocker는 구현이나 검증 결함이 아니라 완료된 Stage 6.17 publication lifecycle을 향후 작업으로 적은 두
+  report의 stale wording이다.
 
 ## 잔여 위험
 
@@ -436,18 +444,18 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
 
 ## 다음 단계 영향
 
-- Stage 6.7부터 Stage 6.16 report-inclusive head `12f59ba`까지 `publish/task6`와 PR #8에 게시했다.
-  Stage 6.17 retained-wrong-signer retry 교정과 두 보고서를 하나의 publication commit으로 추가하고 기존
-  PR #8을 새 final head에 고정한 뒤 새 temp clean detached review worktree에서 five-lane review를 다시
-  실행한다.
-- PR #8 review/merge와 `origin/master` containment verification은 명시적으로 pending이다. Todo 8은
-  아직 완료로 표시하지 않는다.
-- Issue #6 close와 Issue #7 진입은 Task #6 PR이 merge되고 `origin/master`에 포함된 뒤에만 진행한다.
-  live Apple operations, tag, release, upload는 Issue #7 범위에서만 수행한다.
+- Stage 6.17 retained-wrong-signer retry 교정과 두 보고서는
+  `7fdd85ff467862c64a673f47216743a9f3ec7348`로 `publish/task6`와 PR #8에 게시됐다. PR #8
+  immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다.
+- `7fdd85f`의 fresh exact-head review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를
+  기록했다. 유일한 blocker인 두 report의 stale lifecycle wording은 Stage 6.18 report-only closure에서
+  교정한다.
+- Stage 6.18 report-only head의 fresh five-lane exact-head review, PR #8 merge,
+  `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 승인 요청
 
-- 작업지시자의 최신 명시 지시에 따라 Stage 6.17 source/test/report 단일 commit, 정상 publication push,
-  기존 PR #8 final-head immutable-link 교정과 새 temp review worktree 생성을 진행한다. 새 exact-head
-  five-lane review, PR merge,
-  containment verification, Issue #6 close, Issue #7 진입, tag/release/upload는 수행하지 않는다.
+- 작업지시자의 최신 명시 지시에 따라 `7fdd85f` review의 유일한 Context blocker인 두 report의 stale
+  lifecycle wording을 Stage 6.18 report-only commit으로 교정한다. 이 commit은 자신의 exact SHA를
+  재귀적으로 주장하지 않으며 publication, PR #8 링크, detached review worktree의 exact 결과는 commit 뒤
+  ignored receipt에 기록한다. 그 exact head의 fresh five-lane review가 다음 gate다.

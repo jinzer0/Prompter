@@ -134,29 +134,29 @@ Stage 6.13 source/test/report는 `d91526008f8532e31cb48cc703547d790c59f0e6` 한 
 게시됐고 PR #8 immutable blob links도 같은 SHA로 교정됐다. 그 head의 Goal, QA, Code Quality,
 Security lane은 APPROVE였고 Context만 terminal evidence cleanup을 P1으로 REJECT했다. Stage 6.14는
 기존 implementation history를 rewrite하지 않고 해당 P1의 production module, direct regression,
-Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication commit으로 묶는다. `.omo` receipt와
-generated output은 커밋하지 않는다.
+Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication commit으로 묶었다. `.omo` receipt와
+generated output은 해당 commit에 포함하지 않았다.
 
 Stage 6.14 source/test/report는 `976dbda4cda933d1794adfc11ac60b482f2814ee` 한 commit으로
 게시됐고 PR #8 immutable blob links와 temp detached review worktree도 같은 SHA로 갱신됐다. 그 head의
 QA와 Security는 APPROVE였고 Goal, Code Quality, Context는 cleanup kind attribution과 other-kind
 preservation blocker를 REJECT했다. Stage 6.15는 기존 history를 rewrite하지 않고 그 remediation의 두
 production modules, direct regression, Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication
-commit으로 묶는다. `.omo` receipt와 generated output은 커밋하지 않는다.
+commit으로 묶었다. `.omo` receipt와 generated output은 해당 commit에 포함하지 않았다.
 
 Stage 6.15 source/test/report는 `cf0cdef3cd395756748bb50ab861cd3fca5172fd` 한 commit으로
 게시됐고 PR #8 immutable blob links와 temp detached review worktree도 같은 SHA로 갱신됐다. 그 head의
 QA, Code Quality, Security는 APPROVE였고 Goal과 Context는 retained artifact signer-continuity gap을
 REJECT했다. Stage 6.16은 기존 history를 rewrite하지 않고 그 remediation의 production modules, direct
-test/fixtures/config, Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication commit으로 묶는다.
-`.omo` receipt와 generated output은 커밋하지 않는다.
+test/fixtures/config, Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication commit으로 묶었다.
+`.omo` receipt와 generated output은 해당 commit에 포함하지 않았다.
 
 Stage 6.16 source/test/config/report는 `12f59ba1b9c24294d2b094bcbfdb56eb8096793e` 한 commit으로
 게시됐고 PR #8 immutable blob links와 temp detached review worktree도 같은 SHA로 갱신됐다. 그 head의
 Goal, QA, Security는 APPROVE였고 Code Quality와 Context는 deterministic identity mismatch evidence가
 retained되는 retry blocker를 REJECT했다. Stage 6.17은 기존 history를 rewrite하지 않고 그 remediation의
 production module, direct regression, Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication
-commit으로 묶는다. `.omo` receipt와 generated output은 커밋하지 않는다.
+commit으로 묶었다. `.omo` receipt와 generated output은 해당 commit에 포함하지 않았다.
 
 ## 검증 결과
 
@@ -241,7 +241,7 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT
   `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT
   `ses_f7c38f5aeffeCa6aE87Pc14jwv`다. 두 REJECT blocker를 Stage 6.7에서 교정했으며 fresh
-  exact-head review는 아직 pending이다.
+  exact-head review는 당시 pending이었다.
 - DISCLOSURE: historical commits `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재
   git-master 기준의 Sisyphus footer 또는 co-author marker 일부가 없다. published history를
   rewrite하지 않고 이 보고서에 누락을 additive하게 공개한다.
@@ -328,7 +328,7 @@ fresh five-lane review는 pending이었으며, 이후 `0900ba9` review 결과는
 - OK: Atlas verification은 targeted six files/90 tests, focused release 15 files/161 tests, full Vitest
   142 files/929 tests, typecheck, lint, changed-file syntax, pure LOC maximum 246, `git diff --check`를
   통과했다. LSP는 Stage 6.11 seven paths 모두 sibling-worktree request-root 제한으로 거부되어 PASS로
-  기록하지 않는다. 새 report-inclusive final head의 fresh five-lane review는 pending이다.
+  기록하지 않는다. 당시 새 report-inclusive final head의 fresh five-lane review는 pending이었다.
 - REJECT RECORDED: Stage 6.11 report-inclusive old head
   `783b7984115e7af5e537286ca2f4c018c2853405` review는 Goal REJECT, Security REJECT, QA APPROVE,
   Quality APPROVE, Context APPROVE였다. discussion `3967071415`는 package root symlink가 가리키는
@@ -440,6 +440,13 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   future-tense wording을 남긴 completion-state 결함을 확인했다. five-lane review는 시작하지 않았다.
 - OK: 해당 잔여 future tense는 현재 Stage 6.19 report-only closure 계보에서 completed-state wording으로
   교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.19 report-only head
+  `a96eabb928e1fa63c3d7c96b48698d612103e1c3`의 fresh exact-head review는 Goal, QA, Code Quality,
+  Security APPROVE와 Context REJECT를 기록했다. Context는 구현 결함 없이 Stage 6.14부터 6.17까지 이미
+  생성된 additive publication commit을 active future tense로 남긴 네 history line만 blocker로 확인했다.
+- OK: 네 history line의 commit bundling과 `.omo`/generated-output exclusion은 현재 Stage 6.20
+  report-only closure 계보에서 completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는
+  exact SHA를 재귀적으로 기록하지 않는다.
 
 ## 잔여 위험
 
@@ -458,7 +465,11 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - `7fdd85f`의 fresh exact-head review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를
   기록했다. 유일한 blocker인 두 report의 stale lifecycle wording과 Stage 6.18에 남은 future tense는 현재
   Stage 6.19 report-only closure 계보에서 completed-state wording으로 교정됐다.
-- Stage 6.19 report-only head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.19 report-only closure는 `a96eabb928e1fa63c3d7c96b48698d612103e1c3`로 게시됐고 PR #8
+  immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head의 review는 Goal,
+  QA, Code Quality, Security APPROVE와 Context REJECT를 기록했으며 네 stale history line만 blocker였다.
+- 해당 네 line은 현재 Stage 6.20 report-only closure 계보에서 completed-state wording으로 교정됐다.
+- Stage 6.20 report-only head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 승인 요청
@@ -468,3 +479,6 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   completed-state wording으로 교정됐다. 이 commit은 자신의 exact SHA를 재귀적으로 주장하지 않으며
   publication, PR #8 링크, detached review worktree의 exact 결과에 대한 source of truth는 ignored
   receipt다. 그 exact head의 fresh five-lane review가 다음 gate다.
+- 작업지시자의 최신 명시 지시에 따라 `a96eabb` Context가 확인한 네 history line도 현재 Stage 6.20
+  report-only closure 계보에서 completed-state wording으로 교정됐다. 이 closure는 자신의 exact SHA를
+  재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.

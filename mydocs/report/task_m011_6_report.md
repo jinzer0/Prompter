@@ -38,7 +38,8 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.16 / `12f59ba` | `signing.mjs`, `release-attempt.mjs`, coordinator fixtures/support, signer identity recovery test, Vitest config, reports | `cf0cdef` resumed app/DMG signer-continuity blocker 교정 | signed-release offline contracts |
 | 6.17 / `7fdd85f` | `signing.mjs`, signer identity recovery test, reports | `12f59ba` retained wrong-signer deterministic cleanup과 transient resume 교정 | signed-release offline contracts |
 | 6.18 / `dc108f9` | Stage 6 cumulative report, final report | `7fdd85f` Context가 확인한 stale publication lifecycle wording 부분 교정 | governance/reporting only |
-| 6.19 / completed closure lineage | Stage 6 cumulative report, final report | Stage 6.18에 남은 future tense를 completed-state wording으로 교정 | governance/reporting only |
+| 6.19 / `a96eabb` | Stage 6 cumulative report, final report | Stage 6.18에 남은 future tense를 completed-state wording으로 교정 | governance/reporting only |
+| 6.20 / completed closure lineage | Stage 6 cumulative report, final report | Stage 6.14–6.17 publication history의 active future tense를 completed-state wording으로 교정 | governance/reporting only |
 
 ## 문서 위치 검증
 
@@ -98,6 +99,12 @@ Stage 6.18 report-only publication head도 `dc108f9a09a36674471d32e53c258c189926
 push, PR #8 immutable link 교정, temp detached exact-head review worktree 생성까지 완료됐다. 해당 head
 verification이 확인한 잔여 future tense는 현재 Stage 6.19 report-only closure 계보에서 completed-state
 wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다.
+Stage 6.19 report-only publication head도 `a96eabb928e1fa63c3d7c96b48698d612103e1c3`이며 정상
+push, PR #8 immutable link 교정, temp detached exact-head review worktree 생성까지 완료됐다. 그 head의
+fresh review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context가 확인한
+Stage 6.14–6.17 history의 active future tense는 현재 Stage 6.20 report-only closure 계보에서
+completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로
+기록하지 않는다.
 
 ## 변경 전·후 정량 비교
 
@@ -174,8 +181,11 @@ wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact
 | Stage 6.18 publication gate | FULFILLED AT `dc108f9` — 두 report만 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
 | `dc108f9` closure verification | REJECT RECORDED — 두 report가 closure 자체에서 future-tense wording을 남긴 completion-state 결함을 확인했다. five-lane review는 시작하지 않았다. |
 | Stage 6.19 closure | OK — Stage 6.18에 남은 future tense를 completed-state wording으로 교정했다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다. |
-| Stage 6.19 review gate | PENDING FOR NEW EXACT HEAD — report-only closure publication 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
-| rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 pending이다. |
+| Stage 6.19 publication gate | FULFILLED AT `a96eabb` — 두 report만 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
+| `a96eabb` fresh review lanes | REJECT RECORDED — Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context blocker는 Stage 6.14–6.17의 이미 생성된 additive publication commit을 active future tense로 남긴 cumulative-report history 네 line뿐이었다. |
+| Stage 6.20 closure | OK — 네 history line의 commit bundling과 `.omo`/generated-output exclusion을 completed-state wording으로 교정했다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다. |
+| Stage 6.20 review gate | PENDING FOR NEW EXACT HEAD — report-only closure publication 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
+| rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 당시 pending이었다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
 | live Apple/GitHub release operations | OK — Developer ID signing, Apple Notarization, stapling, Gatekeeper, tag, GitHub Release, upload, public v0.1.1 publication은 실행하지 않았다. |
@@ -221,6 +231,8 @@ wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact
   stale report wording만 확인한 Context REJECT를 추가했다.
 - Stage 6.19: `dc108f9` closure verification이 확인한 residual future tense와 five-lane review 미실행을
   기록하고, 두 report를 completed-state wording으로 교정했다.
+- Stage 6.20: `a96eabb` Goal/QA/Code Quality/Security approval과 Context rejection을 기록하고, Stage
+  6.14–6.17 publication history 네 line의 active future tense를 completed-state wording으로 교정했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -244,7 +256,11 @@ wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact
 - `7fdd85f` fresh review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다.
   유일한 blocker인 두 report의 stale lifecycle wording과 Stage 6.18에 남은 future tense는 현재 Stage 6.19
   report-only closure 계보에서 completed-state wording으로 교정됐다.
-- Stage 6.19 report-only head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.19 report-only closure는 `a96eabb928e1fa63c3d7c96b48698d612103e1c3`로 게시됐고 PR #8
+  immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head의 review는 Goal,
+  QA, Code Quality, Security APPROVE와 Context REJECT를 기록했으며 네 stale history line만 blocker였다.
+- 해당 네 line은 현재 Stage 6.20 report-only closure 계보에서 completed-state wording으로 교정됐다.
+- Stage 6.20 report-only head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 작업지시자 승인 기록 및 요청
@@ -254,5 +270,8 @@ wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact
   completed-state wording으로 교정됐다. 이 commit은 자신의 exact SHA를 재귀적으로 주장하지 않으며
   publication, PR #8 링크, detached review worktree의 exact 결과에 대한 source of truth는 ignored
   receipt다. 그 exact head의 fresh five-lane review가 다음 gate다.
-- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.19 exact-head review, PR merge,
+- 작업지시자의 최신 명시 지시에 따라 `a96eabb` Context가 확인한 네 history line도 현재 Stage 6.20
+  report-only closure 계보에서 completed-state wording으로 교정됐다. 이 closure는 자신의 exact SHA를
+  재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
+- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.20 exact-head review, PR merge,
   `origin/master` containment verification은 pending이고 Todo 8은 완료로 주장하지 않는다.

@@ -24,6 +24,8 @@ async function executable(path) {
 export async function createSigningFixture(options = {}) {
   const root = await mkdtemp(join(tmpdir(), "prompter-signing-test-"))
   const appPath = join(root, "Prompter.app")
+  const nativeSuffix = options.nativeSuffix ?? ".node"
+  const dylibSuffix = options.dylibSuffix ?? ".dylib"
   const paths = {
     appPath,
     main: join(appPath, "Contents", "MacOS", "Prompter"),
@@ -37,8 +39,8 @@ export async function createSigningFixture(options = {}) {
       "Prompter Helper",
     ),
     framework: join(appPath, "Contents", "Frameworks", "Kit.framework", "Kit"),
-    dylib: join(appPath, "Contents", "Frameworks", "libfixture.dylib"),
-    native: join(appPath, "Contents", "Resources", "app", "fixture.node"),
+    dylib: join(appPath, "Contents", "Frameworks", `libfixture${dylibSuffix}`),
+    native: join(appPath, "Contents", "Resources", "app", `fixture${nativeSuffix}`),
     xpc: join(appPath, "Contents", "XPCServices", "Worker.xpc", "Contents", "MacOS", "Worker"),
     tool: join(appPath, "Contents", "MacOS", "native-tool"),
     entitlements: join(root, "entitlements.plist"),

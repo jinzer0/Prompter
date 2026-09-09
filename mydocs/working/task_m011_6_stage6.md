@@ -96,6 +96,8 @@ payload 허용을 확인했다. Stage 6.23은 세 blocker를 교정했다.
 | `scripts/macos/release-attempt-validation.mjs`, `scripts/macos/release-attempt.mjs` | terminal app refresh가 affected app과 dependent DMG evidence를 함께 폐기하고, orphan retained DMG를 typed discard로 제거하도록 교정했다. |
 | `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization.mjs`, `scripts/macos/notarization-stapling.mjs`, release lifecycle/support modules | submit UUID를 artifact-bound evidence에 먼저 저장한 뒤 bounded `info` polling을 수행하고, resume 시 재제출을 막으며 app/DMG staple에 injected `0/5s/15s/30s/60s` backoff를 적용했다. |
 | `scripts/macos/signing-discovery.mjs` | lowercase `.node`/`.dylib` 파일이 Mach-O가 아니면 fail closed하고 일반 resource는 기존처럼 무시하도록 교정했다. |
+| `scripts/macos/notarization-storage.mjs`, notarization evidence/service modules | shared evidence directory에 exclusive filesystem claim을 두고 ambiguous existing claim은 보수적으로 거부한다. JSON evidence는 mode `0600` temporary file을 sync한 뒤 atomic rename하며, submit 직전과 UUID 저장 직후 artifact identity drift를 검사한다. |
+| `scripts/macos/signing-discovery.mjs`, signing fixtures/architecture tests | `.node`/`.dylib` extension을 lowercase로 normalize해 uppercase/mixed-case native suffix도 같은 fail-closed Mach-O 계약에 포함하고 일반 resource는 유지한다. |
 | `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.13 blocker 회귀를 contract 13 files/35 tests, focused release 17 files/173 tests로 고정했다. |
 | `tests/package-macos-coordinator-cached-accepted.test.mjs` | cached Accepted cleanup에 더해 malformed app evidence retry와 terminal DMG의 accepted app preservation을 각각 three-run으로 고정했다. |
 | `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG match, missing/duplicate/malformed/mismatch cleanup, sibling-kind preservation, transient display failure retention, third-run success와 direct suite 등록을 고정했다. |
@@ -516,13 +518,35 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   재실행했다고 주장하지 않는다.
 - MISS(환경 제한): Stage 6.23 source/test paths와 두 report의 LSP diagnostics는 sibling-worktree
   request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.23 report-inclusive head
+  `4dcf2192640e9cef847b5f074b4f9ebd31bbe607`의 fresh exact-head review는 Goal/QA PASS와 Code
+  Quality/Security FAIL을 기록했다. Context FAIL은 구현 결함이 아니라 당시 exact-head review, PR merge,
+  `origin/master` containment가 pending이라는 절차적 판정이었다.
+- Code Quality blockers는 shared evidence directory의 concurrent initial call이 duplicate submit할 수 있는
+  경쟁 조건과 resume evidence를 direct `writeFile`로 교체하는 non-atomic storage였다.
+- Security blockers는 최초 hash와 submit 사이 및 UUID acknowledgement 뒤 artifact identity drift, 그리고
+  uppercase/mixed-case `.node`/`.dylib`을 native suffix로 분류하지 않는 case-sensitive 계약이었다.
+- OK: Stage 6.24는 exclusive `wx` filesystem claim을 사용하고 existing/ambiguous claim을 fail closed한다.
+  claim 획득 뒤 resume evidence를 다시 읽어 winner가 UUID를 저장한 경우 재제출 없이 resume한다.
+- OK: evidence replacement는 mode `0600` temporary file write와 file sync 뒤 atomic rename을 수행하고,
+  interruption 시 prior evidence를 보존하며 temporary file을 제거한다.
+- OK: submit 직전 artifact identity를 재검증하고 UUID를 unknown evidence로 먼저 저장한 직후 다시 검증한다.
+  post-UUID drift는 polling 없이 실패하고 다음 호출도 retained UUID/hash mismatch로 재제출하지 않는다.
+- OK: native suffix는 case-insensitive normalize되어 uppercase/mixed-case `.node`/`.dylib`도 non-Mach-O면
+  fail closed하고 valid ARM64 payload와 alias policy에 동일하게 적용된다. 일반 text/extensionless resource는
+  기존처럼 signing 대상에서 제외된다.
+- OK: authoritative verification은 full Vitest 148 files/982 tests, typecheck, lint, changed-file syntax,
+  `git diff --check`다. Stage 6.14의 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.24에서
+  재실행했다고 주장하지 않는다.
+- MISS(환경 제한): Stage 6.24 source/test/config paths와 두 report의 LSP diagnostics는 sibling-worktree
+  request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact manual
   inspection, tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- same-user filesystem TOCTOU hardening은 nonblocking residual risk다. 현재 범위는 same-user local build
-  환경의 fail-closed 검사와 ownership proof를 고정했다.
+- Stage 6.24의 exclusive claim과 pre/post-submit identity 검사는 확인된 submission/evidence race를
+  fail closed하지만, 같은 사용자 권한의 임의 filesystem mutation 가능성 전체를 제거했다고 주장하지 않는다.
 - non-Apple command abortability는 nonblocking residual risk다. 장시간 Apple trust command는 bounded
   timeout과 AbortSignal을 갖지만 모든 non-Apple subprocess의 external abort contract를 새로 만들지는 않았다.
 
@@ -551,8 +575,13 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal/Security/Context
   REJECT와 QA/Code Quality APPROVE를 기록했고 discussions `3971745639`, `3971745648`, `3972249043`의
   submit UUID durability, staple propagation retry, native-suffix payload validation이 product blocker였다.
-- Stage 6.23 세 blocker remediation과 regression은 완료됐다.
-- Stage 6.23 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.23 remediation은 `4dcf2192640e9cef847b5f074b4f9ebd31bbe607`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal/QA PASS,
+  Code Quality/Security FAIL을 기록했다. Context FAIL은 review/merge/containment pending만 근거로 한
+  procedural verdict였다.
+- Stage 6.24 notarization claim/atomic storage/artifact drift와 case-insensitive native suffix remediation,
+  direct regressions 및 config registration은 완료됐다.
+- Stage 6.24 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 승인 요청
@@ -576,3 +605,8 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   `3972249043`의 submit UUID durability, staple propagation retry, native-suffix payload validation
   blocker는 Stage 6.23 source/test와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로
   주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
+- 작업지시자의 최신 명시 지시에 따라 `4dcf219` review의 concurrent duplicate submit, non-atomic evidence
+  replacement, pre/post-submit artifact drift, case-sensitive native suffix blocker는 Stage 6.24
+  source/test/config와 두 report에서 교정됐다. Context procedural FAIL의 당시 pending review는 완료됐고,
+  merge와 containment는 계속 후속 gate다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않으며
+  Atlas가 그 exact head의 fresh five-lane review를 시작하는 것이 다음 gate다.

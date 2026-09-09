@@ -50,8 +50,12 @@ function bundleKind(targetPath) {
   return undefined
 }
 
+function normalizedExtension(targetPath) {
+  return extname(targetPath).toLowerCase()
+}
+
 function rawKind(targetPath, mode, frameworkPath, description) {
-  const extension = extname(targetPath)
+  const extension = normalizedExtension(targetPath)
   if (extension === ".node") return "native-module"
   if (extension === ".dylib" || frameworkPath !== undefined) return "dynamic-library"
   if ((mode & 0o111) !== 0 || description.includes("executable")) return "executable-host"
@@ -93,8 +97,8 @@ export async function discoverSignableCode({ appPath, runFile }) {
     const targetPath = await realpath(candidatePath)
     assertContained(rootPath, targetPath)
     const candidateBundleKind = bundleKind(candidatePath)
-    const candidateExtension = extname(candidatePath)
-    const targetExtension = extname(targetPath)
+    const candidateExtension = normalizedExtension(candidatePath)
+    const targetExtension = normalizedExtension(targetPath)
     if (
       (candidateBundleKind !== undefined && candidateBundleKind !== bundleKind(targetPath)) ||
       ([".node", ".dylib"].includes(candidateExtension) && candidateExtension !== targetExtension)
@@ -127,7 +131,7 @@ export async function discoverSignableCode({ appPath, runFile }) {
     if (!metadata.isFile()) return
 
     const frameworkPath = containingFramework(targetPath, rootPath)
-    const extension = extname(targetPath)
+    const extension = normalizedExtension(targetPath)
     const nativeCodeSuffix = extension === ".node" || extension === ".dylib"
     const inspectByContract =
       nativeCodeSuffix ||

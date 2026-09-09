@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { createReadStream } from "node:fs"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import {
@@ -13,6 +13,7 @@ import {
   submissionArtifactKind,
   validArtifactIdentity,
 } from "./notarization-contract.mjs"
+import { writeAtomicJson } from "./notarization-storage.mjs"
 
 const resumeFileName = "notarization-resume.json"
 
@@ -84,8 +85,7 @@ function resume(value) {
 }
 
 async function save(evidenceDir, fileName, value) {
-  await mkdir(evidenceDir, { recursive: true })
-  await writeFile(join(evidenceDir, fileName), `${JSON.stringify(value)}\n`)
+  await writeAtomicJson({ directory: evidenceDir, fileName, value })
 }
 
 export async function identifyNotarizationArtifact(value) {

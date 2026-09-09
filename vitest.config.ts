@@ -21,6 +21,8 @@ export default defineConfig({
       "tests/package-macos-notarization-resume.test.mjs",
       "tests/package-macos-notarization-commands.test.mjs",
       "tests/package-macos-notarization-evidence.test.mjs",
+      "tests/package-macos-notarization-claim.test.mjs",
+      "tests/package-macos-notarization-storage.test.mjs",
       "tests/macos-release-contract.test.ts",
       "tests/privacy-guard-service.test.ts",
       "tests/privacy-guard-integration.test.ts",

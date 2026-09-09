@@ -42,7 +42,8 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.20 / `169eeef` | Stage 6 cumulative report, final report | Stage 6.14–6.17 publication history의 active future tense를 completed-state wording으로 교정 | governance/reporting only |
 | 6.21 / `800222a` | release-attempt validation/preparation/coordinator, DMG/cached/signing recovery tests, direct DMG app-refresh regression, Vitest config, reports | `169eeef` Context discussion `3971543713` DMG-resume app-refresh bypass 교정 | signed-release offline contracts |
 | 6.22 / `1000150` | release-attempt validation/preparation, direct DMG app-refresh regression, reports | `800222a` review의 dependent DMG invalidation과 orphan recovery 교정 | signed-release offline contracts |
-| 6.23 / completed remediation lineage | notarization command/lifecycle/stapling, signing discovery, direct regressions/support, reports | `1000150` discussions `3971745639`, `3971745648`, `3972249043` 교정 | signed-release offline contracts |
+| 6.23 / `4dcf219` | notarization command/lifecycle/stapling, signing discovery, direct regressions/support, reports | `1000150` discussions `3971745639`, `3971745648`, `3972249043` 교정 | signed-release offline contracts |
+| 6.24 / completed remediation lineage | notarization storage/evidence/service, signing discovery, direct regressions/support, Vitest config, reports | `4dcf219` Quality/Security blockers 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -126,7 +127,13 @@ APPROVE, Security REJECT, Context REJECT를 기록했다. discussions
 [3971745648](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745648),
 [3972249043](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972249043)이 확인한 submit UUID
 durability, staple propagation retry, native-suffix payload validation blocker는 현재 Stage 6.23 remediation
-계보에서 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다.
+계보에서 교정됐다. Stage 6.23 publication head는
+`4dcf2192640e9cef847b5f074b4f9ebd31bbe607`이며 정상 push, PR #8 immutable link 교정, temp detached
+exact-head review worktree 생성까지 완료됐다. 그 head review는 Goal/QA PASS와 Code Quality/Security
+FAIL을 기록했다. Context FAIL은 당시 review/merge/containment pending만 근거로 한 procedural verdict였다.
+Quality는 concurrent duplicate submit과 non-atomic evidence replacement를, Security는 pre/post-submit
+artifact identity drift와 case-sensitive native suffix를 blocker로 확인했다. 이 closure는 자신의 아직 알 수
+없는 exact SHA를 재귀적으로 기록하지 않는다.
 
 ## 변경 전·후 정량 비교
 
@@ -134,7 +141,7 @@ durability, staple propagation retry, native-suffix payload validation blocker�
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
 | focused release regression | Stage 1 40 tests | Stage 6.14 cached-Accepted direct rerun 17/17 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.23 146 files, 972/972 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.24 148 files, 982/982 tests passed |
 | ARM64 Mach-O integrity | asset 이름만 arm64 | 모든 canonical Mach-O에 exact `arm64` slice 강제; universal x86_64+arm64 허용 |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
 | installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
@@ -218,7 +225,11 @@ durability, staple propagation retry, native-suffix payload validation blocker�
 | `1000150` fresh review lanes | REJECT RECORDED — Goal REJECT, QA APPROVE, Code Quality APPROVE, Security REJECT, Context REJECT를 기록했다. Discussion `3971745639`는 submit UUID 선저장 누락, `3971745648`은 staple propagation retry 부재, `3972249043`은 lowercase `.node`/`.dylib` non-Mach-O payload 허용을 확인했다. |
 | Stage 6.23 remediation | OK — submit과 wait를 분리해 artifact-bound UUID를 먼저 저장하고 bounded `info` polling 및 no-resubmission resume을 고정했다. app/DMG stapling은 injected `0/5s/15s/30s/60s` backoff를 사용한다. lowercase native suffix non-Mach-O payload는 fail closed하고 일반 resource는 무시한다. |
 | Stage 6.23 verification | OK — full Vitest 146 files/972 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.23에서 재실행했다고 주장하지 않는다. LSP는 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
-| Stage 6.23 review gate | PENDING FOR NEW EXACT HEAD — source/test/report publication 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
+| Stage 6.23 publication gate | FULFILLED AT `4dcf219` — source/test/config/report commit을 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
+| `4dcf219` fresh review lanes | REJECT RECORDED — Goal/QA PASS, Code Quality/Security FAIL. Context FAIL은 당시 exact-head review, PR merge, `origin/master` containment가 pending이라는 procedural verdict였다. Quality blockers는 concurrent duplicate submit과 non-atomic evidence replacement, Security blockers는 pre/post-submit artifact identity drift와 case-sensitive native suffix였다. |
+| Stage 6.24 remediation | OK — exclusive `wx` filesystem claim과 conservative existing-claim rejection을 추가하고, claim 획득 뒤 resume evidence를 다시 읽어 winner UUID를 재제출 없이 사용한다. evidence는 synced mode-0600 temporary file에서 atomic rename하며 interruption 시 prior evidence를 보존한다. UUID 저장 직후 drift는 polling 없이 fail closed하고 retained UUID 때문에 재제출되지 않는다. native suffix는 case-insensitive normalize하며 일반 resources는 제외한다. |
+| Stage 6.24 verification | OK — full Vitest 148 files/982 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.24에서 재실행했다고 주장하지 않는다. LSP는 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
+| Stage 6.24 review gate | PENDING FOR NEW EXACT HEAD — publication 뒤 Atlas가 동일 exact head의 fresh five reviewers를 실행해야 한다. PR merge와 `origin/master` containment는 그 뒤 gate다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 당시 pending이었다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -276,6 +287,9 @@ durability, staple propagation retry, native-suffix payload validation blocker�
 - Stage 6.23: `1000150` Goal/Security/Context rejection과 QA/Code Quality approval, discussions
   `3971745639`, `3971745648`, `3972249043`, submit UUID 선저장과 no-resubmission resume,
   deterministic staple backoff, native-suffix non-Mach-O rejection, full 972/972와 LSP refusal을 추가했다.
+- Stage 6.24: `4dcf219` Goal/QA PASS, Quality/Security FAIL과 procedural Context FAIL, concurrent submit
+  claim, atomic evidence replacement, pre/post-submit drift rejection, case-insensitive native suffix,
+  direct storage/claim regression, full 982/982와 LSP refusal을 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -283,9 +297,8 @@ durability, staple propagation retry, native-suffix payload validation blocker�
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact inspection,
   tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- same-user filesystem TOCTOU hardening은 nonblocking residual risk다. 현재 release path는 candidate
-  ownership과 fail-closed checks를 갖지만 같은 사용자 권한의 로컬 filesystem race를 완전히 제거했다고
-  주장하지 않는다.
+- Stage 6.24 exclusive claim과 pre/post-submit identity 검사는 확인된 submission/evidence race를
+  fail closed하지만 같은 사용자 권한의 임의 filesystem mutation 가능성 전체를 제거했다고 주장하지 않는다.
 - non-Apple command abortability는 nonblocking residual risk다. 장시간 Apple trust commands는 bounded
   timeout과 AbortSignal을 갖지만 모든 non-Apple subprocess의 external abort contract를 새로 만들지는 않았다.
 - upstream native-addon cast warnings, Biome deprecated-config information, Vite chunk-size warning은 exit 0
@@ -316,8 +329,12 @@ durability, staple propagation retry, native-suffix payload validation blocker�
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal/Security/Context
   REJECT와 QA/Code Quality APPROVE를 기록했고 discussions `3971745639`, `3971745648`, `3972249043`의
   submit UUID durability, staple propagation retry, native-suffix payload validation이 product blocker였다.
-- Stage 6.23 세 blocker remediation과 regression은 완료됐다.
-- Stage 6.23 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.23 remediation은 `4dcf2192640e9cef847b5f074b4f9ebd31bbe607`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal/QA PASS,
+  Code Quality/Security FAIL을 기록했다. Context FAIL은 review/merge/containment pending만 근거로 한
+  procedural verdict였다.
+- Stage 6.24 Quality/Security blocker remediation과 direct regression은 완료됐다.
+- Stage 6.24 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 작업지시자 승인 기록 및 요청
@@ -341,5 +358,10 @@ durability, staple propagation retry, native-suffix payload validation blocker�
   `3972249043`의 submit UUID durability, staple propagation retry, native-suffix payload validation
   blocker는 Stage 6.23 source/test와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로
   주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
-- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.23 exact-head review, PR merge,
+- 작업지시자의 최신 명시 지시에 따라 `4dcf219` review의 concurrent duplicate submit, non-atomic evidence
+  replacement, pre/post-submit artifact drift, case-sensitive native suffix blocker는 Stage 6.24
+  source/test/config와 두 report에서 교정됐다. Context procedural FAIL의 당시 pending review는 완료됐고,
+  merge와 containment는 계속 후속 gate다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않으며
+  Atlas가 그 exact head의 fresh five-lane review를 시작하는 것이 다음 gate다.
+- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.24 exact-head review, PR merge,
   `origin/master` containment verification은 pending이고 Todo 8은 완료로 주장하지 않는다.

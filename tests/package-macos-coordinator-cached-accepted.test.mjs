@@ -38,6 +38,7 @@ test.each([
   const attempt = notarizationAttempt(first, artifactKind)
   const submittedBytes = await readFile(attempt.artifactPath)
   const second = await fixture({
+    pendingAppStatus: "Accepted",
     ...statusOption(artifactKind, "In Progress"),
     shared: first.shared,
   })

@@ -135,6 +135,7 @@ test("rejects a resumed DMG signed by a rotated Developer ID before copy or stap
   await assert.rejects(first.run())
   const second = await fixture({
     displayIdentity: syntheticIdentity,
+    pendingAppStatus: "Accepted",
     pendingDmgStatus: "Accepted",
     shared: first.shared,
     signingIdentity: rotatedIdentity,
@@ -166,7 +167,11 @@ test("rejects a resumed DMG signed by a rotated Developer ID before copy or stap
 test("resumes a DMG when its Developer ID matches the current identity", async () => {
   const first = await fixture({ failure: "dmg-timeout" })
   await assert.rejects(first.run())
-  const second = await fixture({ pendingDmgStatus: "Accepted", shared: first.shared })
+  const second = await fixture({
+    pendingAppStatus: "Accepted",
+    pendingDmgStatus: "Accepted",
+    shared: first.shared,
+  })
 
   await second.run()
 

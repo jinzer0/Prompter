@@ -115,6 +115,7 @@ export async function runMacOSRelease(options) {
       await verifyFinalZip(finalZip, state, run, release.signal)
     }
     const finalDmg = await prepareReleaseDmg({
+      appAttempt: resumed?.appAttempt,
       appPath,
       attempt: state.attempts.dmg,
       release,

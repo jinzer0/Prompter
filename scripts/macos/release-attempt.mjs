@@ -161,7 +161,15 @@ export async function prepareReleaseApp({ attempt, release, resumed, state }) {
   return appPath
 }
 
-export async function prepareReleaseDmg({ appPath, attempt, release, resumed, state, targetPath }) {
+export async function prepareReleaseDmg({
+  appAttempt,
+  appPath,
+  attempt,
+  release,
+  resumed,
+  state,
+  targetPath,
+}) {
   state.attemptHandlingStarted = true
   if (!resumed) {
     await prepareAttempt(attempt)
@@ -189,6 +197,7 @@ export async function prepareReleaseDmg({ appPath, attempt, release, resumed, st
     await verifyDmgSignature({ dmgPath: artifactPath, runFile: state.run })
     await verifyPreparedAttempt(attempt, artifactPath)
   }
+  if (resumed) await acceptAttempt(appAttempt, state)
   await acceptAttempt(attempt, state)
   if (resumed) {
     await verifyDmgSignature({

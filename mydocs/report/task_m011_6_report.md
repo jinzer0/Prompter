@@ -39,7 +39,8 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.17 / `7fdd85f` | `signing.mjs`, signer identity recovery test, reports | `12f59ba` retained wrong-signer deterministic cleanup과 transient resume 교정 | signed-release offline contracts |
 | 6.18 / `dc108f9` | Stage 6 cumulative report, final report | `7fdd85f` Context가 확인한 stale publication lifecycle wording 부분 교정 | governance/reporting only |
 | 6.19 / `a96eabb` | Stage 6 cumulative report, final report | Stage 6.18에 남은 future tense를 completed-state wording으로 교정 | governance/reporting only |
-| 6.20 / completed closure lineage | Stage 6 cumulative report, final report | Stage 6.14–6.17 publication history의 active future tense를 completed-state wording으로 교정 | governance/reporting only |
+| 6.20 / `169eeef` | Stage 6 cumulative report, final report | Stage 6.14–6.17 publication history의 active future tense를 completed-state wording으로 교정 | governance/reporting only |
+| 6.21 / completed remediation lineage | release-attempt validation/preparation/coordinator, DMG/cached/signing recovery tests, direct DMG app-refresh regression, Vitest config, reports | `169eeef` Context discussion `3971543713` DMG-resume app-refresh bypass 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -105,6 +106,12 @@ fresh review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 �
 Stage 6.14–6.17 history의 active future tense는 현재 Stage 6.20 report-only closure 계보에서
 completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로
 기록하지 않는다.
+Stage 6.20 report-only publication head도 `169eeefdbf4dd5a92f3406bf165b8389c10ed6a6`이며 정상
+push, PR #8 immutable link 교정, temp detached exact-head review worktree 생성까지 완료됐다. 그 head의
+fresh review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. discussion
+[3971543713](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971543713)이 확인한 DMG-resume
+app-refresh bypass는 현재 Stage 6.21 remediation 계보에서 교정됐다. 이 closure는 자신의 아직 알 수 없는
+exact SHA를 재귀적으로 기록하지 않는다.
 
 ## 변경 전·후 정량 비교
 
@@ -112,7 +119,7 @@ completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
 | focused release regression | Stage 1 40 tests | Stage 6.14 cached-Accepted direct rerun 17/17 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.17 145 files, 955/955 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.21 146 files, 959/959 tests passed |
 | ARM64 Mach-O integrity | asset 이름만 arm64 | 모든 canonical Mach-O에 exact `arm64` slice 강제; universal x86_64+arm64 허용 |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
 | installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
@@ -184,7 +191,11 @@ completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 
 | Stage 6.19 publication gate | FULFILLED AT `a96eabb` — 두 report만 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
 | `a96eabb` fresh review lanes | REJECT RECORDED — Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context blocker는 Stage 6.14–6.17의 이미 생성된 additive publication commit을 active future tense로 남긴 cumulative-report history 네 line뿐이었다. |
 | Stage 6.20 closure | OK — 네 history line의 commit bundling과 `.omo`/generated-output exclusion을 completed-state wording으로 교정했다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다. |
-| Stage 6.20 review gate | PENDING FOR NEW EXACT HEAD — report-only closure publication 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
+| Stage 6.20 publication gate | FULFILLED AT `169eeef` — 두 report만 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
+| `169eeef` fresh review lanes | REJECT RECORDED — Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context discussion [3971543713](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971543713)은 retained DMG resume가 retained app의 fresh status/log를 확인하지 않고 DMG work로 진행하는 blocker를 확인했다. |
+| Stage 6.21 remediation | OK — inspected DMG resume가 retained app attempt를 전달하고 DMG acceptance 전에 app status/log를 refresh한다. fresh app warning/error/Rejected는 DMG info, staple, attach, checksum 전에 차단되고, Accepted는 app info/log 뒤 DMG info 순서를 지키며 app/DMG resubmission 없이 완료된다. |
+| Stage 6.21 verification | OK — direct DMG app-refresh regression, adjusted DMG/cached/signing recovery tests와 suite registration을 포함해 full Vitest 146 files/959 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.21에서 재실행했다고 주장하지 않는다. LSP는 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
+| Stage 6.21 review gate | PENDING FOR NEW EXACT HEAD — implementation/test/config/report publication 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 당시 pending이었다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -233,6 +244,9 @@ completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 
   기록하고, 두 report를 completed-state wording으로 교정했다.
 - Stage 6.20: `a96eabb` Goal/QA/Code Quality/Security approval과 Context rejection을 기록하고, Stage
   6.14–6.17 publication history 네 line의 active future tense를 completed-state wording으로 교정했다.
+- Stage 6.21: `169eeef` Goal/QA/Code Quality/Security approval과 Context discussion `3971543713`을
+  기록하고, resumed DMG의 retained app status/log refresh, warning/error/Rejected blocking, Accepted
+  no-resubmission happy path, direct regression, full 959/959와 LSP refusal을 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -260,7 +274,12 @@ completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 
   immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head의 review는 Goal,
   QA, Code Quality, Security APPROVE와 Context REJECT를 기록했으며 네 stale history line만 blocker였다.
 - 해당 네 line은 현재 Stage 6.20 report-only closure 계보에서 completed-state wording으로 교정됐다.
-- Stage 6.20 report-only head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.20 report-only closure는 `169eeefdbf4dd5a92f3406bf165b8389c10ed6a6`로 게시됐고 PR #8
+  immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head의 review는 Goal,
+  QA, Code Quality, Security APPROVE와 Context REJECT를 기록했으며 discussion `3971543713`의 DMG-resume
+  app-refresh bypass만 blocker였다.
+- Stage 6.21 DMG-resume app-status refresh remediation과 direct regression은 완료됐다.
+- Stage 6.21 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 작업지시자 승인 기록 및 요청
@@ -273,5 +292,8 @@ completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 
 - 작업지시자의 최신 명시 지시에 따라 `a96eabb` Context가 확인한 네 history line도 현재 Stage 6.20
   report-only closure 계보에서 completed-state wording으로 교정됐다. 이 closure는 자신의 exact SHA를
   재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
-- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.20 exact-head review, PR merge,
+- 작업지시자의 최신 명시 지시에 따라 `169eeef` Context discussion `3971543713`의 DMG-resume
+  app-refresh bypass는 Stage 6.21 implementation/test/config와 두 report에서 교정됐다. 이 closure는
+  자신의 exact SHA를 재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
+- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.21 exact-head review, PR merge,
   `origin/master` containment verification은 pending이고 Todo 8은 완료로 주장하지 않는다.

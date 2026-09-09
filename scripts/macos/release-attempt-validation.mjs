@@ -152,7 +152,7 @@ export async function inspectReleaseAttempts(attempts) {
     ])
     if (app !== undefined && dmg !== undefined) {
       if (app.saved.status !== "Accepted") fail()
-      return dmg
+      return Object.freeze({ ...dmg, appAttempt: app.attempt })
     }
     if (app !== undefined && dmgEvidenceStatus !== undefined) fail()
     if (dmg !== undefined && appEvidenceStatus !== "Accepted") fail()

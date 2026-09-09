@@ -29,7 +29,11 @@ test.each([
   await assert.rejects(first.run())
   const attempt = notarizationAttempt(first, "dmg")
   const submittedBytes = await readFile(attempt.artifactPath)
-  const second = await fixture({ pendingDmgStatus: "Accepted", shared: first.shared })
+  const second = await fixture({
+    pendingAppStatus: "Accepted",
+    pendingDmgStatus: "Accepted",
+    shared: first.shared,
+  })
   const result = await second.run()
   const finalDmg = join(second.candidate, "Prompter-0.1.1-mac-arm64.dmg")
   assert.equal(submissionCount([first, second], "app"), 1)
@@ -90,7 +94,11 @@ test.each([
   assert.equal(pendingEvidence.status, "accepted")
   assert.equal(first.calls.includes("dmg-log"), true)
 
-  const second = await fixture({ pendingDmgStatus: "Accepted", shared: first.shared })
+  const second = await fixture({
+    pendingAppStatus: "Accepted",
+    pendingDmgStatus: "Accepted",
+    shared: first.shared,
+  })
   const result = await second.run()
 
   assert.equal(submissionCount([first, second], "app"), 1)
@@ -137,7 +145,11 @@ test("preserves submitted DMG bytes when a mutating staple is followed by valida
       .every(({ arguments_ }) => arguments_[2] !== attempt.artifactPath),
     true,
   )
-  const second = await fixture({ pendingDmgStatus: "Accepted", shared: first.shared })
+  const second = await fixture({
+    pendingAppStatus: "Accepted",
+    pendingDmgStatus: "Accepted",
+    shared: first.shared,
+  })
 
   const result = await second.run()
 

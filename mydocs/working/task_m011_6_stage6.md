@@ -58,7 +58,13 @@ Stage 6.17 publication, PR link 교정, detached review worktree 생성을 향�
 wording만 blocker로 확인했다. Stage 6.18 report-only head
 `dc108f9a09a36674471d32e53c258c1899267360`은 정상 게시됐지만 closure 자체에 future-tense wording을 남긴
 verification failure가 확인됐다. 해당 잔여 wording은 현재 Stage 6.19 report-only closure 계보에서
-completed-state wording으로 교정됐다.
+completed-state wording으로 교정됐다. Stage 6.20 report-only head
+`169eeefdbf4dd5a92f3406bf165b8389c10ed6a6`도 정상 게시됐고, 그 exact-head review는 Goal, QA,
+Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context discussion
+[3971543713](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971543713)은 retained DMG
+resume가 retained app의 최신 status/log를 refresh하지 않고 DMG work로 진행하는 blocker를 확인했다.
+Stage 6.21은 DMG resume에서 app status/log를 먼저 refresh하고 fresh app warning/error/Rejected를
+차단하며 Accepted happy path는 resubmission 없이 유지하도록 교정했다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -75,9 +81,11 @@ completed-state wording으로 교정됐다.
 | `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-contract.mjs`, `scripts/macos/release-attempt-validation.mjs` | warning/error log는 terminal publication blocker로 유지하고, malformed/service-error retrieval 뒤 valid bound lowercase-accepted app/DMG bytes는 refresh를 위해 보존한다. |
 | `scripts/macos/release-attempt.mjs`, `scripts/macos/release-attempt-validation.mjs` | submission 및 malformed retained-evidence error에 affected artifact kind를 전파하고 terminal cleanup을 해당 kind의 evidence root로 제한해 other-kind Accepted evidence를 보존한다. |
 | `scripts/macos/signing.mjs`, `scripts/macos/release-attempt.mjs` | resumed app/DMG identity를 exact 검증하고 missing/duplicate/malformed/mismatch 같은 deterministic error에 `artifactKind`와 `discardEvidence`를 부여한다. transient codesign execution error에는 cleanup marker를 추가하지 않는다. |
+| `scripts/macos/release-attempt-validation.mjs`, `scripts/macos/release-attempt.mjs`, `scripts/release-macos.mjs` | resumed DMG inspection에서 retained app attempt를 전달하고 DMG status/staple/copy 전에 app status/log를 refresh하도록 교정했다. |
 | `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.13 blocker 회귀를 contract 13 files/35 tests, focused release 17 files/173 tests로 고정했다. |
 | `tests/package-macos-coordinator-cached-accepted.test.mjs` | cached Accepted cleanup에 더해 malformed app evidence retry와 terminal DMG의 accepted app preservation을 각각 three-run으로 고정했다. |
 | `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG match, missing/duplicate/malformed/mismatch cleanup, sibling-kind preservation, transient display failure retention, third-run success와 direct suite 등록을 고정했다. |
+| `tests/package-macos-coordinator-dmg-app-refresh.test.mjs`, DMG/cached/signing recovery tests, `vitest.config.ts` | resumed DMG 전에 fresh app warning/error/Rejected 차단, Accepted status/log ordering, app/DMG no-resubmission과 direct suite 등록을 고정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
@@ -447,6 +455,22 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - OK: 네 history line의 commit bundling과 `.omo`/generated-output exclusion은 현재 Stage 6.20
   report-only closure 계보에서 completed-state wording으로 교정됐다. 이 closure는 자신의 아직 알 수 없는
   exact SHA를 재귀적으로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.20 report-only head
+  `169eeefdbf4dd5a92f3406bf165b8389c10ed6a6`의 fresh exact-head review는 Goal, QA, Code Quality,
+  Security APPROVE와 Context REJECT를 기록했다. Context discussion
+  [3971543713](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971543713)은 retained DMG
+  resume가 app Accepted evidence를 terminal truth로 취급해 fresh app warning/error/Rejected를 확인하지
+  않고 DMG work로 진행하는 blocker를 확인했다.
+- OK: Stage 6.21은 inspected DMG resume에 retained app attempt를 결합하고 `prepareReleaseDmg`가 DMG
+  attempt acceptance보다 먼저 app attempt의 fresh status/log를 검증하게 했다. fresh app warning/error와
+  Rejected는 DMG info, staple, attach, checksum 전에 차단되며 affected app evidence만 폐기한다.
+- OK: fresh app Accepted happy path는 app info/log 뒤 DMG info 순서를 지키고 app과 DMG를 재제출하지
+  않는다. 신규 direct regression과 기존 DMG/cached/signing recovery fixture를 해당 계약에 맞췄다.
+- OK: authoritative verification은 full Vitest 146 files/959 tests, typecheck, lint, changed-file syntax,
+  `git diff --check`다. Stage 6.14의 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.21에서
+  재실행했다고 주장하지 않는다.
+- MISS(환경 제한): Stage 6.21 implementation/test/config paths와 두 report의 LSP diagnostics는
+  sibling-worktree request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
@@ -469,7 +493,12 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head의 review는 Goal,
   QA, Code Quality, Security APPROVE와 Context REJECT를 기록했으며 네 stale history line만 blocker였다.
 - 해당 네 line은 현재 Stage 6.20 report-only closure 계보에서 completed-state wording으로 교정됐다.
-- Stage 6.20 report-only head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.20 report-only closure는 `169eeefdbf4dd5a92f3406bf165b8389c10ed6a6`로 게시됐고 PR #8
+  immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head의 review는 Goal,
+  QA, Code Quality, Security APPROVE와 Context REJECT를 기록했으며 discussion `3971543713`의 DMG-resume
+  app-refresh bypass만 blocker였다.
+- Stage 6.21 DMG-resume app-status refresh remediation과 direct regression은 완료됐다.
+- Stage 6.21 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 승인 요청
@@ -482,3 +511,6 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - 작업지시자의 최신 명시 지시에 따라 `a96eabb` Context가 확인한 네 history line도 현재 Stage 6.20
   report-only closure 계보에서 completed-state wording으로 교정됐다. 이 closure는 자신의 exact SHA를
   재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
+- 작업지시자의 최신 명시 지시에 따라 `169eeef` Context discussion `3971543713`의 DMG-resume
+  app-refresh bypass는 Stage 6.21 구현, direct regression, config와 두 report에서 교정됐다. 이 closure는
+  자신의 exact SHA를 재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.

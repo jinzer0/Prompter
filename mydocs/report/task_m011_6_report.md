@@ -44,7 +44,8 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.22 / `1000150` | release-attempt validation/preparation, direct DMG app-refresh regression, reports | `800222a` review의 dependent DMG invalidation과 orphan recovery 교정 | signed-release offline contracts |
 | 6.23 / `4dcf219` | notarization command/lifecycle/stapling, signing discovery, direct regressions/support, reports | `1000150` discussions `3971745639`, `3971745648`, `3972249043` 교정 | signed-release offline contracts |
 | 6.24 / `daab0ed` | notarization storage/evidence/service, signing discovery, direct regressions/support, Vitest config, reports | `4dcf219` Quality/Security blockers 교정 | signed-release offline contracts |
-| 6.25 / completed remediation lineage | notarization command/service/signing, claim/submission/fingerprint regressions/support, maintainer docs, Vitest config, reports | `daab0ed` Goal/Quality/Security/Context blockers 교정 | signed-release offline contracts |
+| 6.25 / `9edf7e5` | notarization command/service/signing, claim/submission/fingerprint regressions/support, maintainer docs, Vitest config, reports | `daab0ed` Goal/Quality/Security/Context blockers 교정 | signed-release offline contracts |
+| 6.26 / completed remediation lineage | notarization command/storage/service/identity, final signature callers, direct regressions, coordinator fixture split, as-built implementation plan, Vitest config, reports | `9edf7e5` Goal/Quality/Security/Context blockers 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -133,8 +134,14 @@ durability, staple propagation retry, native-suffix payload validation blocker�
 exact-head review worktree 생성까지 완료됐다. 그 head review는 Goal/QA PASS와 Code Quality/Security
 FAIL을 기록했다. Context FAIL은 당시 review/merge/containment pending만 근거로 한 procedural verdict였다.
 Quality는 concurrent duplicate submit과 non-atomic evidence replacement를, Security는 pre/post-submit
-artifact identity drift와 case-sensitive native suffix를 blocker로 확인했다. 이 closure는 자신의 아직 알 수
-없는 exact SHA를 재귀적으로 기록하지 않는다.
+artifact identity drift와 case-sensitive native suffix를 blocker로 확인했다. Stage 6.24 remediation은
+`daab0ed9453715a6807b016f50437966457bb268`로, Stage 6.25 remediation은
+`9edf7e59c7c758de3dccc7c1151fb17220d1e480`로 각각 게시됐다. `9edf7e5` exact-head review는 QA
+APPROVE와 Goal/Quality/Security/Context REJECT를 기록했다. findings는 statusless timeout `{id}`와 explicit
+unknown poll provenance, malformed present-status rejection, claim PID/phase recovery, typed artifact-drift
+cleanup/rebuild, final ZIP app·final DMG·mounted app fingerprint verification, as-built plan drift와 coordinator
+fixture size였다. Stage 6.26은 이 blocker를 source/test/plan/config와 reports에서 교정했다. 이 closure는
+자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다.
 
 ## 변경 전·후 정량 비교
 
@@ -142,7 +149,7 @@ artifact identity drift와 case-sensitive native suffix를 blocker로 확인했�
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
 | focused release regression | Stage 1 40 tests | Stage 6.14 cached-Accepted direct rerun 17/17 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.25 149 files, 991/991 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.26 150 files, 1003/1003 tests passed |
 | ARM64 Mach-O integrity | asset 이름만 arm64 | 모든 canonical Mach-O에 exact `arm64` slice 강제; universal x86_64+arm64 허용 |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
 | installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
@@ -234,7 +241,12 @@ artifact identity drift와 case-sensitive native suffix를 blocker로 확인했�
 | `daab0ed` fresh review lanes | REJECT RECORDED — QA APPROVE, Goal/Quality/Security/Context REJECT. Discussions [3972836759](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972836759), [3972704255](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972704255), [3972704259](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972704259)은 claim release, statusless `{id}` acknowledgement, selected certificate fingerprint continuity blocker를 확인했다. Unknown early return과 `info`/`log` 사이 artifact mutation drift도 기록했다. |
 | Stage 6.25 remediation | OK — claim을 `finally`에서 해제하고 statusless `{id}`를 unknown polling으로 연결했다. original evidence identity를 authoritative하게 유지하며 모든 `info`/`log` 전후 bytes identity를 검증한다. selected Keychain SHA-1/SHA-256 fingerprint는 extracted leaf DER digest와 일치해야 하고 `Authority=`는 secondary exact-name check로 유지한다. private temporary extraction은 모든 경로에서 정리한다. |
 | Stage 6.25 verification | OK — full Vitest 149 files/991 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.25에서 재실행했다고 주장하지 않는다. LSP 12건은 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
-| Stage 6.25 review gate | CURRENT BOUNDARY — report-inclusive publication receipt가 exact head의 source of truth다. Atlas exact-head review, PR merge, `origin/master` containment는 서로 분리된 후속 gate다. |
+| Stage 6.25 publication gate | FULFILLED AT `9edf7e5` — source/test/docs/config/report commit을 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
+| `9edf7e5` fresh review lanes | REJECT RECORDED — QA APPROVE, Goal/Quality/Security/Context REJECT. Findings는 statusless timeout `{id}`, explicit unknown poll provenance, malformed present-status rejection, claim PID/phase recovery, typed artifact-drift cleanup/rebuild, final ZIP app·final DMG·mounted app fingerprint verification, as-built plan drift와 coordinator fixture size를 확인했다. |
+| Stage 6.26 remediation | OK — absent status의 direct/timeout `{id}`와 explicit string `unknown`만 poll provenance를 갖고 malformed present-status는 거부된다. PID/phase claim은 live owner를 거부하고 dead pre-submit만 reclaim하며 ambiguous submitting은 fail closed하고 persisted UUID는 submit을 bypass한다. typed drift error는 fresh/resumed coordinator cleanup과 later rebuild를 허용한다. 세 final artifact gate는 configured signer의 leaf DER fingerprint를 검증한다. |
+| Stage 6.26 test architecture and plan | OK — implementation plan을 `submit --wait`에서 UUID-persist-poll as-built 계약으로 정정했다. coordinator fixture는 249 pure LOC, artifact helper는 34 pure LOC, direct drift suite는 69 pure LOC로 모두 250 LOC ceiling 아래다. |
+| Stage 6.26 verification | OK — full Vitest 150 files/1003 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.26에서 재실행했다고 주장하지 않는다. LSP 17건은 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
+| Stage 6.26 review gate | CURRENT BOUNDARY — report-inclusive publication receipt가 exact head의 source of truth다. Atlas exact-head review, PR merge, `origin/master` containment는 서로 분리된 후속 gate다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 당시 pending이었다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -299,6 +311,9 @@ artifact identity drift와 case-sensitive native suffix를 blocker로 확인했�
   `3972704255`, `3972704259`, claim `finally` cleanup, statusless/unknown polling, 모든 `info`/`log` 전후
   artifact identity 검증, leaf DER fingerprint continuity, temporary extraction cleanup, full 991/991와 LSP
   refusal을 추가했다.
+- Stage 6.26: `9edf7e5` QA APPROVE와 Goal/Quality/Security/Context REJECT, statusless timeout/poll provenance,
+  claim PID/phase recovery, typed fresh/resumed drift cleanup과 rebuild, final ZIP/DMG/mounted-app fingerprint,
+  as-built plan correction, fixture split, full 1003/1003와 LSP refusal을 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -306,9 +321,9 @@ artifact identity drift와 case-sensitive native suffix를 blocker로 확인했�
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact inspection,
   tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.25 exclusive claim, finalization identity checks, certificate fingerprint continuity는 확인된
-  submission/evidence/signing continuity 결함을 fail closed하지만 같은 사용자 권한의 임의 filesystem
-  mutation 가능성 전체를 제거했다고 주장하지 않는다.
+- Stage 6.26 PID/phase claim recovery, typed finalization drift cleanup, final-artifact certificate fingerprint
+  continuity는 확인된 submission/evidence/signing continuity 결함을 fail closed하지만 같은 사용자 권한의
+  임의 filesystem mutation 가능성 전체를 제거했다고 주장하지 않는다.
 - non-Apple command abortability는 nonblocking residual risk다. 장시간 Apple trust commands는 bounded
   timeout과 AbortSignal을 갖지만 모든 non-Apple subprocess의 external abort contract를 새로 만들지는 않았다.
 - upstream native-addon cast warnings, Biome deprecated-config information, Vite chunk-size warning은 exit 0
@@ -347,8 +362,13 @@ artifact identity drift와 case-sensitive native suffix를 blocker로 확인했�
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 QA APPROVE와
   Goal/Quality/Security/Context REJECT를 기록했고 claim release, statusless acknowledgement, signer
   fingerprint continuity, unknown early-return, `info`/`log` mutation drift가 product blocker였다.
-- Stage 6.25 blocker remediation, direct regressions, documentation과 config registration은 검증 완료 상태다.
-- Stage 6.25 report-inclusive publication과 exact-head review는 분리된 후속 gate다. PR #8 merge와
+- Stage 6.25 remediation은 `9edf7e59c7c758de3dccc7c1151fb17220d1e480`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 QA APPROVE와
+  Goal/Quality/Security/Context REJECT를 기록했고 final recovery, claim recovery, coordinator cleanup,
+  final-artifact fingerprint, plan drift와 fixture size가 blocker였다.
+- Stage 6.26 blocker remediation, direct regressions, as-built plan correction, fixture split과 config
+  registration은 검증 완료 상태다.
+- Stage 6.26 report-inclusive publication과 exact-head review는 분리된 후속 gate다. PR #8 merge와
   `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
 
 ## 작업지시자 승인 기록 및 요청
@@ -379,7 +399,11 @@ artifact identity drift와 case-sensitive native suffix를 blocker로 확인했�
 - 작업지시자의 최신 명시 지시에 따라 `daab0ed` review discussions `3972836759`, `3972704255`,
   `3972704259`의 claim release, statusless acknowledgement, signer fingerprint continuity와 unknown early
   return, `info`/`log` mutation drift blocker는 Stage 6.25 source/test/docs/config와 두 report에서 교정됐다.
-  이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않는다. publication receipt가 exact head의 source of
-  truth이며 Atlas exact-head review, PR merge, containment는 서로 분리된 후속 gate다.
-- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.25 exact-head review, PR merge,
+  Stage 6.25 publication과 exact-head review도 완료됐다.
+- 작업지시자의 최신 명시 지시에 따라 `9edf7e5` review의 statusless timeout/poll provenance, claim PID/phase,
+  typed drift cleanup/rebuild, final ZIP/DMG/mounted-app fingerprint, as-built plan과 fixture-size blocker는 Stage
+  6.26 source/test/plan/config와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로
+  주장하지 않는다. publication receipt가 exact head의 source of truth이며 Atlas exact-head review, PR merge,
+  containment는 서로 분리된 후속 gate다.
+- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.26 exact-head review, PR merge,
   `origin/master` containment verification은 완료로 주장하지 않고 Todo 8은 `진행중`으로 유지한다.

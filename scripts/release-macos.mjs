@@ -66,19 +66,23 @@ async function preflight(release, run, state) {
   })
 }
 
-async function verifyFinalZip(finalZip, state, run, signal) {
+async function verifyFinalZip(finalZip, state, release) {
   state.extractDirectory = await mkdtemp(join(tmpdir(), "prompter-release-extract-"))
-  await run("/usr/bin/ditto", ["-x", "-k", finalZip, state.extractDirectory], {})
+  await state.run("/usr/bin/ditto", ["-x", "-k", finalZip, state.extractDirectory], {})
   const extractedApp = await contained(
     state.extractDirectory,
     join(state.extractDirectory, appBundleName),
   )
-  await verifyAppSignature({ appPath: extractedApp, runFile: run })
+  await verifyAppSignature({
+    appPath: extractedApp,
+    identity: release.signingIdentity,
+    runFile: state.run,
+  })
   await assessGatekeeper({
     artifactPath: extractedApp,
     artifactKind: "app",
-    runFile: run,
-    ...(signal === undefined ? {} : { signal }),
+    runFile: state.run,
+    ...(release.signal === undefined ? {} : { signal: release.signal }),
   })
 }
 
@@ -112,7 +116,7 @@ export async function runMacOSRelease(options) {
         packageJsonPath: release.paths.packageJsonPath,
         runFile: run,
       })
-      await verifyFinalZip(finalZip, state, run, release.signal)
+      await verifyFinalZip(finalZip, state, release)
     }
     const finalDmg = await prepareReleaseDmg({
       appAttempt: resumed?.appAttempt,
@@ -140,7 +144,11 @@ export async function runMacOSRelease(options) {
       state.mountDirectory,
       join(state.mountDirectory, appBundleName),
     )
-    await verifyAppSignature({ appPath: mountedApp, runFile: run })
+    await verifyAppSignature({
+      appPath: mountedApp,
+      identity: release.signingIdentity,
+      runFile: run,
+    })
     await assessGatekeeper({
       artifactPath: mountedApp,
       artifactKind: "app",
@@ -159,7 +167,7 @@ export async function runMacOSRelease(options) {
     }
     await run("/usr/bin/hdiutil", ["detach", state.mountDirectory], {})
     state.mountAttached = false
-    if (resumedDmg) await verifyFinalZip(finalZip, state, run, release.signal)
+    if (resumedDmg) await verifyFinalZip(finalZip, state, release)
     state.assets.push(checksumPath)
     await writeFile(
       checksumPath,

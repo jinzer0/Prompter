@@ -76,7 +76,7 @@ test("resumes an app when its Developer ID matches the current identity", async 
 
   assert.equal(submissionCount([first, second], "app"), 1)
   assert.equal(second.calls.includes("app-staple"), true)
-  assert.equal(displayCalls(second).length, 1)
+  assert.equal(displayCalls(second).length, 4)
 })
 
 test.each([
@@ -177,5 +177,5 @@ test("resumes a DMG when its Developer ID matches the current identity", async (
 
   assert.equal(submissionCount([first, second], "dmg"), 1)
   assert.equal(second.calls.includes("dmg-staple"), true)
-  assert.equal(displayCalls(second).length, 1)
+  assert.equal(displayCalls(second).length, 4)
 })

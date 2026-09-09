@@ -4,7 +4,7 @@ import { join } from "node:path"
 
 import { afterEach, test } from "vitest"
 
-import { writeAtomicJson } from "../scripts/macos/notarization-storage.mjs"
+import { createSubmissionClaim, writeAtomicJson } from "../scripts/macos/notarization-storage.mjs"
 import { createNotarizationDirectoryTracker } from "./support/macos-notarization-fixtures.mjs"
 
 const temporaryDirectories = createNotarizationDirectoryTracker()
@@ -29,4 +29,24 @@ test("preserves prior evidence and removes its temporary file when replacement i
 
   assert.equal(await readFile(resumePath, "utf8"), '{"status":"unknown"}\n')
   assert.deepEqual(await readdir(root), ["notarization-resume.json"])
+})
+
+test("reclaims only a dead pre-submit claim", async () => {
+  const root = await temporaryDirectories.create()
+  const claimPath = join(root, ".notarization-submit.claim")
+  await writeFile(claimPath, '{"pid":999999,"phase":"pre-submit"}\n')
+  const claim = createSubmissionClaim(root)
+
+  await claim.acquire()
+  await claim.release()
+})
+
+test("rejects live and ambiguous dead claims without reclaiming them", async () => {
+  const root = await temporaryDirectories.create()
+  const claimPath = join(root, ".notarization-submit.claim")
+  const claim = createSubmissionClaim(root)
+  await writeFile(claimPath, `${JSON.stringify({ pid: process.pid, phase: "pre-submit" })}\n`)
+  await assert.rejects(claim.acquire(), /already in progress/)
+  await writeFile(claimPath, '{"pid":999999,"phase":"submitting"}\n')
+  await assert.rejects(claim.acquire(), /manual recovery/)
 })

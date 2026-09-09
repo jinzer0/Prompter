@@ -236,6 +236,10 @@ export async function prepareReleaseDmg({
     ...(state.staplerWaitFor === undefined ? {} : { waitFor: state.staplerWaitFor }),
   })
   await state.run("/usr/bin/hdiutil", ["verify", targetPath], {})
-  await verifyDmgSignature({ dmgPath: targetPath, runFile: state.run })
+  await verifyDmgSignature({
+    dmgPath: targetPath,
+    identity: release.signingIdentity,
+    runFile: state.run,
+  })
   return targetPath
 }

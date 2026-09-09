@@ -87,7 +87,11 @@ QA APPROVE와 Goal/Quality/Security/Context REJECT를 기록했다. discussions
 statusless submit acknowledgement, selected certificate fingerprint continuity blocker를 확인했다. 별도 finding은
 unknown status early return과 `info`/`log` 사이 artifact mutation drift를 확인했다. Stage 6.25는 claim을
 `finally`에서 해제하고 statusless `{id}`를 unknown polling으로 연결하며, 모든 `info`/`log` 전후 identity를
-검증하고 selected Keychain fingerprint와 extracted leaf DER fingerprint를 비교하도록 교정했다.
+검증하고 selected Keychain fingerprint와 extracted leaf DER fingerprint를 비교하도록 교정해
+report-inclusive head `9edf7e59c7c758de3dccc7c1151fb17220d1e480`로 게시됐다. 그 exact-head review는
+QA APPROVE와 Goal/Quality/Security/Context REJECT를 기록했다. Stage 6.26은 statusless timeout `{id}`와
+explicit unknown poll provenance를 허용하되 malformed present-status를 거부하고, PID/phase claim recovery,
+typed artifact-drift cleanup/rebuild, final ZIP app·final DMG·mounted app fingerprint 검증을 추가했다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -111,6 +115,8 @@ unknown status early return과 `info`/`log` 사이 artifact mutation drift를 �
 | `scripts/macos/notarization-storage.mjs`, notarization evidence/service modules | shared evidence directory에 exclusive filesystem claim을 두고 ambiguous existing claim은 보수적으로 거부한다. JSON evidence는 mode `0600` temporary file을 sync한 뒤 atomic rename하며, submit 직전과 UUID 저장 직후 artifact identity drift를 검사한다. |
 | `scripts/macos/signing-discovery.mjs`, signing fixtures/architecture tests | `.node`/`.dylib` extension을 lowercase로 normalize해 uppercase/mixed-case native suffix도 같은 fail-closed Mach-O 계약에 포함하고 일반 resource는 유지한다. |
 | `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization.mjs`, `scripts/macos/signing.mjs` | statusless submit acknowledgement를 unknown polling으로 연결하고 claim을 모든 종료 경로에서 해제한다. original evidence identity를 authoritative하게 유지하며 모든 `info`/`log` 전후 artifact identity를 검증하고 selected certificate fingerprint를 extracted leaf DER fingerprint와 비교한다. `Authority=`는 secondary check로 유지하고 private temporary extraction은 항상 정리한다. |
+| `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-storage.mjs`, `scripts/macos/notarization.mjs`, `scripts/macos/notarization-identity.mjs` | statusless timeout `{id}`와 explicit unknown poll provenance를 polling으로 연결하고 malformed present-status를 거부한다. claim은 PID와 `pre-submit`/`submitting` phase를 기록해 live owner를 거부하고 dead pre-submit만 reclaim하며 ambiguous submitting은 manual recovery로 fail closed한다. persisted UUID evidence는 claim 뒤 재조회해 submit을 bypass한다. artifact drift는 `artifactKind`와 `discardEvidence`를 전파한다. |
+| `scripts/macos/release-attempt.mjs`, `scripts/release-macos.mjs` | fresh/resumed `info`/`log` artifact drift를 affected evidence cleanup에 연결하고 이후 clean rebuild를 허용한다. final ZIP extracted app, final DMG, mounted app 모두 configured identity의 leaf DER fingerprint를 검증한 뒤 downstream으로 진행한다. |
 | `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.13 blocker 회귀를 contract 13 files/35 tests, focused release 17 files/173 tests로 고정했다. |
 | `tests/package-macos-coordinator-cached-accepted.test.mjs` | cached Accepted cleanup에 더해 malformed app evidence retry와 terminal DMG의 accepted app preservation을 각각 three-run으로 고정했다. |
 | `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG match, missing/duplicate/malformed/mismatch cleanup, sibling-kind preservation, transient display failure retention, third-run success와 direct suite 등록을 고정했다. |
@@ -118,6 +124,8 @@ unknown status early return과 `info`/`log` 사이 artifact mutation drift를 �
 | `tests/package-macos-coordinator-dmg-app-refresh.test.mjs` | terminal app outcome의 dependent DMG invalidation과 third-run rebuild, orphan retained DMG typed discard/rebuild, In Progress dual retention, Accepted no-resubmission을 고정했다. |
 | Stage 6.23 notarization/signing direct tests와 support fixtures | submit UUID 선저장, interrupted polling resume, deterministic staple backoff, lowercase native-suffix non-Mach-O rejection과 일반 resource exclusion을 고정했다. |
 | Stage 6.25 notarization claim/submission과 coordinator signer-fingerprint tests, support fixtures, `vitest.config.ts` | claim cleanup, statusless `{id}` polling, unknown status continuation, `info`/`log` mutation rejection, SHA-1/SHA-256 exact certificate match, renewed/missing/malformed leaf rejection과 temporary extraction cleanup을 고정했다. |
+| Stage 6.26 notarization storage/claim, artifact-drift, signer-fingerprint tests와 coordinator fixtures, `vitest.config.ts` | live/dead/ambiguous claim phase, fresh/resumed `info`/`log` drift cleanup과 third-run rebuild, final ZIP/DMG/mounted-app fingerprint gates를 고정했다. coordinator fixture는 249 pure LOC, artifact helper는 34 pure LOC, direct drift suite는 69 pure LOC다. |
+| `mydocs/plans/task_m011_6_impl.md` | as-built Notarization contract를 `submit --wait`에서 UUID 제출·저장 후 bounded `info` polling으로 정정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
@@ -573,14 +581,39 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   재실행했다고 주장하지 않는다.
 - MISS(환경 제한): Stage 6.25 source/test/docs/config paths와 두 report의 LSP diagnostics는
   sibling-worktree request-root 제한으로 12건 모두 거부됐으며 PASS로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.25 report-inclusive head
+  `9edf7e59c7c758de3dccc7c1151fb17220d1e480`의 fresh exact-head review는 QA APPROVE와
+  Goal/Quality/Security/Context REJECT를 기록했다. findings는 statusless timeout `{id}`, explicit unknown
+  poll provenance, malformed present-status rejection, claim owner PID/phase recovery, typed artifact-drift
+  cleanup/rebuild, final release artifact fingerprint verification, as-built plan drift와 oversized coordinator
+  fixture를 확인했다.
+- OK: Stage 6.26 command parser는 absent status의 direct/timeout `{id}`와 explicit string `unknown`에만 poll
+  provenance를 부여하고, present non-string status는 malformed response로 거부한다.
+- OK: submission claim은 mode-0600 JSON에 PID와 phase를 기록한다. live PID는 already-in-progress로
+  거부하고 dead `pre-submit`만 reclaim한다. dead/unknown `submitting`은 ambiguous manual recovery로 fail
+  closed하며, claim 획득 뒤 발견한 persisted UUID evidence는 release 후 submit 없이 resume한다.
+- OK: artifact drift error는 affected `artifactKind`와 `discardEvidence=true`를 전달한다. fresh/resumed app의
+  `info`/`log` mutation은 coordinator에서 affected attempt/evidence만 제거하고 sibling/caller/external
+  sentinels를 보존하며 다음 invocation의 clean app/DMG rebuild를 허용한다.
+- OK: final ZIP extracted app, final DMG와 mounted app은 각각 configured signing identity의 selected
+  fingerprint와 extracted leaf DER digest를 비교한다. mismatch는 checksum/candidate publication 전에
+  차단되고 temporary certificate extraction은 정리된다.
+- OK: implementation plan은 실제 `submit` UUID 저장 뒤 bounded `info` polling 계약으로 정정됐다.
+  coordinator fixture는 249 pure LOC로 250 LOC ceiling 아래며 34-LOC artifact helper와 69-LOC direct drift
+  suite로 분리됐다.
+- OK: authoritative verification은 full Vitest 150 files/1003 tests, typecheck, lint, changed-file syntax,
+  `git diff --check`다. Stage 6.14의 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.26에서
+  재실행했다고 주장하지 않는다.
+- MISS(환경 제한): Stage 6.26 source/test/plan/config paths와 두 report의 LSP diagnostics는
+  sibling-worktree request-root 제한으로 17건 모두 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact manual
   inspection, tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.25의 exclusive claim, finalization identity checks, certificate fingerprint continuity는 확인된
-  submission/evidence/signing continuity 결함을 fail closed하지만, 같은 사용자 권한의 임의 filesystem
-  mutation 가능성 전체를 제거했다고 주장하지 않는다.
+- Stage 6.26의 PID/phase claim recovery, typed finalization drift cleanup, final-artifact certificate fingerprint
+  continuity는 확인된 submission/evidence/signing continuity 결함을 fail closed하지만, 같은 사용자 권한의
+  임의 filesystem mutation 가능성 전체를 제거했다고 주장하지 않는다.
 - non-Apple command abortability는 nonblocking residual risk다. 장시간 Apple trust command는 bounded
   timeout과 AbortSignal을 갖지만 모든 non-Apple subprocess의 external abort contract를 새로 만들지는 않았다.
 
@@ -617,9 +650,13 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 QA APPROVE와
   Goal/Quality/Security/Context REJECT를 기록했고 discussions `3972836759`, `3972704255`, `3972704259` 및
   unknown early-return/`info`·`log` mutation drift가 product blocker였다.
-- Stage 6.25 notarization finalization integrity와 signer-fingerprint continuity remediation, direct regressions,
-  documentation 및 config registration은 검증 완료 상태다.
-- Stage 6.25 report-inclusive head publication과 exact-head review는 분리된 후속 gate다. PR #8 merge와
+- Stage 6.25 remediation은 `9edf7e59c7c758de3dccc7c1151fb17220d1e480`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 QA APPROVE와
+  Goal/Quality/Security/Context REJECT를 기록했고 final recovery, claim recovery, coordinator cleanup,
+  final-artifact fingerprint, plan drift와 fixture size가 blocker였다.
+- Stage 6.26 final notarization recovery와 final-artifact fingerprint remediation, direct regressions, as-built
+  plan correction, fixture split 및 config registration은 검증 완료 상태다.
+- Stage 6.26 report-inclusive publication과 exact-head review는 분리된 후속 gate다. PR #8 merge와
   `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
 
 ## 승인 요청
@@ -650,5 +687,9 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - 작업지시자의 최신 명시 지시에 따라 `daab0ed` review discussions `3972836759`, `3972704255`,
   `3972704259`의 claim release, statusless acknowledgement, signer fingerprint continuity와 unknown early
   return, `info`/`log` mutation drift blocker는 Stage 6.25 source/test/docs/config와 두 report에서 교정됐다.
-  이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않는다. publication receipt가 exact head의 source of
-  truth이며 Atlas exact-head review, PR merge, containment는 서로 분리된 후속 gate다.
+  Stage 6.25 publication과 exact-head review도 완료됐다.
+- 작업지시자의 최신 명시 지시에 따라 `9edf7e5` review의 statusless timeout/poll provenance, claim PID/phase,
+  typed drift cleanup/rebuild, final ZIP/DMG/mounted-app fingerprint, as-built plan과 fixture-size blocker는 Stage
+  6.26 source/test/plan/config와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로
+  주장하지 않는다. publication receipt가 exact head의 source of truth이며 Atlas exact-head review, PR merge,
+  containment는 서로 분리된 후속 gate다.

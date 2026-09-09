@@ -213,7 +213,9 @@ Evidence:
   - `fetchNotaryLog({ submissionId, profile, evidenceDir, runFile })`
   - `stapleAndValidate({ artifactPath, artifactKind, runFile })`
   - `assessGatekeeper({ artifactPath, artifactKind, runFile })`
-- `xcrun notarytool`은 `--keychain-profile`, `--wait`, `--output-format json`만 사용한다.
+- 구현-as-built 정정: `xcrun notarytool submit`은 `--keychain-profile`, `--output-format json`으로
+  UUID를 제출·저장하고, 이후 `notarytool info` polling으로 상태를 확인한다. `submit --wait`는
+  사용하지 않는다.
   `.app` 직접 upload를 거부하고 submission archive 또는 DMG만 허용하며 ZIP staple을 거부한다.
 - 응답은 exit code 0만으로 성공 처리하지 않고 JSON schema, submission ID, status를 검사한다.
   `Accepted`가 아니면 중단하고 Accepted여도 log를 항상 받아 error 0개, warning 0개일 때만

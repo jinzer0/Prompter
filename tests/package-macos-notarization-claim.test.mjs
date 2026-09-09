@@ -124,3 +124,48 @@ test("retains the acknowledged UUID and rejects artifact drift before polling", 
   )
   assert.equal(submitCalls, 1)
 })
+
+test.each([
+  ["fresh info", false, "info"],
+  ["fresh log", false, "log"],
+  ["resumed info", true, "info"],
+  ["resumed log", true, "log"],
+])("rejects %s artifact mutation without accepted evidence", async (_label, resumed, phase) => {
+  const root = await temporaryDirectories.create()
+  const artifactPath = await artifact(root, "Prompter.zip", "original bytes")
+  let submitCalls = 0
+  const submissionsBeforeMutation = []
+  let mutate = false
+  const runFile = async (_command, arguments_) => {
+    if (arguments_[1] === "history") return { stdout: "{}" }
+    if (arguments_[1] === "submit") {
+      submitCalls += 1
+      return { stdout: JSON.stringify({ id, status: "Accepted" }) }
+    }
+    if (arguments_[1] === phase && mutate) {
+      submissionsBeforeMutation.push(submitCalls)
+      await writeFile(artifactPath, "changed bytes")
+    }
+    if (arguments_[1] === "info") return { stdout: JSON.stringify({ id, status: "Accepted" }) }
+    return { stdout: JSON.stringify({ issues: [] }) }
+  }
+  if (resumed) {
+    await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+  }
+  mutate = true
+  let drift
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+    (error) => {
+      drift = error
+      return true
+    },
+  )
+
+  assert.equal(drift?.artifactKind, "app")
+  assert.equal(drift?.discardEvidence, true)
+  assert.deepEqual(submissionsBeforeMutation, [1])
+  assert.equal(submitCalls, 1)
+  const saved = JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8"))
+  assert.notEqual(saved.artifactSha256, sha256("changed bytes"))
+})

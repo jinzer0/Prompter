@@ -1,8 +1,14 @@
-import { access, cp, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
+import { access, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { runMacOSRelease } from "../../scripts/release-macos.mjs"
+import {
+  createDmgSnapshot,
+  createFakeArtifacts,
+  createZipSnapshot,
+  restoreSnapshot,
+} from "./macos-coordinator-artifacts.mjs"
 import {
   appSubmissionId,
   commandStage,
@@ -31,6 +37,7 @@ export async function createCoordinatorFixture({
   shared,
   warningLog = false,
   notaryLog,
+  notaryMutation,
 } = {}) {
   const root = shared?.root ?? (await mkdtemp(join(tmpdir(), "prompter-release-test-")))
   const sourceRoot = shared?.sourceRoot ?? join(root, "source")
@@ -38,11 +45,14 @@ export async function createCoordinatorFixture({
   const releaseRoot = shared?.releaseRoot ?? join(root, "release-parent", "release")
   const evidenceRoot = shared?.evidenceRoot ?? join(root, "evidence-parent", "evidence")
   const electron = shared?.electron ?? (await createElectronAppFixture())
-  const fakeArtifacts = shared?.fakeArtifacts ?? {
-    directory: join(root, "fake-artifacts"),
-    nextId: 0,
-    snapshots: new Map(),
-  }
+  const fakeArtifacts = shared?.fakeArtifacts ?? createFakeArtifacts(root)
+  const appAttemptPath = join(
+    evidenceRoot,
+    "v0.1.1",
+    "app",
+    "notarization-attempt",
+    "Prompter-0.1.1-mac-arm64.zip",
+  )
   if (shared === undefined) {
     await mkdir(sourceRoot, { recursive: true })
     await mkdir(dirname(nativeSourcePath), { recursive: true })
@@ -71,6 +81,9 @@ export async function createCoordinatorFixture({
     const stage = commandStage(command, arguments_)
     calls.push(stage)
     rawCalls.push({ command, arguments_, options })
+    if (stage === "app-info" || stage === "app-log") {
+      await notaryMutation?.({ artifactPath: appAttemptPath, stage })
+    }
     for (const value of [...arguments_, options.cwd].filter((entry) => typeof entry === "string")) {
       const match = value.match(
         /^(.*\/prompter-(?:release-app|notary-app|release-extract|release-mount|dmg|signing-certificate)-[^/]+)/u,
@@ -236,32 +249,4 @@ function xcrunResult(arguments_, pendingAppStatus, pendingDmgStatus, warningLog,
       stderr: "",
     }
   return { stdout: "", stderr: "" }
-}
-
-async function createZipSnapshot(arguments_, options, fakeArtifacts) {
-  const contents = `zip-${fakeArtifacts.nextId++}`
-  const snapshot = join(fakeArtifacts.directory, contents)
-  await cp(join(options.cwd, "Prompter.app"), snapshot, { recursive: true, verbatimSymlinks: true })
-  fakeArtifacts.snapshots.set(contents, snapshot)
-  await writeFile(arguments_.at(-1), contents)
-}
-
-async function createDmgSnapshot(arguments_, fakeArtifacts) {
-  const contents = `dmg-${fakeArtifacts.nextId++}`
-  const snapshot = join(fakeArtifacts.directory, contents)
-  const stagingDirectory = arguments_[arguments_.indexOf("-srcfolder") + 1]
-  await cp(join(stagingDirectory, "Prompter.app"), snapshot, {
-    recursive: true,
-    verbatimSymlinks: true,
-  })
-  fakeArtifacts.snapshots.set(contents, snapshot)
-  await writeFile(arguments_.at(-1), contents)
-}
-
-async function restoreSnapshot(source, destination, fakeArtifacts) {
-  const contents = await readFile(source, "utf8")
-  await cp(fakeArtifacts.snapshots.get(contents), join(destination, "Prompter.app"), {
-    recursive: true,
-    verbatimSymlinks: true,
-  })
 }

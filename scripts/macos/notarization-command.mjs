@@ -43,13 +43,14 @@ function api(payload) {
 
 function submission(payload, statuslessUnknown = false) {
   api(payload)
-  if (typeof payload.status !== "string" && !statuslessUnknown) {
+  const hasStatus = Object.hasOwn(payload, "status")
+  if ((hasStatus && typeof payload.status !== "string") || (!hasStatus && !statuslessUnknown)) {
     failNotarization("Invalid notarization submission")
   }
   return {
     submissionId: notarizationSubmissionId(payload.id ?? payload.submissionId),
-    status: typeof payload.status === "string" ? payload.status : "unknown",
-    ...(typeof payload.status === "string" ? {} : { poll: true }),
+    status: hasStatus ? payload.status : "unknown",
+    ...(!hasStatus || payload.status === "unknown" ? { poll: true } : {}),
   }
 }
 
@@ -60,7 +61,7 @@ function commandError() {
 function timeoutId(error) {
   for (const output of [error?.stdout, error?.result?.stdout]) {
     try {
-      return submission(json(output, "notarization submission")).submissionId
+      return submission(json(output, "notarization submission"), true).submissionId
     } catch (caught) {
       if (!isNotarizationError(caught)) throw caught
     }

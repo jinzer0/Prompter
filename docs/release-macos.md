@@ -120,9 +120,10 @@ Evidence is stored under ignored local paths beneath `.omo/evidence/release-maco
 error-free issues. It must not contain identity values, profile values, private keys, credential
 values, local key paths, full environment dumps, or raw notary payloads.
 
-If `notarytool submit --wait` returns `Accepted`, the artifact-bound submission state is saved
-before log retrieval. If log retrieval fails, resume by using `notarytool info` and `notarytool
-log` through the same Keychain profile, not by submitting the same bytes again. A cached accepted
+`notarytool submit` returns an acknowledgement UUID, which is saved as artifact-bound state before
+bounded `notarytool info` polling and log retrieval. If polling or log retrieval fails, resume with
+`notarytool info` and `notarytool log` through the same Keychain profile, not by submitting the same
+bytes again. A cached accepted
 receipt is not trusted alone: every continuation refreshes Apple status and log before staple,
 Gatekeeper, final archive, checksum, or publication-adjacent work. The refreshed state must be
 `Accepted` with warning-free, error-free issues before stapling or packaging continues.

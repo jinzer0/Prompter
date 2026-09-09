@@ -7,7 +7,9 @@ import {
   appSubmissionId,
   commandStage,
   dmgSubmissionId,
+  syntheticCertificate,
   syntheticIdentity,
+  syntheticIdentityFingerprint,
   syntheticSecret,
 } from "./macos-coordinator-support.mjs"
 import { createElectronAppFixture } from "./macos-package-fixtures.mjs"
@@ -23,6 +25,9 @@ export async function createCoordinatorFixture({
   pendingDmgStatus,
   reservationBarrier,
   appSubmissionBarrier,
+  certificateContents = syntheticCertificate,
+  certificateExtraction = "valid",
+  identityFingerprint = syntheticIdentityFingerprint,
   shared,
   warningLog = false,
   notaryLog,
@@ -68,7 +73,7 @@ export async function createCoordinatorFixture({
     rawCalls.push({ command, arguments_, options })
     for (const value of [...arguments_, options.cwd].filter((entry) => typeof entry === "string")) {
       const match = value.match(
-        /^(.*\/prompter-(?:release-app|notary-app|release-extract|release-mount|dmg)-[^/]+)/u,
+        /^(.*\/prompter-(?:release-app|notary-app|release-extract|release-mount|dmg|signing-certificate)-[^/]+)/u,
       )
       if (match?.[1] !== undefined) observedTempRoots.add(match[1])
     }
@@ -104,11 +109,17 @@ export async function createCoordinatorFixture({
     if (stage === "identity") {
       const matches = identityListing === "multiple" ? 2 : identityListing === "none" ? 0 : 1
       return {
-        stdout: `${Array.from({ length: matches }, (_, index) => `  ${index + 1}) ${"a".repeat(40)} "${signingIdentity}"`).join("\n")}\n  ${matches} valid identities found\n`,
+        stdout: `${Array.from({ length: matches }, (_, index) => `  ${index + 1}) ${identityFingerprint} "${signingIdentity}"`).join("\n")}\n  ${matches} valid identities found\n`,
         stderr: "",
       }
     }
     if (stage === "signer-display") {
+      const certificatePrefixIndex = arguments_.indexOf("--extract-certificates")
+      const certificatePrefix = arguments_[certificatePrefixIndex + 1]
+      if (certificatePrefixIndex !== -1 && certificateExtraction === "valid")
+        await writeFile(`${certificatePrefix}0`, certificateContents)
+      if (certificatePrefixIndex !== -1 && certificateExtraction === "malformed")
+        await writeFile(`${certificatePrefix}0`, "")
       options.finalDmgExistsDuringSignerDisplay = await access(
         join(releaseRoot, "v0.1.1", "Prompter-0.1.1-mac-arm64.dmg"),
       ).then(

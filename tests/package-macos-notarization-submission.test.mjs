@@ -185,7 +185,9 @@ test("fails closed for malformed, unauthorized, Invalid, and Rejected submission
     { id, status: "Rejected" },
   ]) {
     const { calls, runFile } = createNotaryRunner({ submit })
-    await assert.rejects(submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }))
+    await assert.rejects(
+      submitAndWait({ artifactPath, profile, evidenceDir: await evidence(), runFile }),
+    )
     assert.equal(
       calls.some(({ arguments_ }) => arguments_[1] === "log"),
       false,

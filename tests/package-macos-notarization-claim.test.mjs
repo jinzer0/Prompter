@@ -8,6 +8,7 @@ import { submitAndWait } from "../scripts/macos/notarization.mjs"
 import {
   createNotarizationArtifact as artifact,
   createNotarizationDirectoryTracker,
+  createNotaryRunner,
   notarizationSubmissionId as id,
   notarizationProfile as profile,
   sha256,
@@ -15,6 +16,36 @@ import {
 
 const temporaryDirectories = createNotarizationDirectoryTracker()
 afterEach(() => temporaryDirectories.cleanup())
+
+test("persists a statusless submission acknowledgement before polling", async () => {
+  const root = await temporaryDirectories.create()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const { calls, runFile } = createNotaryRunner({ submit: { id } })
+
+  const accepted = await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+
+  assert.equal(accepted.status, "Accepted")
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 1)
+})
+
+test("releases the claim after a pre-ack submit failure", async () => {
+  const root = await temporaryDirectories.create()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const failed = createNotaryRunner({
+    fail: (_command, arguments_) =>
+      arguments_[1] === "submit" ? new Error("synthetic submit failure") : undefined,
+  })
+
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile: failed.runFile }),
+    /Notarization command failed/,
+  )
+  const recovered = createNotaryRunner()
+  await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile: recovered.runFile })
+
+  assert.equal(recovered.calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+})
 
 test("allows only one concurrent initial submit for shared evidence", async () => {
   const root = await temporaryDirectories.create()

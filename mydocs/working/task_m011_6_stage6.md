@@ -75,7 +75,19 @@ Security, Context REJECT와 QA timeout을 기록했다. QA는 timeout 전에 ind
 [3971745648](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745648),
 [3972249043](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972249043)은 각각 submit UUID를
 wait 전에 저장하지 않는 결함, staple propagation retry 부재, lowercase `.node`/`.dylib` non-Mach-O
-payload 허용을 확인했다. Stage 6.23은 세 blocker를 교정했다.
+payload 허용을 확인했다. Stage 6.23은 세 blocker를 교정해 report-inclusive head
+`4dcf2192640e9cef847b5f074b4f9ebd31bbe607`로 게시됐다. 그 exact-head review는 Goal/QA PASS,
+Quality/Security FAIL과 procedural Context FAIL을 기록했다. Stage 6.24는 concurrent submit claim,
+atomic evidence replacement, pre/post-submit artifact drift, case-insensitive native suffix blocker를 교정해
+report-inclusive head `daab0ed9453715a6807b016f50437966457bb268`로 게시됐다. 그 exact-head review는
+QA APPROVE와 Goal/Quality/Security/Context REJECT를 기록했다. discussions
+[3972836759](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972836759),
+[3972704255](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972704255),
+[3972704259](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972704259)은 각각 claim release,
+statusless submit acknowledgement, selected certificate fingerprint continuity blocker를 확인했다. 별도 finding은
+unknown status early return과 `info`/`log` 사이 artifact mutation drift를 확인했다. Stage 6.25는 claim을
+`finally`에서 해제하고 statusless `{id}`를 unknown polling으로 연결하며, 모든 `info`/`log` 전후 identity를
+검증하고 selected Keychain fingerprint와 extracted leaf DER fingerprint를 비교하도록 교정했다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -98,12 +110,14 @@ payload 허용을 확인했다. Stage 6.23은 세 blocker를 교정했다.
 | `scripts/macos/signing-discovery.mjs` | lowercase `.node`/`.dylib` 파일이 Mach-O가 아니면 fail closed하고 일반 resource는 기존처럼 무시하도록 교정했다. |
 | `scripts/macos/notarization-storage.mjs`, notarization evidence/service modules | shared evidence directory에 exclusive filesystem claim을 두고 ambiguous existing claim은 보수적으로 거부한다. JSON evidence는 mode `0600` temporary file을 sync한 뒤 atomic rename하며, submit 직전과 UUID 저장 직후 artifact identity drift를 검사한다. |
 | `scripts/macos/signing-discovery.mjs`, signing fixtures/architecture tests | `.node`/`.dylib` extension을 lowercase로 normalize해 uppercase/mixed-case native suffix도 같은 fail-closed Mach-O 계약에 포함하고 일반 resource는 유지한다. |
+| `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization.mjs`, `scripts/macos/signing.mjs` | statusless submit acknowledgement를 unknown polling으로 연결하고 claim을 모든 종료 경로에서 해제한다. original evidence identity를 authoritative하게 유지하며 모든 `info`/`log` 전후 artifact identity를 검증하고 selected certificate fingerprint를 extracted leaf DER fingerprint와 비교한다. `Authority=`는 secondary check로 유지하고 private temporary extraction은 항상 정리한다. |
 | `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.13 blocker 회귀를 contract 13 files/35 tests, focused release 17 files/173 tests로 고정했다. |
 | `tests/package-macos-coordinator-cached-accepted.test.mjs` | cached Accepted cleanup에 더해 malformed app evidence retry와 terminal DMG의 accepted app preservation을 각각 three-run으로 고정했다. |
 | `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG match, missing/duplicate/malformed/mismatch cleanup, sibling-kind preservation, transient display failure retention, third-run success와 direct suite 등록을 고정했다. |
 | `tests/package-macos-coordinator-dmg-app-refresh.test.mjs`, DMG/cached/signing recovery tests, `vitest.config.ts` | resumed DMG 전에 fresh app warning/error/Rejected 차단, Accepted status/log ordering, app/DMG no-resubmission과 direct suite 등록을 고정했다. |
 | `tests/package-macos-coordinator-dmg-app-refresh.test.mjs` | terminal app outcome의 dependent DMG invalidation과 third-run rebuild, orphan retained DMG typed discard/rebuild, In Progress dual retention, Accepted no-resubmission을 고정했다. |
 | Stage 6.23 notarization/signing direct tests와 support fixtures | submit UUID 선저장, interrupted polling resume, deterministic staple backoff, lowercase native-suffix non-Mach-O rejection과 일반 resource exclusion을 고정했다. |
+| Stage 6.25 notarization claim/submission과 coordinator signer-fingerprint tests, support fixtures, `vitest.config.ts` | claim cleanup, statusless `{id}` polling, unknown status continuation, `info`/`log` mutation rejection, SHA-1/SHA-256 exact certificate match, renewed/missing/malformed leaf rejection과 temporary extraction cleanup을 고정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
@@ -540,13 +554,33 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   재실행했다고 주장하지 않는다.
 - MISS(환경 제한): Stage 6.24 source/test/config paths와 두 report의 LSP diagnostics는 sibling-worktree
   request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.24 report-inclusive head
+  `daab0ed9453715a6807b016f50437966457bb268`의 fresh exact-head review는 QA APPROVE와
+  Goal/Quality/Security/Context REJECT를 기록했다. discussion `3972836759`는 submit/poll failure에서 claim이
+  남는 blocker, `3972704255`는 statusless `{id}` acknowledgement rejection, `3972704259`는 표시 이름만
+  비교해 renewed same-name certificate를 허용하는 fingerprint-continuity blocker를 확인했다. unknown status
+  early return과 `info`/`log` 사이 artifact mutation drift도 blocker로 기록했다.
+- OK: Stage 6.25는 claim cleanup을 `finally`로 이동해 success, rejection, timeout, malformed polling의 모든
+  종료 경로에서 release한다. statusless `{id}`는 `unknown`과 poll intent로 보존되어 bounded `info` polling에
+  진입한다. unknown intermediate status는 early return하지 않고 계속 polling한다.
+- OK: original evidence identity는 authoritative source로 유지된다. 모든 `info`/`log` 전후 artifact identity를
+  재검증해 bytes mutation을 final evidence, stapling, assessment 전에 차단한다.
+- OK: resumed app/DMG signer continuity는 현재 selected security fingerprint를 extracted leaf certificate DER의
+  SHA-1 또는 SHA-256 digest와 비교한다. `Authority=` exact name은 secondary check이며 private temporary
+  extraction directory는 success와 모든 failure에서 정리된다.
+- OK: authoritative verification은 full Vitest 149 files/991 tests, typecheck, lint, changed-file syntax,
+  `git diff --check`다. Stage 6.14의 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.25에서
+  재실행했다고 주장하지 않는다.
+- MISS(환경 제한): Stage 6.25 source/test/docs/config paths와 두 report의 LSP diagnostics는
+  sibling-worktree request-root 제한으로 12건 모두 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact manual
   inspection, tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.24의 exclusive claim과 pre/post-submit identity 검사는 확인된 submission/evidence race를
-  fail closed하지만, 같은 사용자 권한의 임의 filesystem mutation 가능성 전체를 제거했다고 주장하지 않는다.
+- Stage 6.25의 exclusive claim, finalization identity checks, certificate fingerprint continuity는 확인된
+  submission/evidence/signing continuity 결함을 fail closed하지만, 같은 사용자 권한의 임의 filesystem
+  mutation 가능성 전체를 제거했다고 주장하지 않는다.
 - non-Apple command abortability는 nonblocking residual risk다. 장시간 Apple trust command는 bounded
   timeout과 AbortSignal을 갖지만 모든 non-Apple subprocess의 external abort contract를 새로 만들지는 않았다.
 
@@ -579,10 +613,14 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal/QA PASS,
   Code Quality/Security FAIL을 기록했다. Context FAIL은 review/merge/containment pending만 근거로 한
   procedural verdict였다.
-- Stage 6.24 notarization claim/atomic storage/artifact drift와 case-insensitive native suffix remediation,
-  direct regressions 및 config registration은 완료됐다.
-- Stage 6.24 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
-  `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
+- Stage 6.24 remediation은 `daab0ed9453715a6807b016f50437966457bb268`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 QA APPROVE와
+  Goal/Quality/Security/Context REJECT를 기록했고 discussions `3972836759`, `3972704255`, `3972704259` 및
+  unknown early-return/`info`·`log` mutation drift가 product blocker였다.
+- Stage 6.25 notarization finalization integrity와 signer-fingerprint continuity remediation, direct regressions,
+  documentation 및 config registration은 검증 완료 상태다.
+- Stage 6.25 report-inclusive head publication과 exact-head review는 분리된 후속 gate다. PR #8 merge와
+  `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
 
 ## 승인 요청
 
@@ -608,5 +646,9 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - 작업지시자의 최신 명시 지시에 따라 `4dcf219` review의 concurrent duplicate submit, non-atomic evidence
   replacement, pre/post-submit artifact drift, case-sensitive native suffix blocker는 Stage 6.24
   source/test/config와 두 report에서 교정됐다. Context procedural FAIL의 당시 pending review는 완료됐고,
-  merge와 containment는 계속 후속 gate다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않으며
-  Atlas가 그 exact head의 fresh five-lane review를 시작하는 것이 다음 gate다.
+  merge와 containment는 계속 후속 gate다.
+- 작업지시자의 최신 명시 지시에 따라 `daab0ed` review discussions `3972836759`, `3972704255`,
+  `3972704259`의 claim release, statusless acknowledgement, signer fingerprint continuity와 unknown early
+  return, `info`/`log` mutation drift blocker는 Stage 6.25 source/test/docs/config와 두 report에서 교정됐다.
+  이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않는다. publication receipt가 exact head의 source of
+  truth이며 Atlas exact-head review, PR merge, containment는 서로 분리된 후속 gate다.

@@ -11,6 +11,7 @@ export default defineConfig({
       "tests/package-macos-coordinator-dmg-recovery.test.mjs",
       "tests/package-macos-coordinator-dmg-app-refresh.test.mjs",
       "tests/package-macos-coordinator-signing-identity-recovery.test.mjs",
+      "tests/package-macos-coordinator-signing-fingerprint-recovery.test.mjs",
       "tests/package-macos-coordinator-cached-accepted.test.mjs",
       "tests/package-macos-signing-flow.test.mjs",
       "tests/package-macos-signing-discovery.test.mjs",

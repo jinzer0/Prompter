@@ -5,6 +5,10 @@ import { join } from "node:path"
 
 export const syntheticIdentity = "Developer ID Application: SYNTHETIC_IDENTITY"
 export const syntheticSecret = "SYNTHETIC_PROFILE_PASSWORD_KEY_PATH"
+export const syntheticCertificate = Buffer.from("synthetic leaf certificate")
+export const syntheticIdentityFingerprint = createHash("sha1")
+  .update(syntheticCertificate)
+  .digest("hex")
 export const appSubmissionId = "123e4567-e89b-42d3-a456-426614174000"
 export const dmgSubmissionId = "123e4567-e89b-42d3-a456-426614174001"
 

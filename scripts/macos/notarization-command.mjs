@@ -41,14 +41,15 @@ function api(payload) {
   }
 }
 
-function submission(payload) {
+function submission(payload, statuslessUnknown = false) {
   api(payload)
-  if (typeof payload.status !== "string") {
+  if (typeof payload.status !== "string" && !statuslessUnknown) {
     failNotarization("Invalid notarization submission")
   }
   return {
     submissionId: notarizationSubmissionId(payload.id ?? payload.submissionId),
-    status: payload.status,
+    status: typeof payload.status === "string" ? payload.status : "unknown",
+    ...(typeof payload.status === "string" ? {} : { poll: true }),
   }
 }
 
@@ -202,7 +203,7 @@ export function createNotarizationClient(options) {
           ],
           commandOptions,
         )
-        return submission(json(response?.stdout, "notarization submission"))
+        return submission(json(response?.stdout, "notarization submission"), true)
       } catch (error) {
         if (isNotarizationError(error)) throw error
         const timedOut = error?.code === "ETIMEDOUT" || error?.name === "AbortError"

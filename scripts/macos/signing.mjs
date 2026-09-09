@@ -1,5 +1,7 @@
-import { readFile, realpath } from "node:fs/promises"
-import { resolve } from "node:path"
+import { createHash } from "node:crypto"
+import { mkdtemp, readFile, realpath, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join, resolve } from "node:path"
 
 import { discoverSignableCode, SigningInputError } from "./signing-discovery.mjs"
 
@@ -46,14 +48,19 @@ async function requireIdentity(identity, runFile) {
   if (summaryMatch === null || Number(summaryMatch[1]) !== lines.length) {
     throw new SigningInputError("Unable to validate signing identity")
   }
-  let exactMatches = 0
+  let selectedFingerprint
   for (const line of lines) {
-    const match = line.match(/^\s*\d+\)\s+(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})\s+"([^"\r\n]+)"\s*$/u)
+    const match = line.match(/^\s*\d+\)\s+([0-9A-Fa-f]{40}|[0-9A-Fa-f]{64})\s+"([^"\r\n]+)"\s*$/u)
     if (match === null) throw new SigningInputError("Unable to validate signing identity")
-    if (match[1] === identity) exactMatches += 1
+    if (match[2] === identity) {
+      if (selectedFingerprint !== undefined)
+        throw new SigningInputError("Exactly one signing identity is required")
+      selectedFingerprint = match[1].toLowerCase()
+    }
   }
-  if (exactMatches !== 1) throw new SigningInputError("Exactly one signing identity is required")
-  return identity
+  if (selectedFingerprint === undefined)
+    throw new SigningInputError("Exactly one signing identity is required")
+  return { fingerprint: selectedFingerprint, identity }
 }
 
 async function validateEntitlements(entitlementsPath, runFile) {
@@ -91,26 +98,48 @@ function invalidArtifactIdentity(artifactKind) {
 
 async function verifyArtifactIdentity(path, identity, artifactKind, runFile) {
   if (identity === undefined) return
-  if (
-    typeof identity !== "string" ||
-    identity.length === 0 ||
-    identity.trim() !== identity ||
-    /[\0\r\n]/u.test(identity)
-  ) {
-    throw invalidArtifactIdentity(artifactKind)
+  let selectedIdentity
+  try {
+    selectedIdentity = await requireIdentity(identity, runFile)
+  } catch (error) {
+    if (error instanceof SigningInputError) throw invalidArtifactIdentity(artifactKind)
+    throw error
   }
-  const { stdout, stderr } = await runFile(codesignCommand, ["--display", "--verbose=4", path], {})
-  if (typeof stdout !== "string" || typeof stderr !== "string")
-    throw invalidArtifactIdentity(artifactKind)
-  const authorities = []
-  for (const line of `${stdout}\n${stderr}`.split(/\r?\n/u)) {
-    if (!line.startsWith("Authority")) continue
-    const match = line.match(/^Authority=([^\r\n]+)$/u)
-    if (match === null) throw invalidArtifactIdentity(artifactKind)
-    if (match[1].startsWith("Developer ID Application: ")) authorities.push(match[1])
+  const certificateDirectory = await mkdtemp(join(tmpdir(), "prompter-signing-certificate-"))
+  const certificatePrefix = join(certificateDirectory, "leaf-certificate-")
+  try {
+    const { stdout, stderr } = await runFile(
+      codesignCommand,
+      ["--display", "--verbose=4", "--extract-certificates", certificatePrefix, path],
+      {},
+    )
+    let certificate
+    try {
+      certificate = await readFile(`${certificatePrefix}0`)
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT")
+        throw invalidArtifactIdentity(artifactKind)
+      throw error
+    }
+    if (certificate.length === 0) throw invalidArtifactIdentity(artifactKind)
+    const algorithm = selectedIdentity.fingerprint.length === 40 ? "sha1" : "sha256"
+    const fingerprint = createHash(algorithm).update(certificate).digest("hex")
+    if (fingerprint.toLowerCase() !== selectedIdentity.fingerprint)
+      throw invalidArtifactIdentity(artifactKind)
+    if (typeof stdout !== "string" || typeof stderr !== "string")
+      throw invalidArtifactIdentity(artifactKind)
+    const authorities = []
+    for (const line of `${stdout}\n${stderr}`.split(/\r?\n/u)) {
+      if (!line.startsWith("Authority")) continue
+      const match = line.match(/^Authority=([^\r\n]+)$/u)
+      if (match === null) throw invalidArtifactIdentity(artifactKind)
+      if (match[1].startsWith("Developer ID Application: ")) authorities.push(match[1])
+    }
+    if (authorities.length !== 1 || authorities[0] !== selectedIdentity.identity)
+      throw invalidArtifactIdentity(artifactKind)
+  } finally {
+    await rm(certificateDirectory, { force: true, recursive: true })
   }
-  if (authorities.length !== 1 || authorities[0] !== identity)
-    throw invalidArtifactIdentity(artifactKind)
 }
 
 export async function signAppBundle({ appPath, identity, entitlementsPath, runFile }) {
@@ -123,7 +152,7 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   for (const target of targets) {
     await executeFile(
       codesignCommand,
-      signingArguments(signingIdentity, target, canonicalEntitlementsPath),
+      signingArguments(signingIdentity.identity, target, canonicalEntitlementsPath),
       {},
     )
   }
@@ -139,7 +168,7 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   await executeFile(
     codesignCommand,
     signingArguments(
-      signingIdentity,
+      signingIdentity.identity,
       { path: rootPath, entitlements: true },
       canonicalEntitlementsPath,
     ),

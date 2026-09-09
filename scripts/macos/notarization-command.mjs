@@ -69,12 +69,13 @@ function timeoutId(error) {
 
 function reviewedLog(payload, submissionId) {
   api(payload)
-  if (!hasSafeNotarizationIssues(payload.issues)) {
+  const issues = payload.issues === null ? [] : payload.issues
+  if (!hasSafeNotarizationIssues(issues)) {
     failNotarization("Invalid notarization log")
   }
   return {
     submissionId,
-    issues: payload.issues.map((issue) => ({ severity: issue.severity })),
+    issues: issues.map((issue) => ({ severity: issue.severity })),
   }
 }
 

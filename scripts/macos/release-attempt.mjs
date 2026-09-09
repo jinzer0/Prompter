@@ -85,18 +85,28 @@ async function verifyPreparedAttempt(attempt, artifactPath) {
 }
 
 async function acceptAttempt(attempt, state) {
-  const result = await submitAndWait({
-    artifactPath: attempt.artifactPath,
-    profile: state.notaryProfile,
-    evidenceDir: attempt.evidenceDirectory,
-    runFile: state.run,
-    ...(state.signal === undefined ? {} : { signal: state.signal }),
-  })
-  if (["unknown", "accepted"].includes(result?.status)) {
-    throw new Error("Notarization submission is unresolved")
-  }
-  if (result?.status !== "Accepted" || typeof result.logPath !== "string") {
-    throw new Error("Notarization submission was not accepted")
+  try {
+    const result = await submitAndWait({
+      artifactPath: attempt.artifactPath,
+      profile: state.notaryProfile,
+      evidenceDir: attempt.evidenceDirectory,
+      runFile: state.run,
+      ...(state.signal === undefined ? {} : { signal: state.signal }),
+    })
+    if (["unknown", "accepted"].includes(result?.status)) {
+      throw new Error("Notarization submission is unresolved")
+    }
+    if (result?.status !== "Accepted" || typeof result.logPath !== "string") {
+      throw new Error("Notarization submission was not accepted")
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      error.artifactKind = attempt.artifactKind
+      throw error
+    }
+    const sanitized = new Error("Notarization command failed")
+    sanitized.artifactKind = attempt.artifactKind
+    throw sanitized
   }
 }
 

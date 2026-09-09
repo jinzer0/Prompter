@@ -143,3 +143,68 @@ test("removes only terminal app evidence and unlinks nested symlinks", async () 
   assert.equal(await readFile(join(outsideDirectory, "outside-sentinel"), "utf8"), "retain")
   assert.equal(await readFile(join(first.evidenceRoot, "caller-sentinel"), "utf8"), "retain")
 })
+
+test("rebuilds a terminal DMG without discarding accepted app evidence", async () => {
+  const first = await fixture({ failure: "dmg-mutating-validate-exhaustion" })
+  await assert.rejects(first.run())
+  const app = notarizationAttempt(first, "app")
+  const dmg = notarizationAttempt(first, "dmg")
+  const versionDirectory = join(first.evidenceRoot, "v0.1.1")
+  const outsideDirectory = join(first.shared.root, "outside-terminal-dmg-evidence")
+  await mkdir(outsideDirectory)
+  await Promise.all([
+    writeFile(join(versionDirectory, "version-sentinel"), "retain"),
+    writeFile(join(outsideDirectory, "outside-sentinel"), "retain"),
+  ])
+  await symlink(outsideDirectory, join(dmg.evidenceDirectory, "nested-link"))
+
+  const second = await fixture({
+    pendingAppStatus: "Accepted",
+    pendingDmgStatus: "Rejected",
+    shared: first.shared,
+  })
+  await assert.rejects(second.run())
+  assertNoLaterReleaseStages(second.calls, "dmg-info")
+  assert.equal(submissionCount([first, second], "app"), 1)
+  assert.equal(submissionCount([first, second], "dmg"), 1)
+  await access(join(app.evidenceDirectory, "notarization-resume.json"))
+  await assert.rejects(access(dmg.evidenceDirectory))
+  assert.equal(await readFile(join(versionDirectory, "version-sentinel"), "utf8"), "retain")
+  assert.equal(await readFile(join(outsideDirectory, "outside-sentinel"), "utf8"), "retain")
+  assert.equal(await readFile(join(first.evidenceRoot, "caller-sentinel"), "utf8"), "retain")
+
+  const third = await fixture({ pendingAppStatus: "Accepted", shared: first.shared })
+  await third.run()
+
+  assert.equal(submissionCount([first, second, third], "app"), 1)
+  assert.equal(submissionCount([first, second, third], "dmg"), 2)
+})
+
+test("rebuilds after malformed app evidence is discarded", async () => {
+  const first = await fixture({ failure: "app-staple-exhaustion" })
+  await assert.rejects(first.run())
+  const app = notarizationAttempt(first, "app")
+  const versionDirectory = join(first.evidenceRoot, "v0.1.1")
+  const dmgEvidenceDirectory = join(versionDirectory, "dmg")
+  const outsideDirectory = join(first.shared.root, "outside-malformed-evidence")
+  await Promise.all([mkdir(dmgEvidenceDirectory), mkdir(outsideDirectory)])
+  await Promise.all([
+    writeFile(join(app.evidenceDirectory, "notarization-resume.json"), "{}"),
+    writeFile(join(dmgEvidenceDirectory, "dmg-sentinel"), "retain"),
+    writeFile(join(outsideDirectory, "outside-sentinel"), "retain"),
+  ])
+  await symlink(outsideDirectory, join(app.evidenceDirectory, "nested-link"))
+
+  const second = await fixture({ shared: first.shared })
+  await assert.rejects(second.run(), /Invalid retained notarization attempt/)
+  await assert.rejects(access(app.evidenceDirectory))
+  assert.equal(await readFile(join(dmgEvidenceDirectory, "dmg-sentinel"), "utf8"), "retain")
+  assert.equal(await readFile(join(outsideDirectory, "outside-sentinel"), "utf8"), "retain")
+  assert.equal(await readFile(join(first.evidenceRoot, "caller-sentinel"), "utf8"), "retain")
+
+  const third = await fixture({ shared: first.shared })
+  await third.run()
+
+  assert.equal(submissionCount([first, second, third], "app"), 2)
+  assert.equal(submissionCount([first, second, third], "dmg"), 1)
+})

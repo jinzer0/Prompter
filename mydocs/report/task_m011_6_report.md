@@ -33,7 +33,8 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.11 / `f95640b`, `5f9b3dd` | production-coupled entrypoint fixture; accepted-pending app/DMG retention and recovery tests | `4a647e6` Quality blocker와 `discussion_r3965376377` P2 교정 | signed-release offline contracts |
 | 6.12 / `8b4123f` | package-root ownership, fresh-status normalization, cached-Accepted cleanup precedence, direct regressions | `783b798` Goal/Security product blockers 교정과 report publication | signed-release offline contracts |
 | 6.13 / `d915260` | signing discovery architecture gate, architecture/discovery/flow tests, shared fixtures, Vitest registration, reports | `8b4123f` Context ARM64 blocker 교정과 review-integrity chronology | signed-release offline contracts |
-| 6.14 / 본 publication commit | `release-attempt-validation.mjs`, cached-Accepted coordinator regression, reports | `d915260` Context terminal-evidence P1 교정과 three-run retry proof | signed-release offline contracts |
+| 6.14 / `976dbda` | `release-attempt-validation.mjs`, cached-Accepted coordinator regression, reports | `d915260` Context terminal-evidence P1 교정과 three-run retry proof | signed-release offline contracts |
+| 6.15 / 본 publication commit | `release-attempt.mjs`, `release-attempt-validation.mjs`, cached-Accepted regression, reports | `976dbda` cleanup-kind attribution 및 DMG other-kind deletion blocker 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -80,6 +81,8 @@ Stage 6.12 source/test/report publication head는
 `8b4123f19a1eca56d902b02f997c8dafef167da0`이며 더 이상 publication 또는 push pending이 아니다.
 Stage 6.13 ARM64 source/test/report publication head도
 `d91526008f8532e31cb48cc703547d790c59f0e6`이며 더 이상 publication 또는 push pending이 아니다.
+Stage 6.14 terminal-evidence source/test/report publication head도
+`976dbda4cda933d1794adfc11ac60b482f2814ee`이며 더 이상 publication 또는 push pending이 아니다.
 
 ## 변경 전·후 정량 비교
 
@@ -87,7 +90,7 @@ Stage 6.13 ARM64 source/test/report publication head도
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
 | focused release regression | Stage 1 40 tests | Stage 6.14 cached-Accepted direct rerun 17/17 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.14 145 files, 945/945 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.15 144 files, 947/947 tests passed |
 | ARM64 Mach-O integrity | asset 이름만 arm64 | 모든 canonical Mach-O에 exact `arm64` slice 강제; universal x86_64+arm64 허용 |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
 | installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
@@ -140,7 +143,11 @@ Stage 6.13 ARM64 source/test/report publication head도
 | `d915260` fresh review lanes | REJECT RECORDED — Goal APPROVE, QA APPROVE, Code Quality APPROVE, Security APPROVE, Context REJECT P1. discussion `3967875371`은 cached Accepted 뒤 terminal outcome에서 stale terminal evidence가 남아 다음 invocation의 clean rebuild를 막는 결함을 확인했다. |
 | Stage 6.14 remediation | OK — terminal warning/error/Rejected outcome은 affected attempt evidence root만 폐기한다. 첫 run의 cached Accepted, 두 번째 run의 terminal cleanup, 세 번째 run의 fresh app/DMG submission과 Accepted evidence/release artifact 생성을 고정하고 sibling/version/caller/outside sentinels를 보존한다. |
 | Stage 6.14 verification | OK — full Vitest 145 files/945 tests, typecheck, lint, build, unsigned package, smoke 49/49와 cached-Accepted direct rerun 17/17이 통과했다. 최초 full Vitest 시도는 환경 timeout으로 final summary 없이 종료되어 PASS나 test failure로 계산하지 않고 완료된 rerun만 통과 근거로 사용한다. publication 재개 중 implementation과 tests는 재실행하지 않았다. |
-| Stage 6.14 review gate | PENDING FOR NEW EXACT HEAD — publication과 새 accessible temp detached worktree 생성 뒤 동일 exact head의 fresh five compact reviewers가 모두 APPROVE해야 merge할 수 있다. |
+| Stage 6.14 review gate | FULFILLED AT `976dbda` — source/test/report commit을 정상 push하고 PR #8 immutable links와 accessible exact-head temp review worktree를 갱신했다. |
+| `976dbda` fresh review lanes | REJECT RECORDED — QA APPROVE, Security APPROVE, Goal REJECT, Code Quality REJECT, Context REJECT. discussion `3970365453`은 malformed retained evidence가 affected kind와 evidence-disposal intent 없이 generic failure로 축약되어 stale evidence를 남기는 retry blocker를 확인했다. DMG terminal error가 other-kind accepted app evidence까지 삭제하는 blocker도 확인됐다. |
+| Stage 6.15 remediation | OK — submission 및 retained-evidence inspection failure에 affected `artifactKind`를 전파하고 malformed evidence에는 `discardEvidence`를 표시한다. cleanup은 error와 attempt kind가 일치할 때만 terminal evidence root를 제거하므로 malformed app은 retry 가능하고 terminal DMG는 accepted app evidence를 보존한다. |
+| Stage 6.15 verification | OK — malformed-evidence retry와 DMG app-preservation three-run regressions을 포함해 full Vitest 144 files/947 tests, typecheck, lint가 통과했다. Stage 6.14의 build, unsigned package, smoke 49/49 evidence를 보존하며 Stage 6.15에서 재실행했다고 주장하지 않는다. LSP는 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
+| Stage 6.15 review gate | PENDING FOR NEW EXACT HEAD — publication과 새 accessible temp detached worktree 생성 뒤 동일 exact head의 fresh five reviewers가 모두 APPROVE해야 merge할 수 있다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 pending이다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -173,6 +180,9 @@ Stage 6.13 ARM64 source/test/report publication head도
 - Stage 6.14: 같은 Stage 6 보고서에 `d915260` Goal/QA/Quality/Security approval, Context P1
   `discussion_r3967875371`, three-run terminal evidence cleanup, cached-Accepted 17/17 rerun, full
   945/945, smoke 49/49, initial environmental timeout과 pending new-head review를 추가했다.
+- Stage 6.15: 같은 Stage 6 보고서에 `976dbda` QA/Security approval과 Goal/Quality/Context rejection,
+  `discussion_r3970365453`, affected artifact-kind propagation, malformed-evidence retry, terminal DMG의
+  accepted app-preservation three-run regressions, full 947/947, typecheck/lint와 LSP refusal을 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -190,7 +200,7 @@ Stage 6.13 ARM64 source/test/report publication head도
 
 ### 후속 작업 후보
 
-- Stage 6.7부터 Stage 6.13 report-inclusive head `d915260`까지 기존 PR #8에 게시됐다. Stage 6.14
+- Stage 6.7부터 Stage 6.14 report-inclusive head `976dbda`까지 기존 PR #8에 게시됐다. Stage 6.15
   source/test/report commit, final-head immutable-link 교정, 새 temp detached review worktree 생성 뒤 fresh
   exact-head five-lane review, PR #8 merge,
   `origin/master` containment verification은 pending이다.
@@ -201,7 +211,7 @@ Stage 6.13 ARM64 source/test/report publication head도
 
 ## 작업지시자 승인 기록 및 요청
 
-- 작업지시자의 최신 명시 지시에 따라 Stage 6.14 source/test와 두 report의 failed-review 및 remediation
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.15 source/test와 두 report의 failed-review 및 remediation
   chronology를 하나의 commit으로 묶고 기존 PR #8 publication branch, final-head immutable links,
   새 temp detached review worktree를 갱신한다. fresh exact-head review는 그 publication 뒤의 다음 gate다.
 - 승인 범위 밖 작업은 수행하지 않는다. PR merge, containment verification, Issue #6 close,

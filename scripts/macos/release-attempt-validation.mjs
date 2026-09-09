@@ -18,6 +18,13 @@ function fail() {
   throw new Error("Invalid retained notarization attempt")
 }
 
+function invalidAttemptError(attempt) {
+  const error = new Error("Invalid retained notarization attempt")
+  error.artifactKind = attempt.artifactKind
+  error.discardEvidence = true
+  return error
+}
+
 function isContained(rootPath, targetPath) {
   const pathFromRoot = relative(rootPath, targetPath)
   return (
@@ -96,21 +103,25 @@ export async function validateReleaseAttemptDirectories(attempts) {
 }
 
 async function readBoundAttempt(attempt) {
-  const artifactIdentity = await identifyRetainedAttempt(attempt)
-  if (artifactIdentity === undefined) return undefined
-  const evidence = createNotarizationEvidence({
-    evidenceDir: attempt.evidenceDirectory,
-    artifactIdentity,
-  })
-  const saved = await evidence.readResume()
-  if (
-    saved === undefined ||
-    !evidence.matchesArtifact(saved) ||
-    !["unknown", "accepted", "Accepted"].includes(saved.status)
-  ) {
-    fail()
+  try {
+    const artifactIdentity = await identifyRetainedAttempt(attempt)
+    if (artifactIdentity === undefined) return undefined
+    const evidence = createNotarizationEvidence({
+      evidenceDir: attempt.evidenceDirectory,
+      artifactIdentity,
+    })
+    const saved = await evidence.readResume()
+    if (
+      saved === undefined ||
+      !evidence.matchesArtifact(saved) ||
+      !["unknown", "accepted", "Accepted"].includes(saved.status)
+    ) {
+      fail()
+    }
+    return Object.freeze({ attempt, saved })
+  } catch {
+    throw invalidAttemptError(attempt)
   }
-  return Object.freeze({ attempt, saved })
 }
 
 async function savedEvidenceStatus(attempt) {
@@ -127,7 +138,7 @@ async function savedEvidenceStatus(attempt) {
     return "Accepted"
   } catch (error) {
     if (error?.code === "ENOENT") return undefined
-    fail()
+    throw invalidAttemptError(attempt)
   }
 }
 
@@ -149,7 +160,8 @@ export async function inspectReleaseAttempts(attempts) {
     if (app === undefined && appEvidenceStatus === "pending") fail()
     if (dmg === undefined && dmgEvidenceStatus === "pending") fail()
     return app ?? dmg
-  } catch {
+  } catch (error) {
+    if (error?.artifactKind === "app" || error?.artifactKind === "dmg") throw error
     fail()
   }
 }
@@ -180,18 +192,18 @@ export async function cleanupReleaseAttempts(attempts, error, attemptHandlingSta
     let retain = false
     let discardEvidence = false
     if (error !== undefined) {
+      const affectedAttempt = error?.artifactKind === attempt.artifactKind
+      const terminalError = error?.blocksPublication || terminalAttemptErrors.has(error?.message)
+      discardEvidence = affectedAttempt && (error?.discardEvidence === true || terminalError)
       try {
         const retained = await readBoundAttempt(attempt)
-        discardEvidence =
-          retained !== undefined &&
-          (error.blocksPublication || terminalAttemptErrors.has(error.message))
         retain =
           retained !== undefined &&
-          !error.blocksPublication &&
-          !terminalAttemptErrors.has(error.message) &&
-          (retained.saved.status === "Accepted" ||
-            retained.saved.status === "accepted" ||
-            resumableErrors.has(error.message))
+          (!affectedAttempt ||
+            (!terminalError &&
+              (retained.saved.status === "Accepted" ||
+                retained.saved.status === "accepted" ||
+                resumableErrors.has(error.message))))
       } catch {
         retain = false
       }

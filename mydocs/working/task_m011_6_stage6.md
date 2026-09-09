@@ -46,7 +46,12 @@ DMG terminal error가 app loop에도 전역 적용되어 accepted app evidence�
 report-inclusive head `cf0cdef3cd395756748bb50ab861cd3fca5172fd`로 게시됐다. 그 exact-head review는
 QA, Code Quality, Security APPROVE와 Goal, Context REJECT를 기록했다. discussion `3970619017`은
 retained app/DMG가 현재 configured Developer ID identity와 같은 signer인지 확인하지 않는 continuity
-gap을 확인했다. Stage 6.16은 resumed artifact의 displayed authority를 현재 identity와 exact 비교한다.
+gap을 확인했다. Stage 6.16은 resumed artifact의 displayed authority를 현재 identity와 exact 비교해
+report-inclusive head `12f59ba1b9c24294d2b094bcbfdb56eb8096793e`로 게시됐다. 그 exact-head
+review는 Goal, QA, Security APPROVE와 Code Quality, Context REJECT를 기록했다. 두 REJECT는 wrong-signer
+또는 deterministic malformed identity evidence가 retained되어 이후 invocation도 같은 failure를 반복하는
+retry blocker를 확인했다. Stage 6.17은 deterministic identity error를 affected-kind evidence cleanup에
+연결하고 transient codesign execution error는 resumable하게 보존한다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -62,10 +67,10 @@ gap을 확인했다. Stage 6.16은 resumed artifact의 displayed authority를 �
 | `scripts/macos/release-inputs.mjs`, release preflight/entrypoints | signed release input 이름을 한 곳에 고정하고 exact version 뒤 두 nonblank input을 build 전에 검사한다. runtime coordinator의 기존 input validation은 유지한다. |
 | `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-contract.mjs`, `scripts/macos/release-attempt-validation.mjs` | warning/error log는 terminal publication blocker로 유지하고, malformed/service-error retrieval 뒤 valid bound lowercase-accepted app/DMG bytes는 refresh를 위해 보존한다. |
 | `scripts/macos/release-attempt.mjs`, `scripts/macos/release-attempt-validation.mjs` | submission 및 malformed retained-evidence error에 affected artifact kind를 전파하고 terminal cleanup을 해당 kind의 evidence root로 제한해 other-kind Accepted evidence를 보존한다. |
-| `scripts/macos/signing.mjs`, `scripts/macos/release-attempt.mjs` | resumed app/DMG에 `/usr/bin/codesign --display --verbose=4`를 실행하고 stdout/stderr의 `Authority=` metadata에서 exact one `Developer ID Application:` authority가 configured identity와 완전히 일치하는지 검증한다. |
+| `scripts/macos/signing.mjs`, `scripts/macos/release-attempt.mjs` | resumed app/DMG identity를 exact 검증하고 missing/duplicate/malformed/mismatch 같은 deterministic error에 `artifactKind`와 `discardEvidence`를 부여한다. transient codesign execution error에는 cleanup marker를 추가하지 않는다. |
 | `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.13 blocker 회귀를 contract 13 files/35 tests, focused release 17 files/173 tests로 고정했다. |
 | `tests/package-macos-coordinator-cached-accepted.test.mjs` | cached Accepted cleanup에 더해 malformed app evidence retry와 terminal DMG의 accepted app preservation을 각각 three-run으로 고정했다. |
-| `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG signer mismatch와 match, malformed authority metadata, downstream suppression 및 direct suite 등록을 고정했다. |
+| `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG match, missing/duplicate/malformed/mismatch cleanup, sibling-kind preservation, transient display failure retention, third-run success와 direct suite 등록을 고정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록한다. |
@@ -138,6 +143,13 @@ QA, Code Quality, Security는 APPROVE였고 Goal과 Context는 retained artifact
 REJECT했다. Stage 6.16은 기존 history를 rewrite하지 않고 그 remediation의 production modules, direct
 test/fixtures/config, Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication commit으로 묶는다.
 `.omo` receipt와 generated output은 커밋하지 않는다.
+
+Stage 6.16 source/test/config/report는 `12f59ba1b9c24294d2b094bcbfdb56eb8096793e` 한 commit으로
+게시됐고 PR #8 immutable blob links와 temp detached review worktree도 같은 SHA로 갱신됐다. 그 head의
+Goal, QA, Security는 APPROVE였고 Code Quality와 Context는 deterministic identity mismatch evidence가
+retained되는 retry blocker를 REJECT했다. Stage 6.17은 기존 history를 rewrite하지 않고 그 remediation의
+production module, direct regression, Stage 6 누적 보고서와 최종 보고서만 하나의 additive publication
+commit으로 묶는다. `.omo` receipt와 generated output은 커밋하지 않는다.
 
 ## 검증 결과
 
@@ -395,6 +407,23 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   주장하지 않는다.
 - MISS(환경 제한): Stage 6.16 six implementation/test/config paths와 두 report의 LSP diagnostics는
   sibling-worktree request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
+- REVIEW RECORDED: Stage 6.16 report-inclusive exact head
+  `12f59ba1b9c24294d2b094bcbfdb56eb8096793e` review는 Goal, QA, Security APPROVE와 Code Quality,
+  Context REJECT였다. 두 blocker는 wrong signer와 deterministic malformed identity metadata가 fail closed한
+  뒤에도 retained evidence를 남겨 다음 invocation이 같은 artifact에서 영구 실패하는 retry 결함이다.
+- OK: Stage 6.17은 missing, duplicate, malformed 또는 configured identity mismatch를 deterministic
+  `SigningInputError`로 유지하면서 affected `artifactKind`와 `discardEvidence=true`를 부여한다. cleanup은
+  affected app 또는 DMG evidence만 폐기해 sibling-kind Accepted evidence를 보존하고 third run이 fresh
+  submission으로 성공하게 한다.
+- OK: `/usr/bin/codesign --display` 자체의 transient execution error는 sanitized macOS release command
+  failure로 남고 `artifactKind`나 `discardEvidence`를 갖지 않는다. 따라서 valid retained evidence를
+  보존하고 다음 invocation에서 resubmit 없이 resume한다.
+- OK: direct regression은 missing/duplicate/malformed/mismatch, app/DMG sibling preservation, third-run
+  success와 transient codesign retention을 고정한다. 완료된 authoritative verification은 full Vitest
+  145 files/955 tests, typecheck, lint, changed-file syntax와 `git diff --check`다. Stage 6.14의 build,
+  unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.17에서 재실행했다고 주장하지 않는다.
+- MISS(환경 제한): Stage 6.17 two source/test paths와 두 report의 LSP diagnostics는 sibling-worktree
+  request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
@@ -407,8 +436,8 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
 
 ## 다음 단계 영향
 
-- Stage 6.7부터 Stage 6.15 report-inclusive head `cf0cdef`까지 `publish/task6`와 PR #8에 게시했다.
-  Stage 6.16 signer-continuity 교정과 두 보고서를 하나의 publication commit으로 추가하고 기존
+- Stage 6.7부터 Stage 6.16 report-inclusive head `12f59ba`까지 `publish/task6`와 PR #8에 게시했다.
+  Stage 6.17 retained-wrong-signer retry 교정과 두 보고서를 하나의 publication commit으로 추가하고 기존
   PR #8을 새 final head에 고정한 뒤 새 temp clean detached review worktree에서 five-lane review를 다시
   실행한다.
 - PR #8 review/merge와 `origin/master` containment verification은 명시적으로 pending이다. Todo 8은
@@ -418,7 +447,7 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
 
 ## 승인 요청
 
-- 작업지시자의 최신 명시 지시에 따라 Stage 6.16 source/test/config/report 단일 commit, 정상 publication push,
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.17 source/test/report 단일 commit, 정상 publication push,
   기존 PR #8 final-head immutable-link 교정과 새 temp review worktree 생성을 진행한다. 새 exact-head
   five-lane review, PR merge,
   containment verification, Issue #6 close, Issue #7 진입, tag/release/upload는 수행하지 않는다.

@@ -124,6 +124,53 @@ test("discovers the installed Electron 43 framework with only a read-only file r
   )
 })
 
+test("accepts a contained executable npm-bin alias when its canonical target is text", async () => {
+  const paths = await fixture({ npmBinAlias: true })
+  const npmBinTarget = await realpath(paths.npmBinTarget)
+  const targets = await discoverSignableCode({
+    appPath: paths.appPath,
+    runFile: createSigningRunner({ textPaths: [npmBinTarget] }),
+  })
+
+  assert.equal(
+    targets.some(({ path }) => path === npmBinTarget),
+    false,
+  )
+})
+
+test("ignores an initially foreign native payload while retaining Mach-O targets", async () => {
+  const paths = await fixture()
+  const foreignNative = await realpath(paths.native)
+  const mainPath = await realpath(paths.main)
+  const targets = await discoverSignableCode({
+    appPath: paths.appPath,
+    runFile: createSigningRunner({ foreignPaths: [foreignNative] }),
+  })
+
+  assert.equal(
+    targets.some(({ path }) => path === foreignNative),
+    false,
+  )
+  assert.equal(
+    targets.some(({ path }) => path === mainPath),
+    true,
+  )
+})
+
+test("discovers a non-executable extensionless Mach-O payload by file magic", async () => {
+  const paths = await fixture({ hiddenMachO: true })
+  const hiddenMachO = await realpath(paths.hiddenMachO)
+  const targets = await discoverSignableCode({
+    appPath: paths.appPath,
+    runFile: createSigningRunner(),
+  })
+
+  assert.equal(
+    targets.some(({ path }) => path === hiddenMachO),
+    true,
+  )
+})
+
 test.each([
   "before-canonical",
   "before-conventional",
@@ -149,14 +196,41 @@ test.each([
 test("rejects a post-sign unsigned native object and suppresses the outer signature", async () => {
   const paths = await fixture()
   const calls = []
+  const nativePath = await realpath(paths.native)
   await assert.rejects(
     signAppBundle({
       appPath: paths.appPath,
       identity: signingIdentity,
       entitlementsPath: paths.entitlements,
-      runFile: createSigningRunner({ calls, unsignedAfterSigning: true }),
+      runFile: createSigningRunner({ calls, foreignAfterSigningPaths: [nativePath] }),
     }),
-    /Native-code path is not a Mach-O object/,
+    /Signable code changed during signing/,
+  )
+  assert.equal(
+    calls.some(
+      ({ command, arguments_ }) =>
+        command === "/usr/bin/codesign" && arguments_.at(-1) === paths.appPath,
+    ),
+    false,
+  )
+})
+
+test("rejects a post-sign Mach-O addition and suppresses the outer signature", async () => {
+  const paths = await fixture()
+  const calls = []
+  const nativePath = await realpath(paths.native)
+  await assert.rejects(
+    signAppBundle({
+      appPath: paths.appPath,
+      identity: signingIdentity,
+      entitlementsPath: paths.entitlements,
+      runFile: createSigningRunner({
+        calls,
+        textPaths: [nativePath],
+        machOAfterSigningPaths: [nativePath],
+      }),
+    }),
+    /Signable code changed during signing/,
   )
   assert.equal(
     calls.some(

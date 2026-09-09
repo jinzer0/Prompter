@@ -1,14 +1,11 @@
-import { lstat, readdir, readFile, realpath, stat } from "node:fs/promises"
-import { extname, isAbsolute, relative, resolve, sep } from "node:path"
+import { readFile, realpath } from "node:fs/promises"
+import { resolve } from "node:path"
 
-import {
-  containingFramework,
-  createFrameworkAliasPolicy,
-  isFrameworkBinary,
-} from "./framework-alias.mjs"
+import { discoverSignableCode, SigningInputError } from "./signing-discovery.mjs"
+
+export { discoverSignableCode } from "./signing-discovery.mjs"
 
 const codesignCommand = "/usr/bin/codesign"
-const fileCommand = "/usr/bin/file"
 const plutilCommand = "/usr/bin/plutil"
 const securityCommand = "/usr/bin/security"
 const expectedEntitlements = `<?xml version="1.0" encoding="UTF-8"?>
@@ -20,13 +17,6 @@ const expectedEntitlements = `<?xml version="1.0" encoding="UTF-8"?>
 </dict>
 </plist>
 `
-
-class SigningInputError extends Error {
-  constructor(message) {
-    super(message)
-    this.name = "SigningInputError"
-  }
-}
 
 function requireRunner(runFile) {
   if (typeof runFile !== "function") throw new SigningInputError("runFile must be a function")
@@ -64,136 +54,6 @@ async function requireIdentity(identity, runFile) {
   }
   if (exactMatches !== 1) throw new SigningInputError("Exactly one signing identity is required")
   return identity
-}
-
-function assertContained(rootPath, targetPath) {
-  const pathFromRoot = relative(rootPath, targetPath)
-  const contained =
-    pathFromRoot === "" ||
-    (!pathFromRoot.startsWith(`..${sep}`) && pathFromRoot !== ".." && !isAbsolute(pathFromRoot))
-  if (!contained) throw new SigningInputError("Signable code resolves outside the app bundle")
-}
-
-function pathDepth(rootPath, targetPath) {
-  return targetPath === rootPath ? 0 : relative(rootPath, targetPath).split(sep).length
-}
-
-function lexicalCompare(left, right) {
-  return left === right ? 0 : left < right ? -1 : 1
-}
-
-function bundleKind(targetPath) {
-  if (targetPath.endsWith(".app")) return "helper-app"
-  if (targetPath.endsWith(".xpc")) return "xpc-service"
-  if (targetPath.endsWith(".framework")) return "framework"
-  return undefined
-}
-
-function rawKind(targetPath, mode, frameworkPath) {
-  const extension = extname(targetPath).toLowerCase()
-  if (extension === ".node") return "native-module"
-  if (extension === ".dylib") return "dynamic-library"
-  if (frameworkPath !== undefined) return "framework-binary"
-  if ((mode & 0o111) !== 0) return "executable-host"
-  return undefined
-}
-
-function sortedTargets(rootPath, targets) {
-  return [...targets.values()].sort((left, right) => {
-    const depthDifference = pathDepth(rootPath, right.path) - pathDepth(rootPath, left.path)
-    return depthDifference === 0 ? lexicalCompare(left.path, right.path) : depthDifference
-  })
-}
-
-export async function discoverSignableCode({ appPath, runFile }) {
-  const executeFile = requireRunner(runFile)
-  const rootPath = await realpath(resolve(appPath))
-  if (!(await stat(rootPath)).isDirectory() || !rootPath.endsWith(".app")) {
-    throw new SigningInputError("appPath must be an app bundle directory")
-  }
-
-  const visited = new Set()
-  const targets = new Map()
-  const frameworkAliases = createFrameworkAliasPolicy(rootPath)
-
-  async function visit(candidatePath) {
-    const candidateMetadata = await lstat(candidatePath)
-    const targetPath = await realpath(candidatePath)
-    assertContained(rootPath, targetPath)
-    const candidateBundleKind = bundleKind(candidatePath)
-    const candidateExtension = extname(candidatePath).toLowerCase()
-    const targetExtension = extname(targetPath).toLowerCase()
-    if (
-      (candidateBundleKind !== undefined && candidateBundleKind !== bundleKind(targetPath)) ||
-      ([".node", ".dylib"].includes(candidateExtension) && candidateExtension !== targetExtension)
-    ) {
-      throw new SigningInputError("Signable symlink alias has an ambiguous target type")
-    }
-    const metadata = await stat(targetPath)
-    if (metadata.isDirectory()) {
-      if (
-        candidateMetadata.isSymbolicLink() &&
-        !(await frameworkAliases.directory(candidatePath, targetPath))
-      ) {
-        throw new SigningInputError("Signable directory alias is not allowed")
-      }
-      if (visited.has(targetPath)) return
-      visited.add(targetPath)
-      const kind = targetPath === rootPath ? undefined : bundleKind(targetPath)
-      if (kind !== undefined) {
-        targets.set(targetPath, {
-          path: targetPath,
-          kind,
-          entitlements: ["helper-app", "xpc-service", "executable-host"].includes(kind),
-        })
-      }
-      const entries = await readdir(targetPath)
-      entries.sort(lexicalCompare)
-      for (const entry of entries) await visit(resolve(targetPath, entry))
-      return
-    }
-    if (!metadata.isFile()) return
-
-    const frameworkPath = containingFramework(targetPath, rootPath)
-    const extension = extname(targetPath).toLowerCase()
-    const mustInspect =
-      extension === ".node" ||
-      extension === ".dylib" ||
-      (metadata.mode & 0o111) !== 0 ||
-      isFrameworkBinary(targetPath, frameworkPath)
-    const isInvalidAlias =
-      mustInspect &&
-      candidatePath !== targetPath &&
-      !(await frameworkAliases.binary(candidatePath, targetPath))
-    if (isInvalidAlias) throw new SigningInputError("Signable binary alias is not allowed")
-    if (visited.has(targetPath)) return
-    visited.add(targetPath)
-    if (!mustInspect) return
-
-    const { stdout } = await executeFile(fileCommand, ["-b", targetPath], {})
-    const kind = rawKind(targetPath, metadata.mode, frameworkPath)
-    if (!stdout.includes("Mach-O")) {
-      if (
-        extension === ".node" ||
-        extension === ".dylib" ||
-        isFrameworkBinary(targetPath, frameworkPath)
-      ) {
-        throw new SigningInputError("Native-code path is not a Mach-O object")
-      }
-      return
-    }
-    if (kind === undefined) {
-      throw new SigningInputError("Mach-O object could not be classified")
-    }
-    targets.set(targetPath, {
-      path: targetPath,
-      kind,
-      entitlements: ["helper-app", "xpc-service", "executable-host"].includes(kind),
-    })
-  }
-
-  await visit(rootPath)
-  return sortedTargets(rootPath, targets)
 }
 
 async function validateEntitlements(entitlementsPath, runFile) {

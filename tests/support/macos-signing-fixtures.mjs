@@ -62,6 +62,35 @@ export async function createSigningFixture(options = {}) {
     await executable(outside)
     await symlink(outside, join(appPath, "Contents", "Resources", "app", "escape.node"))
   }
+  if (options.npmBinAlias) {
+    paths.npmBinTarget = join(
+      appPath,
+      "Contents",
+      "Resources",
+      "app",
+      "node_modules",
+      "vite",
+      "bin",
+      "vite.js",
+    )
+    paths.npmBinAlias = join(
+      appPath,
+      "Contents",
+      "Resources",
+      "app",
+      "node_modules",
+      ".bin",
+      "vite",
+    )
+    await executable(paths.npmBinTarget)
+    await mkdir(join(paths.npmBinAlias, ".."), { recursive: true })
+    await symlink("../vite/bin/vite.js", paths.npmBinAlias)
+  }
+  if (options.hiddenMachO) {
+    paths.hiddenMachO = join(appPath, "Contents", "Resources", "opaque-payload")
+    await mkdir(join(paths.hiddenMachO, ".."), { recursive: true })
+    await writeFile(paths.hiddenMachO, Buffer.from([0xcf, 0xfa, 0xed, 0xfe]))
+  }
   return { paths, remove: () => rm(root, { recursive: true, force: true }) }
 }
 
@@ -123,6 +152,10 @@ export function createSigningRunner({
   listing = identityListing(),
   calls = [],
   unsignedAfterSigning = false,
+  textPaths = [],
+  foreignPaths = [],
+  foreignAfterSigningPaths = [],
+  machOAfterSigningPaths = [],
 } = {}) {
   return async (command, arguments_) => {
     calls.push({ command, arguments_ })
@@ -133,6 +166,16 @@ export function createSigningRunner({
         ({ command: entry, arguments_: args }) =>
           entry === "/usr/bin/codesign" && args[0] === "--force",
       )
+      if (signed && machOAfterSigningPaths.includes(arguments_[1])) {
+        return { stdout: "Mach-O 64-bit executable" }
+      }
+      if (
+        foreignPaths.includes(arguments_[1]) ||
+        (signed && foreignAfterSigningPaths.includes(arguments_[1]))
+      ) {
+        return { stdout: "ELF 64-bit LSB shared object" }
+      }
+      if (textPaths.includes(arguments_[1])) return { stdout: "JavaScript source, ASCII text" }
       return { stdout: unsignedAfterSigning && signed ? "text" : "Mach-O 64-bit executable" }
     }
     return { stdout: "" }

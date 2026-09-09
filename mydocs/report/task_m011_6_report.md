@@ -25,7 +25,8 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.4 / `c3d7173`, `63a35d4` | Electron 43 aliases, preflight ordering, final evidence validator, docs wording | latest failed fresh-review blocker 교정 | signed-release offline contracts |
 | 6.5 / `fa6ef98e783d53995ced53de34a1460b244b5064`, `81faa9869c9ae06b6f782093671d333449a42578` | arbitrary framework binary alias rejection, lowercase-info severity taxonomy | final fresh-review blockers 교정 | signed-release offline contracts |
 | PR #8 remediation after old head `1185a7365f441dee3dc9b7b19acd9be5c4bfe7c6` / remediation commit | notarization, release lifecycle/attempt handling, framework alias, split tests, Vitest config, reports | PR review remediation, resumed code-quality APPROVE | signed-release offline contracts |
-| 6 closure / draft | `mydocs/working/task_m011_6_stage6.md`, `mydocs/report/task_m011_6_report.md`, `mydocs/orders/20260908.md` | PR #8 remediation evidence, closure report, truthful orders note | governance/reporting only |
+| 6.7 / `e940e29`, `a81fe86`, `fc3fb08`, `3adaf6b` | trusted-anchor path ownership, verbatim npm-bin links, actual Mach-O classification, signing/package module extraction, docs/tests | exact head `9e561e5` Quality/Context REJECT와 installed foreign-native blocker 교정 | signed-release offline contracts |
+| 6.7 report / `3b6477d` | `mydocs/working/task_m011_6_stage6.md` | Stage 6.7 exact commit facts와 fresh review pending gate 기록 | governance/reporting only |
 
 ## 문서 위치 검증
 
@@ -40,18 +41,22 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 `docs/plan/**`, `docs/draft/**`, `.omo/boulder.json`, approved plans, README public unsigned v0.1.0
 notice와 prior reports는 이 closure에서 수정하지 않았다. `.omo` evidence와 notepad는 ignored 상태로
 커밋하지 않는다. PR #8 remediation은 old head
-`1185a7365f441dee3dc9b7b19acd9be5c4bfe7c6` 뒤 forthcoming history에 production source,
-split tests/support, Vitest config, reports 변경을 함께 포함하며, 이 문서는 그 reporting portion을
+`1185a7365f441dee3dc9b7b19acd9be5c4bfe7c6` 뒤 Stage 6.7 history는
+`e940e29d4c9ae946b6705fafe70dee822a454fba`,
+`a81fe8664701435bbfc2fc100cbc9b7eff29ac0f`,
+`fc3fb088c8b76cac44aef8be8dc714f107b71104`,
+`3adaf6b2deddc6123fde62ff76b97b9a15ad4192`,
+`3b6477db464a398ed26d2f36aa91ef463fbb2d47`로 구분하며, 이 문서는 그 reporting portion을
 기록한다.
 
 ## 변경 전·후 정량 비교
 
 | 지표 | 변경 전 | 변경 후 |
 |---|---:|---:|
-| focused release regression | Stage 1 40 tests | PR #8 remediation 14 files, 141 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | PR #8 remediation 130 files, 911 tests passed |
+| focused release regression | Stage 1 40 tests | Stage 6.7 14 files, 149 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.7 130 files, 919 tests passed |
 | Electron smoke | Stage 5 49 tests | PR #8 remediation 49/49 tests passed |
-| installed Electron discovery | 미확인 | Electron 43, 23 canonical targets, 15 read-only file inspections, zero signing/Apple service calls |
+| installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
 | signed missing-input candidate/evidence mutation | candidate mutation 0건 | candidate/evidence absent, command nonzero, mutation 0건 |
 | final validation artifacts left | release/dist/build/smoke output 0개 | release/dist/build/smoke output 0개 |
 
@@ -62,15 +67,18 @@ split tests/support, Vitest config, reports 변경을 함께 포함하며, 이 �
 | Stage 1-5 reports와 승인된 commits 보존 | OK — Stage 1부터 Stage 5 report와 commits를 rewrite하지 않고 Stage 6 report에서 failed-review chronology를 보존했다. |
 | Stage 6.2부터 Stage 6.5 remediation history 보존 | OK — `ce079c2`, `654b044`, `4fefcd0`, `0ffa654`, `5114a1e`, `c3d7173`, `63a35d4`, `fa6ef98e783d53995ced53de34a1460b244b5064`, `81faa9869c9ae06b6f782093671d333449a42578`를 구분해 기록했고 지우지 않았다. |
 | PR #8 old head 이후 remediation 상태 | OK — old head `1185a7365f441dee3dc9b7b19acd9be5c4bfe7c6` 뒤 교정으로 literal `issues: null`, premature pre-notarization Gatekeeper assessment, immutable restart-safe retained attempts, accepted app lifecycle retention, candidate-copy DMG stapling, evidence-root symlink ownership, pre-recovery cleanup ownership, release-root symlink rejection을 고정했다. |
+| Stage 6.7 exact-head remediation | OK — release/evidence root의 symlinked ancestor를 trusted anchor 아래 component walk로 차단하고, anchor 위 macOS alias는 canonicalize해 허용한다. assembly는 npm-bin relative link text를 보존한다. signing discovery는 실제 file type이 Mach-O인 target만 선택하므로 initially foreign ELF/PE/text native payload는 package에 남고 signing 대상에서 제외된다. Mach-O alias/path/duplicate validation과 signing 전후 target-set 비교는 fail closed로 유지된다. |
 | exact `0.1.1`, preflight-before-candidate, artifact-bound resume, timeout/abort, DMG runtime, detach cleanup | OK — focused tests, full tests, typecheck, lint, build, unsigned package, signed missing-input mutation-zero와 smoke가 모두 통과했다. |
 | arbitrary framework alias fail-closed | OK — arbitrary `Versions/*` binary aliases fail before signing while conventional Current-bound root binary aliases remain supported. |
 | Notarization issue severity taxonomy | OK — empty array 또는 exact lowercase `info` issue record만 허용하고 unknown/malformed values는 live log와 final evidence에서 fail closed한다. |
-| installed Electron 43 compatibility | OK — 23 canonical targets, 15 read-only file inspections, zero signing/Apple service calls로 통과했다. |
+| installed Electron 43 compatibility | OK — source bundle은 23 canonical targets/15 inspections, actual assembled installed dependency tree는 63 signable targets/236 real `/usr/bin/file` inspections로 완료됐다. packaged foreign ELF `.node`는 삭제하지 않고 target에서만 제외했으며 signing/Apple service call은 0회였다. |
 | dead wrappers and oversized tests | OK — unused framework-alias wrapper exports were removed. Oversized package/coordinator, signing, and notarization test modules were split while preserving title inventories and Vitest registration. |
-| package, build, test totals | OK — focused split release suite 14 files/141 tests, full Vitest 130 files/911 tests, smoke 49/49, `npm run typecheck`, `npm run lint`, `git diff --check`, `npm run build`, unsigned `npm run package` passed. |
+| package, build, test totals | OK — focused split release suite 14 files/149 tests, full Vitest 130 files/919 tests, smoke 49/49, `npm run typecheck`, `npm run lint`, `npm run build`, unsigned `npm run package` passed. |
 | signed missing-input behavior | OK(expected nonzero) — missing-input `npm run package:release:macos` exited nonzero with no candidate/evidence mutation and no live Apple operation. This is not recorded as a successful release command. |
-| fresh review lanes | OK — previous fresh lanes were Goal PASS, QA PASS, Code quality PASS, Context PASS, Security PASS. Sessions: Goal `ses_f7cca8a57ffejMEXr61Xruwj52`, QA `ses_f7cca88e4ffe2yI4Z44axRYvDn`, Quality `ses_f7cca879effe940uVoPb6Ot5P4`, Context `ses_f7cca86b8ffe4QfW7J2ICb2ZRv`, Security `ses_f7cca85cbffeNNAhxJAIpUjEkZ`. Resumed code-quality reviewer verdict for PR #8 remediation is `APPROVE`, session `ses_f7cbaed05ffeMvNxTxrA62eoMB`. |
-| protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan, no-publication boundary를 재확인하고 closure commit에는 reports/orders만 포함한다. |
+| fresh review lanes | PENDING FOR NEW HEAD — previous committed-head lanes were Goal PASS, QA PASS, Code quality PASS, Context PASS, Security PASS. Sessions: Goal `ses_f7cca8a57ffejMEXr61Xruwj52`, QA `ses_f7cca88e4ffe2yI4Z44axRYvDn`, Quality `ses_f7cca879effe940uVoPb6Ot5P4`, Context `ses_f7cca86b8ffe4QfW7J2ICb2ZRv`, Security `ses_f7cca85cbffeNNAhxJAIpUjEkZ`. Resumed code-quality reviewer verdict for earlier PR #8 remediation is `APPROVE`, session `ses_f7cbaed05ffeMvNxTxrA62eoMB`. Stage 6.7 implementation/docs head is `3adaf6b2deddc6123fde62ff76b97b9a15ad4192`; no report-inclusive exact-head review exists yet. |
+| rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 pending이다. |
+| historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
+| protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
 | live Apple/GitHub release operations | OK — Developer ID signing, Apple Notarization, stapling, Gatekeeper, tag, GitHub Release, upload, public v0.1.1 publication은 실행하지 않았다. |
 | draft markdown LSP diagnostics | MISS (environment limitation) — sibling worktree path를 request cwd 밖으로 판정해 실행하지 못했다. typecheck, lint, syntax/import, tests, build, package, smoke, template section review, whitespace check로 대체했다. |
 
@@ -82,6 +90,7 @@ split tests/support, Vitest config, reports 변경을 함께 포함하며, 이 �
 - Stage 4: [`task_m011_6_stage4.md`](../working/task_m011_6_stage4.md) — checked-in regression과 maintainer documentation contract를 고정했다.
 - Stage 5: [`task_m011_6_stage5.md`](../working/task_m011_6_stage5.md) — full offline validation, unsigned artifact receipt, signed mutation-zero proof, smoke, scan classification과 cleanup을 완료했다.
 - Stage 6: [`task_m011_6_stage6.md`](../working/task_m011_6_stage6.md) — pre-PR blocker, Stage 6.2부터 6.5 failed-review chronology, PR #8 remediation evidence, resumed code-quality APPROVE, PR review/merge pending gate를 기록했다.
+- Stage 6.7: 같은 Stage 6 보고서에 exact-head Quality/Context rejection, trusted-anchor/npm-bin/foreign-native remediation, signing/package extraction, 149/919/49 검증, attribution disclosure를 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -99,7 +108,8 @@ split tests/support, Vitest config, reports 변경을 함께 포함하며, 이 �
 
 ### 후속 작업 후보
 
-- PR #8 exact-head review, merge, `origin/master` containment verification은 아직 pending이다.
+- Stage 6.7 commit과 기존 PR #8 publication 뒤 fresh exact-head review, PR #8 merge,
+  `origin/master` containment verification은 pending이다.
 - Issue #7은 이 Task #6 implementation PR이 `origin/master`에 merge된 뒤에만 진입한다.
 - Issue #7에서 live Developer ID signing, Apple Notarization, staple, Gatekeeper assessment, tag, GitHub
   Release, upload, public v0.1.1 publication, README public installation update를 수행한다.
@@ -107,9 +117,8 @@ split tests/support, Vitest config, reports 변경을 함께 포함하며, 이 �
 
 ## 작업지시자 승인 기록 및 요청
 
-- 작업지시자의 최신 명시 continuation을 Stage 6 report, final report, orders completion, closure commit,
-  `publish/task6` update push 승인으로 사용한다. 이 push는 existing PR #8 head를 갱신하며,
-  exact-head independent review는 그 뒤의 다음 gate다.
+- 작업지시자의 최신 명시 continuation에 따라 Stage 6.7 commit과 기존 PR #8 publication을
+  진행한다. fresh exact-head review는 publication 뒤의 다음 gate다.
 - 승인 범위 밖 작업은 수행하지 않는다. PR merge, Issue #6 close, branch/worktree cleanup, Issue #7 진입,
   tag, release, upload, live Apple operations는 남아 있다. Todo 8도 merge와 `origin/master` containment
   verification 전까지 완료로 주장하지 않는다.

@@ -30,6 +30,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.8 / `b7ab935`, `d6692d4`, `64bf4a8`, `9d260c2`, `619d0d8`, `8678bf1`, `d8a79ae` | Electron contract fixtures/helper, 13 direct test modules, Vitest registration | `4c720cc` Code Quality oversized-suite REJECT 교정과 919-title 보존 | test architecture and registration |
 | 6.9 / `a7d84bb`, `ada1e31` | DMG Gatekeeper production/test/QA docs; concurrent attempt production/test/support | `0900ba9` Goal/Quality blocker 교정 | signed-release offline contracts |
 | 6.10 / `3c52890` | shared release input names, version preflight, package/release entrypoints, direct fixture regression | `2c59d61` Goal/Security 공통 pre-build input blocker 교정 | signed-release offline contracts |
+| 6.11 / `f95640b`, `5f9b3dd` | production-coupled entrypoint fixture; accepted-pending app/DMG retention and recovery tests | `4a647e6` Quality blocker와 `discussion_r3965376377` P2 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -67,15 +68,18 @@ primary-signature `a7d84bb8314f043ebba4809e905ee1c4771ce958`과 concurrent attem
 verification을 additive하게 기록한다. Stage 6.9 report-inclusive publication head는
 `2c59d615ff4235eb33be52170cd3064518b1fd1f`다. 이어진 Stage 6.10 pre-build release-input
 remediation은 `3c5289047f6f4590ce6cc24c757606fde7bb472e`이며, 이 문서는 해당 rejected review와
-verification을 additive하게 이어서 기록한다.
+verification을 additive하게 이어서 기록한다. Stage 6.10 report-inclusive publication head는
+`4a647e68adbd58445885600d24cd06e405734a31`이다. 이어진 Stage 6.11 entrypoint fixture
+`f95640b4cd3e3ce3b7ba160538d26f8388b6e216`과 accepted-pending retention
+`5f9b3dd269ffd5993e6ac10f81b5db72f93c1be8`은 그 review와 live P2 remediation을 구분한다.
 
 ## 변경 전·후 정량 비교
 
 | 지표 | 변경 전 | 변경 후 |
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
-| focused release regression | Stage 1 40 tests | Stage 6.10 15 files, 156/156 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.10 142 files, 924/924 tests passed |
+| focused release regression | Stage 1 40 tests | Stage 6.11 15 files, 161/161 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.11 142 files, 929/929 tests passed |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
 | installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
 | signed missing-input candidate/evidence mutation | candidate mutation 0건 | candidate/evidence absent, command nonzero, mutation 0건 |
@@ -108,7 +112,12 @@ verification을 additive하게 이어서 기록한다.
 | Stage 6.10 failing-first evidence | RECORDED — missing/blank signing identity와 notary profile 네 actual npm entrypoint case는 교정 전 4/17 실패했고 fixture build/downstream marker가 실행됐다. |
 | Stage 6.10 remediation | OK — frozen shared input-name map을 preflight와 두 release entrypoint가 재사용한다. exact version 뒤 두 input을 build 전에 검사하고, runtime coordinator input validation은 defense-in-depth로 유지한다. rejected fixture는 build/downstream/candidate/evidence를 변경하지 않고 synthetic value를 출력하지 않는다. |
 | Stage 6.10 verification | OK — targeted 17/17, focused release 15 files/156 tests, full Vitest 142 files/924 tests, typecheck, lint, changed-file syntax, pure LOC maximum 214, `git diff --check`가 통과했다. LSP는 six paths 모두 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
-| Stage 6.10 review gate | PENDING FOR REPORT-INCLUSIVE FINAL HEAD — behavior commit `3c52890`과 본 report commit을 포함한 새 final head에서 fresh five-lane review를 다시 수행해야 한다. PR merge, containment, Issue #6 closure, Issue #7 entry와 Todo 8 완료는 pending이다. |
+| `4a647e6` review lanes | REJECT RECORDED — Goal APPROVE, QA REJECT, Quality REJECT, Security APPROVE, Context APPROVE. QA는 한 번의 transient native rebuild failure를 기록했지만 retry와 full suite는 통과했다. Quality는 synthetic hardcoded release script fixture가 production ordering을 고정하지 않는 blocker를 확인했다. |
+| current-head P2 | REJECT RECORDED — PR comment `discussion_r3965376377`는 accepted submit 뒤 malformed/service-error log retrieval이 lowercase `accepted` evidence만 남기고 bound app/DMG artifact를 삭제해 다음 invocation을 `ENOENT`로 만드는 blocker를 확인했다. |
+| Stage 6.11 failing-first evidence | RECORDED — temporary production script reorder는 6/18 entrypoint failure와 build marker 생성을 재현했고 즉시 복구돼 `package.json` diff는 없다. app/DMG malformed 및 service-error accepted-pending case는 교정 전 retained artifact read에서 `ENOENT`로 실패했다. |
+| Stage 6.11 remediation | OK — fixture는 exact production release script를 보존하고 build/downstream implementation만 교체한다. valid bound lowercase-accepted bytes는 malformed/service-error refresh를 위해 보존한다. warning/error logs는 terminal publication blocker이고 Rejected status도 계속 cleanup된다. |
+| Stage 6.11 verification | OK — targeted six files/90 tests, focused release 15 files/161 tests, full Vitest 142 files/929 tests, typecheck, lint, changed syntax, pure LOC maximum 246, `git diff --check`가 통과했다. LSP는 seven paths 모두 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
+| Stage 6.11 review gate | PENDING FOR REPORT-INCLUSIVE FINAL HEAD — behavior commits `f95640b`, `5f9b3dd`와 본 report commit을 포함한 새 final head에서 fresh five-lane review를 다시 수행해야 한다. PR merge, containment, Issue #6 closure, Issue #7 entry와 Todo 8 완료는 pending이다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 pending이다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -129,6 +138,9 @@ verification을 additive하게 이어서 기록한다.
 - Stage 6.10: 같은 Stage 6 보고서에 `2c59d61` Goal/Security 공통 blocker와 QA/Quality/Context approval,
   pre-build failing-first 4/17, shared input-name remediation commit, targeted 17/17, focused 156/156,
   full 924/924, LOC 214와 pending fresh final-head review를 추가했다.
+- Stage 6.11: 같은 Stage 6 보고서에 `4a647e6` Goal/Security/Context approval, transient-rebuild QA
+  rejection, synthetic-script Quality rejection, live accepted-pending P2, 두 failing-first proof,
+  targeted 90/90, focused 161/161, full 929/929, LOC 246과 pending fresh final-head review를 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -146,7 +158,7 @@ verification을 additive하게 이어서 기록한다.
 
 ### 후속 작업 후보
 
-- Stage 6.7부터 Stage 6.9 commits는 기존 PR #8에 게시됐고 Stage 6.10 behavior commit을 추가했다.
+- Stage 6.7부터 Stage 6.10 commits는 기존 PR #8에 게시됐고 Stage 6.11 behavior commits를 추가했다.
   본 report commit과 final-head immutable-link 교정 뒤 fresh exact-head five-lane review, PR #8 merge,
   `origin/master` containment verification은 pending이다.
 - Issue #7은 이 Task #6 implementation PR이 `origin/master`에 merge된 뒤에만 진입한다.
@@ -156,7 +168,7 @@ verification을 additive하게 이어서 기록한다.
 
 ## 작업지시자 승인 기록 및 요청
 
-- 작업지시자의 최신 명시 지시에 따라 Stage 6.10 behavior commit 뒤 두 report의 rejected review와
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.11 behavior commits 뒤 두 report의 rejected review와
   remediation chronology를 별도 commit하고 기존 PR #8 publication branch와 final-head immutable links를
   갱신한다. fresh exact-head review는 그 report-inclusive publication 뒤의 다음 gate다.
 - 승인 범위 밖 작업은 수행하지 않는다. PR merge, containment verification, Issue #6 close,

@@ -21,9 +21,13 @@ report/link remediation으로 이어가 report-inclusive head
 Stage 6.9은 두 blocker의 failing-first remediation을 추가해 report-inclusive head
 `2c59d615ff4235eb33be52170cd3064518b1fd1f`로 게시됐다. 그 head review의 Goal과 Security는
 독립적으로 signed npm entrypoint가 필수 release input을 build 전에 검사하지 않는 같은 blocker를
-확인했다. Stage 6.10은 shared input-name contract와 pre-build rejection regression으로 이를 교정한다.
-실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는
-실행하지 않았다.
+확인했다. Stage 6.10은 shared input-name contract와 pre-build rejection regression으로 이를 교정해
+report-inclusive head `4a647e68adbd58445885600d24cd06e405734a31`로 게시됐다. 그 head review는
+synthetic hardcoded release script test blocker를 확인했고, current-head PR comment
+`discussion_r3965376377`는 accepted-pending app/DMG bytes cleanup blocker를 확인했다. Stage 6.11은
+production-script-coupled entrypoint fixture와 state-based accepted-pending retention으로 두 blocker를
+교정한다. 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release,
+upload는 실행하지 않았다.
 
 ## 산출물
 
@@ -36,7 +40,8 @@ Stage 6.9은 두 blocker의 failing-first remediation을 추가해 report-inclus
 | `scripts/package-macos.mjs`, `scripts/macos/app-bundle.mjs`, `scripts/macos/signing.mjs`, `scripts/macos/signing-discovery.mjs` | package/app-bundle과 signing/discovery 책임을 분리했다. source copy는 npm-bin relative link text를 보존하고, discovery는 실제 file type이 Mach-O인 target만 선택한다. 초기 ELF/PE/text native payload는 package에 남기되 signing 대상에서 제외하고, Mach-O alias/path/duplicate 검증과 signing 전후 target-set 불변성은 fail closed로 유지한다. |
 | `scripts/macos/release-version-preflight.mjs`, `package.json` | signed npm entrypoint가 build와 candidate mutation 전에 exact version preflight를 실행하게 했다. |
 | `scripts/macos/release-inputs.mjs`, release preflight/entrypoints | signed release input 이름을 한 곳에 고정하고 exact version 뒤 두 nonblank input을 build 전에 검사한다. runtime coordinator의 기존 input validation은 유지한다. |
-| `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.10 blocker 회귀를 contract 13 files/35 tests, focused release 15 files/156 tests로 고정했다. |
+| `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-contract.mjs`, `scripts/macos/release-attempt-validation.mjs` | warning/error log는 terminal publication blocker로 유지하고, malformed/service-error retrieval 뒤 valid bound lowercase-accepted app/DMG bytes는 refresh를 위해 보존한다. |
+| `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.11 blocker 회귀를 contract 13 files/35 tests, focused release 15 files/161 tests로 고정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록한다. |
@@ -73,7 +78,10 @@ production/test/support `ada1e31040307e96ec62a3434c2c8619710400d0`로 구분했�
 delta 외 implementation behavior는 변경하지 않았고 보고서는
 `2c59d615ff4235eb33be52170cd3064518b1fd1f`로 별도 게시했다. Stage 6.10의 six-file
 pre-build release-input remediation은 `3c5289047f6f4590ce6cc24c757606fde7bb472e`로 고정했고,
-본 보고서와 최종 보고서만 그 뒤 별도 reporting commit으로 묶는다.
+보고서는 `4a647e68adbd58445885600d24cd06e405734a31`로 별도 게시했다. Stage 6.11의 production-script-coupled
+entrypoint fixture는 `f95640b4cd3e3ce3b7ba160538d26f8388b6e216`, accepted-pending artifact
+retention은 `5f9b3dd269ffd5993e6ac10f81b5db72f93c1be8`로 구분했다. 본 보고서와 최종 보고서만
+그 뒤 별도 reporting commit으로 묶는다.
 
 ## 검증 결과
 
@@ -223,6 +231,27 @@ npm test -- tests/package-macos-notarization-commands.test.mjs tests/package-mac
 - OK: Atlas verification은 targeted entrypoint 17/17, focused release 15 files/156 tests, full Vitest
   142 files/924 tests, typecheck, lint, changed-file syntax, pure LOC maximum 214, `git diff --check`를
   통과했다. LSP는 Stage 6.10 six paths 모두 sibling-worktree request-root 제한으로 거부되어 PASS로
+  기록하지 않는다. 당시 새 report-inclusive final head의 fresh five-lane review는 pending이었다.
+- REJECT RECORDED: Stage 6.10 report-inclusive head
+  `4a647e68adbd58445885600d24cd06e405734a31` review는 Goal APPROVE, QA REJECT, Quality REJECT,
+  Security APPROVE, Context APPROVE였다. QA는 첫 native rebuild의 transient failure를 이유로 REJECT했지만
+  retry와 full suite는 통과했다. Quality는 fixture가 production `package:release:macos` 대신 synthetic
+  hardcoded script를 사용해 실제 ordering regression을 놓칠 수 있는 blocker를 확인했다.
+- P2 RECORDED: current-head PR comment `discussion_r3965376377`는 submit이 Accepted를 반환한 뒤 malformed
+  log 또는 service-error payload가 발생하면 lowercase `accepted` evidence만 남고 bound ZIP/DMG bytes가
+  cleanup되어 다음 invocation이 `ENOENT`로 실패하는 blocker를 확인했다.
+- FAILING-FIRST: production release script를 임시로 build-before-preflight 순서로 바꾸자 entrypoint
+  boundary suite는 6/18 실패했고 여섯 wrong/missing/blank case 모두 build marker를 만들었다. script는 즉시
+  복구돼 `package.json` diff는 없다. accepted-pending app/DMG malformed와 service-error case는 교정 전
+  retained artifact read에서 각각 `ENOENT`로 실패했다.
+- OK: Stage 6.11 fixture는 repository `package.json`의 production release script를 그대로 복사하고 build와
+  downstream implementation만 marker로 교체한다. retention은 canonical containment, no-symlink, exact
+  kind/SHA-256 binding을 통과한 lowercase `accepted` bytes를 malformed/service-error log refresh용으로
+  보존한다. warning/error logs는 `blocksPublication`으로 terminal publication blocker이며 Rejected status도
+  계속 cleanup된다.
+- OK: Atlas verification은 targeted six files/90 tests, focused release 15 files/161 tests, full Vitest
+  142 files/929 tests, typecheck, lint, changed-file syntax, pure LOC maximum 246, `git diff --check`를
+  통과했다. LSP는 Stage 6.11 seven paths 모두 sibling-worktree request-root 제한으로 거부되어 PASS로
   기록하지 않는다. 새 report-inclusive final head의 fresh five-lane review는 pending이다.
 - MISS(환경 제한): sibling worktree markdown LSP diagnostics는 request-root 제한으로 실행하지 못했다.
   typecheck, lint, markdown/template section review, syntax/import, tests, build, package, smoke,
@@ -239,8 +268,8 @@ npm test -- tests/package-macos-notarization-commands.test.mjs tests/package-mac
 
 ## 다음 단계 영향
 
-- Stage 6.7부터 Stage 6.9까지 `e940e29`부터 `2c59d61`까지 `publish/task6`에 게시했다. Stage 6.10
-  behavior remediation은 `3c52890`으로 commit했다. 본 보고서와 최종 보고서를 별도 report commit으로
+- Stage 6.7부터 Stage 6.10까지 `e940e29`부터 `4a647e6`까지 `publish/task6`에 게시했다. Stage 6.11
+  behavior remediation은 `f95640b`, `5f9b3dd`로 commit했다. 본 보고서와 최종 보고서를 별도 report commit으로
   추가하고 기존 PR #8을 새 final head에 고정한 뒤 fresh five-lane review를 다시 실행한다.
 - PR #8 review/merge와 `origin/master` containment verification은 명시적으로 pending이다. Todo 8은
   아직 완료로 표시하지 않는다.
@@ -249,6 +278,6 @@ npm test -- tests/package-macos-notarization-commands.test.mjs tests/package-mac
 
 ## 승인 요청
 
-- 작업지시자의 최신 명시 지시에 따라 Stage 6.10 behavior/report commits, 정상 publication push,
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.11 behavior/report commits, 정상 publication push,
   기존 PR #8 final-head immutable-link 교정을 진행한다. report-inclusive exact-head re-review, PR merge,
   containment verification, Issue #6 close, Issue #7 진입, tag/release/upload는 수행하지 않는다.

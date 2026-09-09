@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from "node:timers/promises"
 import { createNotarizationClient } from "./notarization-command.mjs"
 import {
   evidenceDirectory,
@@ -13,17 +14,49 @@ import {
   identifyNotarizationArtifact,
 } from "./notarization-evidence.mjs"
 
-function input(value, fields) {
-  const allowedFields = Object.hasOwn(value ?? {}, "signal") ? [...fields, "signal"] : fields
+const pollingDelaysMs = [0, 5_000, 15_000, 30_000, 60_000]
+
+function defaultWaitFor(delayMs, signal) {
+  if (signal === undefined) return sleep(delayMs)
+  return sleep(delayMs, undefined, { signal })
+}
+
+async function pollNotarizationStatus(options) {
+  const waitFor = options.waitFor ?? defaultWaitFor
+  for (const delayMs of pollingDelaysMs) {
+    if (delayMs > 0) {
+      try {
+        await waitFor(delayMs, options.signal)
+      } catch {
+        failNotarization("Notarization command failed")
+      }
+    }
+    if (options.signal?.aborted) failNotarization("Notarization command failed")
+    const status = await options.notary.info({
+      submissionId: options.submissionId,
+      profile: options.profile,
+    })
+    if (status === "Accepted") return status
+    if (status !== "In Progress") failNotarization("Notarization submission was not accepted")
+  }
+  return "In Progress"
+}
+
+function input(value, fields, optionalFields = ["signal"]) {
+  const allowedFields = [
+    ...fields,
+    ...optionalFields.filter((field) => Object.hasOwn(value ?? {}, field)),
+  ]
   const options = exactNotarizationObject(value, allowedFields, "Invalid notarization options")
   if (typeof options.runFile !== "function") failNotarization("Invalid notarization options")
   return options
 }
 
-function client(runFile, signal) {
+function client(runFile, signal, waitFor) {
   return createNotarizationClient({
     runFile,
     ...(signal === undefined ? {} : { signal }),
+    ...(waitFor === undefined ? {} : { waitFor }),
   })
 }
 
@@ -53,7 +86,11 @@ export async function fetchNotaryLog(options) {
 }
 
 export async function submitAndWait(options) {
-  const value = input(options, ["artifactPath", "profile", "evidenceDir", "runFile"])
+  const value = input(
+    options,
+    ["artifactPath", "profile", "evidenceDir", "runFile"],
+    ["signal", "waitFor"],
+  )
   const artifactIdentity = await identifyNotarizationArtifact(value.artifactPath)
   const profile = notaryProfile(value.profile)
   const evidenceDir = evidenceDirectory(value.evidenceDir)
@@ -63,10 +100,16 @@ export async function submitAndWait(options) {
   if (saved !== undefined && !evidence.matchesArtifact(saved)) {
     failNotarization("Notarization resume does not match artifact")
   }
-  const notary = client(value.runFile, signal)
+  const notary = client(value.runFile, signal, value.waitFor)
   await notary.preflight(profile)
   if (saved !== undefined) {
-    const status = await notary.info({ submissionId: saved.submissionId, profile })
+    const status = await pollNotarizationStatus({
+      notary,
+      submissionId: saved.submissionId,
+      profile,
+      signal,
+      waitFor: value.waitFor,
+    })
     if (status === "Accepted") {
       return fetchNotaryLog({
         submissionId: saved.submissionId,
@@ -83,10 +126,20 @@ export async function submitAndWait(options) {
     failNotarization("Notarization submission was not accepted")
   }
   const result = await notary.submit({ artifactPath: value.artifactPath, profile })
-  if (result.status === "unknown") return evidence.saveUnknown(result.submissionId)
-  if (result.status !== "Accepted") {
+  if (!["Accepted", "In Progress", "unknown"].includes(result.status)) {
     failNotarization("Notarization submission was not accepted")
   }
+  const unknown = await evidence.saveUnknown(result.submissionId)
+  if (result.status === "unknown") return unknown
+  const status = await pollNotarizationStatus({
+    notary,
+    submissionId: result.submissionId,
+    profile,
+    signal,
+    waitFor: value.waitFor,
+  })
+  if (status === "In Progress") return unknown
+  if (status !== "Accepted") failNotarization("Notarization submission was not accepted")
   await evidence.saveAcceptedPending(result.submissionId)
   return fetchNotaryLog({
     submissionId: result.submissionId,
@@ -99,10 +152,10 @@ export async function submitAndWait(options) {
 }
 
 export async function stapleAndValidate(options) {
-  const value = input(options, ["artifactPath", "artifactKind", "runFile"])
+  const value = input(options, ["artifactPath", "artifactKind", "runFile"], ["signal", "waitFor"])
   staplingArtifact(value.artifactPath, value.artifactKind)
   const signal = notarizationSignal(value.signal)
-  return client(value.runFile, signal).staple({
+  return client(value.runFile, signal, value.waitFor).staple({
     artifactPath: value.artifactPath,
     artifactKind: value.artifactKind,
   })

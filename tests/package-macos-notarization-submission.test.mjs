@@ -205,3 +205,19 @@ test("fails closed for malformed, unauthorized, Invalid, and Rejected submission
     /Invalid resume state/,
   )
 })
+
+test("fails closed without a receipt when submission JSON has no valid UUID", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const { calls, runFile } = createNotaryRunner({
+    submit: { diagnostic: sentinel, status: "In Progress" },
+  })
+
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+    (error) => error instanceof Error && error.message === "Invalid notarization submission",
+  )
+
+  await assert.rejects(access(join(root, "notarization-resume.json")))
+  assert.equal(JSON.stringify(calls).includes(sentinel), false)
+})

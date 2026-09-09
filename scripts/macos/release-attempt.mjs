@@ -92,6 +92,7 @@ async function acceptAttempt(attempt, state) {
       evidenceDir: attempt.evidenceDirectory,
       runFile: state.run,
       ...(state.signal === undefined ? {} : { signal: state.signal }),
+      ...(state.staplerWaitFor === undefined ? {} : { waitFor: state.staplerWaitFor }),
     })
     if (["unknown", "accepted"].includes(result?.status)) {
       throw new Error("Notarization submission is unresolved")
@@ -175,6 +176,7 @@ export async function prepareReleaseApp({ attempt, release, resumed, state }) {
     artifactKind: "app",
     runFile: state.run,
     ...(state.signal === undefined ? {} : { signal: state.signal }),
+    ...(state.staplerWaitFor === undefined ? {} : { waitFor: state.staplerWaitFor }),
   })
   return appPath
 }
@@ -231,6 +233,7 @@ export async function prepareReleaseDmg({
     artifactKind: "dmg",
     runFile: state.run,
     ...(state.signal === undefined ? {} : { signal: state.signal }),
+    ...(state.staplerWaitFor === undefined ? {} : { waitFor: state.staplerWaitFor }),
   })
   await state.run("/usr/bin/hdiutil", ["verify", targetPath], {})
   await verifyDmgSignature({ dmgPath: targetPath, runFile: state.run })

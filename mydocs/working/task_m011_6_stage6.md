@@ -67,12 +67,15 @@ Stage 6.21은 DMG resume에서 app status/log를 먼저 refresh하고 fresh app 
 차단하며 Accepted happy path는 resubmission 없이 유지하도록 교정해 report-inclusive head
 `800222a95a49b65ffae28f02ad73601968a0fa0b`로 게시됐다. 그 exact-head review는 Goal, Code Quality,
 Security, Context REJECT와 QA timeout을 기록했다. QA는 timeout 전에 independent full Vitest 959/959를
-통과했다. Context discussions
-[3971745639](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745639)와
-[3971745648](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745648)은 terminal app refresh가
-dependent DMG evidence를 보존하는 결함과 orphan retained DMG가 typed discard 없이 막히는 결함을 확인했다.
-Stage 6.22는 dependent evidence invalidation, typed orphan discard와 third-run rebuild를 교정하면서
-transient In Progress retention과 Accepted no-resubmission resume를 유지했다.
+통과했고 terminal app refresh의 dependent DMG invalidation 누락과 orphan retained DMG recovery 누락을
+확인했다. Stage 6.22는 두 결함을 교정해 `1000150b8256f8876b13ae9036e61c5285dca079`로 게시됐다.
+그 exact-head review는 Goal REJECT, QA APPROVE, Code Quality APPROVE, Security REJECT, Context REJECT를
+기록했다. discussions
+[3971745639](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745639),
+[3971745648](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745648),
+[3972249043](https://github.com/jinzer0/Prompter/pull/8#discussion_r3972249043)은 각각 submit UUID를
+wait 전에 저장하지 않는 결함, staple propagation retry 부재, lowercase `.node`/`.dylib` non-Mach-O
+payload 허용을 확인했다. Stage 6.23은 세 blocker를 교정했다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -91,11 +94,14 @@ transient In Progress retention과 Accepted no-resubmission resume를 유지했�
 | `scripts/macos/signing.mjs`, `scripts/macos/release-attempt.mjs` | resumed app/DMG identity를 exact 검증하고 missing/duplicate/malformed/mismatch 같은 deterministic error에 `artifactKind`와 `discardEvidence`를 부여한다. transient codesign execution error에는 cleanup marker를 추가하지 않는다. |
 | `scripts/macos/release-attempt-validation.mjs`, `scripts/macos/release-attempt.mjs`, `scripts/release-macos.mjs` | resumed DMG inspection에서 retained app attempt를 전달하고 DMG status/staple/copy 전에 app status/log를 refresh하도록 교정했다. |
 | `scripts/macos/release-attempt-validation.mjs`, `scripts/macos/release-attempt.mjs` | terminal app refresh가 affected app과 dependent DMG evidence를 함께 폐기하고, orphan retained DMG를 typed discard로 제거하도록 교정했다. |
+| `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization.mjs`, `scripts/macos/notarization-stapling.mjs`, release lifecycle/support modules | submit UUID를 artifact-bound evidence에 먼저 저장한 뒤 bounded `info` polling을 수행하고, resume 시 재제출을 막으며 app/DMG staple에 injected `0/5s/15s/30s/60s` backoff를 적용했다. |
+| `scripts/macos/signing-discovery.mjs` | lowercase `.node`/`.dylib` 파일이 Mach-O가 아니면 fail closed하고 일반 resource는 기존처럼 무시하도록 교정했다. |
 | `tests/package-macos*.mjs`, `tests/electron-contract-*.test.ts`, `tests/macos-release-contract.test.ts` | Stage 6.2부터 6.13 blocker 회귀를 contract 13 files/35 tests, focused release 17 files/173 tests로 고정했다. |
 | `tests/package-macos-coordinator-cached-accepted.test.mjs` | cached Accepted cleanup에 더해 malformed app evidence retry와 terminal DMG의 accepted app preservation을 각각 three-run으로 고정했다. |
 | `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG match, missing/duplicate/malformed/mismatch cleanup, sibling-kind preservation, transient display failure retention, third-run success와 direct suite 등록을 고정했다. |
 | `tests/package-macos-coordinator-dmg-app-refresh.test.mjs`, DMG/cached/signing recovery tests, `vitest.config.ts` | resumed DMG 전에 fresh app warning/error/Rejected 차단, Accepted status/log ordering, app/DMG no-resubmission과 direct suite 등록을 고정했다. |
 | `tests/package-macos-coordinator-dmg-app-refresh.test.mjs` | terminal app outcome의 dependent DMG invalidation과 third-run rebuild, orphan retained DMG typed discard/rebuild, In Progress dual retention, Accepted no-resubmission을 고정했다. |
+| Stage 6.23 notarization/signing direct tests와 support fixtures | submit UUID 선저장, interrupted polling resume, deterministic staple backoff, lowercase native-suffix non-Mach-O rejection과 일반 resource exclusion을 고정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
@@ -483,10 +489,8 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   sibling-worktree request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
 - REJECT/TIMEOUT RECORDED: Stage 6.21 report-inclusive head
   `800222a95a49b65ffae28f02ad73601968a0fa0b` review는 Goal, Code Quality, Security, Context REJECT와
-  QA timeout이었다. QA는 timeout 전에 independent full Vitest 146 files/959 tests를 통과했다. Context
-  discussions [3971745639](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745639)와
-  [3971745648](https://github.com/jinzer0/Prompter/pull/8#discussion_r3971745648)은 dependent DMG
-  invalidation 누락과 orphan retained DMG recovery 누락을 확인했다.
+  QA timeout이었다. QA는 timeout 전에 independent full Vitest 146 files/959 tests를 통과했다. Review는
+  dependent DMG invalidation 누락과 orphan retained DMG recovery 누락을 확인했다.
 - OK: Stage 6.22는 terminal app refresh error에 dependent DMG kind를 결합해 app과 DMG evidence를 함께
   폐기한다. orphan retained DMG는 `artifactKind="dmg"`, `discardEvidence=true` typed error로 폐기되고
   third run이 app과 DMG를 fresh rebuild한다.
@@ -497,6 +501,21 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   재실행했다고 주장하지 않는다.
 - MISS(환경 제한): Stage 6.22 two implementation paths, direct regression과 두 report의 LSP diagnostics는
   sibling-worktree request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
+- OK: Stage 6.22 remediation은 `1000150b8256f8876b13ae9036e61c5285dca079`로 정상 push됐고 PR #8
+  immutable links와 detached exact-head review worktree도 같은 SHA로 갱신됐다.
+- REJECT RECORDED: `1000150` fresh review는 Goal REJECT, QA APPROVE, Code Quality APPROVE,
+  Security REJECT, Context REJECT를 기록했다. discussion `3971745639`는 submit UUID를 wait 전에
+  durable evidence로 저장하지 않는 결함, `3971745648`은 staple propagation retry 부재,
+  `3972249043`은 lowercase `.node`/`.dylib` non-Mach-O payload 허용을 확인했다.
+- OK: Stage 6.23은 `notarytool submit`과 bounded `info` polling을 분리해 artifact-bound UUID를 먼저
+  저장하고 중단 후 resume에서 재제출하지 않는다. app/DMG staple은 주입 가능한 wait 함수로
+  `0/5s/15s/30s/60s` retry를 수행한다. lowercase native suffix non-Mach-O payload는 fail closed하며
+  일반 resource는 기존처럼 무시한다.
+- OK: authoritative verification은 full Vitest 146 files/972 tests, typecheck, lint, changed-file syntax,
+  `git diff --check`다. Stage 6.14의 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.23에서
+  재실행했다고 주장하지 않는다.
+- MISS(환경 제한): Stage 6.23 source/test paths와 두 report의 LSP diagnostics는 sibling-worktree
+  request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
@@ -526,10 +545,14 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - Stage 6.21 DMG-resume app-status refresh remediation과 direct regression은 완료됐다.
 - Stage 6.21 remediation은 `800222a95a49b65ffae28f02ad73601968a0fa0b`로 게시됐고 PR #8 immutable
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal, Code
-  Quality, Security, Context REJECT와 QA timeout을 기록했고 discussions `3971745639`/`3971745648`만
+  Quality, Security, Context REJECT와 QA timeout을 기록했고 dependent DMG invalidation과 orphan recovery가
   product blocker였다.
-- Stage 6.22 dependent DMG invalidation과 orphan recovery remediation은 완료됐다.
-- Stage 6.22 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
+- Stage 6.22 remediation은 `1000150b8256f8876b13ae9036e61c5285dca079`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 Goal/Security/Context
+  REJECT와 QA/Code Quality APPROVE를 기록했고 discussions `3971745639`, `3971745648`, `3972249043`의
+  submit UUID durability, staple propagation retry, native-suffix payload validation이 product blocker였다.
+- Stage 6.23 세 blocker remediation과 regression은 완료됐다.
+- Stage 6.23 report-inclusive head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 승인 요청
@@ -545,7 +568,11 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - 작업지시자의 최신 명시 지시에 따라 `169eeef` Context discussion `3971543713`의 DMG-resume
   app-refresh bypass는 Stage 6.21 구현, direct regression, config와 두 report에서 교정됐다. 이 closure는
   자신의 exact SHA를 재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.
-- 작업지시자의 최신 명시 지시에 따라 `800222a` discussions `3971745639`/`3971745648`의 dependent
-  DMG invalidation과 orphan recovery blocker는 Stage 6.22 source/test와 두 report에서 교정됐다. 이
+- 작업지시자의 최신 명시 지시에 따라 `800222a` review의 dependent DMG invalidation과 orphan recovery
+  blocker는 Stage 6.22 source/test와 두 report에서 교정됐다. 이
   closure는 자신의 exact SHA를 재귀적으로 주장하지 않으며 그 exact head의 fresh five-lane review가 다음
   gate다.
+- 작업지시자의 최신 명시 지시에 따라 `1000150` review discussions `3971745639`, `3971745648`,
+  `3972249043`의 submit UUID durability, staple propagation retry, native-suffix payload validation
+  blocker는 Stage 6.23 source/test와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로
+  주장하지 않으며 그 exact head의 fresh five-lane review가 다음 gate다.

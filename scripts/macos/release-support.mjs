@@ -38,10 +38,14 @@ function abortSignal(value, message) {
   return value
 }
 export function input(value) {
-  const fields = Object.hasOwn(value ?? {}, "signal") ? [...releaseKeys, "signal"] : releaseKeys
+  const fields = [
+    ...releaseKeys,
+    ...["signal", "staplerWaitFor"].filter((field) => Object.hasOwn(value ?? {}, field)),
+  ]
   const release = exactObject(value, fields, "Invalid macOS release options")
   if (
     typeof release.runFile !== "function" ||
+    (release.staplerWaitFor !== undefined && typeof release.staplerWaitFor !== "function") ||
     release.platform !== "darwin" ||
     release.arch !== "arm64"
   )
@@ -56,6 +60,7 @@ export function input(value) {
     signingIdentity,
     notaryProfile: text(release.notaryProfile, "Notary profile is required"),
     signal: abortSignal(release.signal, "Invalid macOS release options"),
+    staplerWaitFor: release.staplerWaitFor,
   }
 }
 function timeoutId(output) {

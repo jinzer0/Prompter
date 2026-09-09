@@ -48,27 +48,78 @@ test("persists an accepted submission before log retrieval and resumes it withou
 
   assert.equal(accepted.status, "Accepted")
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
-  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 2)
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 2)
+})
+
+test("persists a submitted UUID before an interrupted status refresh and resumes without resubmitting", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  let interruptStatusRefresh = true
+  const { calls, runFile } = createNotaryRunner({
+    submit: { id, status: "In Progress" },
+    info: { id, status: "Accepted" },
+    fail: (_command, arguments_) =>
+      interruptStatusRefresh && arguments_[1] === "info"
+        ? Object.assign(new Error(sentinel), { name: "AbortError" })
+        : undefined,
+  })
+
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }),
+    /Notarization command failed/,
+  )
+
+  assert.deepEqual(JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8")), {
+    submissionId: id,
+    status: "unknown",
+    artifactKind: "app",
+    artifactSha256: sha256("artifact"),
+  })
+  assert.deepEqual(
+    calls.slice(0, 3).map(({ arguments_ }) => arguments_[1]),
+    ["history", "submit", "info"],
+  )
+  assert.equal(calls[1]?.arguments_.includes("--wait"), false)
+
+  interruptStatusRefresh = false
+  const accepted = await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+
+  assert.equal(accepted.status, "Accepted")
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.deepEqual(
+    calls.slice(3).map(({ arguments_ }) => arguments_[1]),
+    ["history", "info", "log"],
+  )
 })
 
 test("keeps an accepted-pending submission unresolved when refreshed Apple status is In Progress", async () => {
   const root = await evidence()
   const artifactPath = await artifact(root, "Prompter.zip")
   let logFails = true
+  let infoCalls = 0
+  const waitFor = async () => undefined
   const { calls, runFile } = createNotaryRunner({
-    info: { id, status: "In Progress" },
+    info: () => ({ id, status: ++infoCalls === 1 ? "Accepted" : "In Progress" }),
     fail: (_command, arguments_) =>
       logFails && arguments_[1] === "log" ? new Error(sentinel) : undefined,
   })
 
-  await assert.rejects(submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }))
+  await assert.rejects(
+    submitAndWait({ artifactPath, profile, evidenceDir: root, runFile, waitFor }),
+  )
   logFails = false
-  const resumed = await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+  const resumed = await submitAndWait({
+    artifactPath,
+    profile,
+    evidenceDir: root,
+    runFile,
+    waitFor,
+  })
 
   assert.equal(resumed.status, "accepted")
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
-  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 6)
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 1)
 })
 
@@ -76,8 +127,9 @@ test("rejects an accepted-pending submission when refreshed Apple status is Reje
   const root = await evidence()
   const artifactPath = await artifact(root, "Prompter.zip")
   let logFails = true
+  let infoCalls = 0
   const { calls, runFile } = createNotaryRunner({
-    info: { id, status: "Rejected" },
+    info: () => ({ id, status: ++infoCalls === 1 ? "Accepted" : "Rejected" }),
     fail: (_command, arguments_) =>
       logFails && arguments_[1] === "log" ? new Error(sentinel) : undefined,
   })
@@ -90,7 +142,7 @@ test("rejects an accepted-pending submission when refreshed Apple status is Reje
   )
 
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
-  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 2)
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 1)
 })
 

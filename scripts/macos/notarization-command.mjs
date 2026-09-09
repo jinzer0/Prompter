@@ -9,9 +9,9 @@ import {
   submissionArtifactKind,
 } from "./notarization-contract.mjs"
 import { hasSafeNotarizationIssues } from "./notarization-evidence.mjs"
+import { createStaplingClient } from "./notarization-stapling.mjs"
 
 const appleCommandTimeoutMs = 10 * 60 * 1000
-const retryDelaysMs = [0, 100, 250]
 const xcrunCommand = "/usr/bin/xcrun"
 const spctlCommand = "/usr/sbin/spctl"
 
@@ -86,9 +86,17 @@ function reviewedLog(payload, submissionId) {
 }
 
 export function createNotarizationClient(options) {
-  const fields = Object.hasOwn(options ?? {}, "signal") ? ["runFile", "signal"] : ["runFile"]
+  const fields = [
+    "runFile",
+    ...["signal", "waitFor"].filter((field) => Object.hasOwn(options ?? {}, field)),
+  ]
   const value = exactNotarizationObject(options, fields, "Invalid notarization options")
-  if (typeof value.runFile !== "function") failNotarization("Invalid notarization options")
+  if (
+    typeof value.runFile !== "function" ||
+    (value.waitFor !== undefined && typeof value.waitFor !== "function")
+  ) {
+    failNotarization("Invalid notarization options")
+  }
   const abortSignal = notarizationSignal(value.signal)
   const commandOptions = {
     timeoutMs: appleCommandTimeoutMs,
@@ -104,6 +112,11 @@ export function createNotarizationClient(options) {
       commandError()
     }
   }
+  const stapler = createStaplingClient({
+    runFile: value.runFile,
+    commandOptions,
+    waitFor: value.waitFor,
+  })
 
   return Object.freeze({
     async preflight(profileValue) {
@@ -184,7 +197,6 @@ export function createNotarizationClient(options) {
             submitOptions.artifactPath,
             "--keychain-profile",
             profile,
-            "--wait",
             "--output-format",
             "json",
           ],
@@ -199,32 +211,7 @@ export function createNotarizationClient(options) {
         commandError()
       }
     },
-    async staple(optionsValue) {
-      const stapleOptions = exactNotarizationObject(
-        optionsValue,
-        ["artifactPath", "artifactKind"],
-        "Invalid notarization options",
-      )
-      staplingArtifact(stapleOptions.artifactPath, stapleOptions.artifactKind)
-      for (const [attempt, delay] of retryDelaysMs.entries()) {
-        if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay))
-        try {
-          await value.runFile(
-            xcrunCommand,
-            ["stapler", "staple", stapleOptions.artifactPath],
-            commandOptions,
-          )
-          await value.runFile(
-            xcrunCommand,
-            ["stapler", "validate", stapleOptions.artifactPath],
-            commandOptions,
-          )
-          return { status: "stapled", attempts: attempt + 1 }
-        } catch {
-          if (attempt === retryDelaysMs.length - 1) commandError()
-        }
-      }
-    },
+    staple: stapler.staple,
     async assess(optionsValue) {
       const assessment = exactNotarizationObject(
         optionsValue,

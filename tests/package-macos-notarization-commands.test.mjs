@@ -17,9 +17,10 @@ import {
 
 const executeFile = promisify(execFile)
 
-test("retries stapling a bounded three times and uses Gatekeeper's app and disk-image kinds", async () => {
+test("staples on the third attempt and uses Gatekeeper's app and disk-image kinds", async () => {
   let stapleAttempts = 0
   const calls = []
+  const waitFor = async () => undefined
   const runFile = async (command, arguments_) => {
     calls.push({ command, arguments_ })
     if (arguments_[0] === "stapler" && arguments_[1] === "staple" && ++stapleAttempts < 3)
@@ -27,7 +28,12 @@ test("retries stapling a bounded three times and uses Gatekeeper's app and disk-
     return { stdout: "", stderr: "" }
   }
   assert.deepEqual(
-    await stapleAndValidate({ artifactPath: "Prompter.app", artifactKind: "app", runFile }),
+    await stapleAndValidate({
+      artifactPath: "Prompter.app",
+      artifactKind: "app",
+      runFile,
+      waitFor,
+    }),
     { status: "stapled", attempts: 3 },
   )
   await assessGatekeeper({ artifactPath: "Prompter.app", artifactKind: "app", runFile })
@@ -47,6 +53,65 @@ test("retries stapling a bounded three times and uses Gatekeeper's app and disk-
       ],
     ],
   )
+})
+
+test("retries ticket propagation with the production backoff schedule before stapling succeeds", async () => {
+  const delays = []
+  const calls = []
+  let stapleAttempts = 0
+  const waitFor = async (delayMs) => delays.push(delayMs)
+  const runFile = async (_command, arguments_) => {
+    calls.push(arguments_)
+    if (arguments_[0] === "stapler" && arguments_[1] === "staple" && ++stapleAttempts < 3) {
+      throw new Error("ticket is not yet available")
+    }
+    return { stdout: "", stderr: "" }
+  }
+
+  const result = await stapleAndValidate({
+    artifactPath: "Prompter.app",
+    artifactKind: "app",
+    runFile,
+    waitFor,
+  })
+
+  assert.deepEqual(result, { status: "stapled", attempts: 3 })
+  assert.deepEqual(delays, [5_000, 15_000])
+  assert.deepEqual(calls, [
+    ["stapler", "staple", "Prompter.app"],
+    ["stapler", "staple", "Prompter.app"],
+    ["stapler", "staple", "Prompter.app"],
+    ["stapler", "validate", "Prompter.app"],
+  ])
+})
+
+test("exhausts bounded ticket-propagation retries using the exact backoff schedule", async () => {
+  const delays = []
+  const calls = []
+  const waitFor = async (delayMs) => delays.push(delayMs)
+  const runFile = async (_command, arguments_) => {
+    calls.push(arguments_)
+    throw new Error("ticket is not yet available")
+  }
+
+  await assert.rejects(
+    stapleAndValidate({
+      artifactPath: "Prompter.dmg",
+      artifactKind: "dmg",
+      runFile,
+      waitFor,
+    }),
+    (error) => error instanceof Error && error.message === "Notarization command failed",
+  )
+
+  assert.deepEqual(delays, [5_000, 15_000, 30_000, 60_000])
+  assert.deepEqual(calls, [
+    ["stapler", "staple", "Prompter.dmg"],
+    ["stapler", "staple", "Prompter.dmg"],
+    ["stapler", "staple", "Prompter.dmg"],
+    ["stapler", "staple", "Prompter.dmg"],
+    ["stapler", "staple", "Prompter.dmg"],
+  ])
 })
 
 test("uses absolute Apple trust command paths", async () => {

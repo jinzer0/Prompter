@@ -26,7 +26,9 @@ test("stores only a UUID unknown state on a real timeout and resumes without res
   const root = await evidence()
   const artifactPath = await artifact(root, "Prompter.zip")
   let timedOut = true
+  const waitFor = async () => undefined
   const { calls, runFile } = createNotaryRunner({
+    info: { id, status: "In Progress" },
     fail: (_command, arguments_) => {
       if (timedOut && arguments_[1] === "submit")
         return Object.assign(new Error(sentinel), {
@@ -42,6 +44,7 @@ test("stores only a UUID unknown state on a real timeout and resumes without res
     profile,
     evidenceDir: root,
     runFile,
+    waitFor,
   })
   assert.deepEqual(unknown, {
     submissionId: id,
@@ -59,6 +62,7 @@ test("stores only a UUID unknown state on a real timeout and resumes without res
     profile,
     evidenceDir: root,
     runFile,
+    waitFor,
   })
   assert.deepEqual(resumed, unknown)
   assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
@@ -76,6 +80,103 @@ test("stores only a UUID unknown state on a real timeout and resumes without res
     }),
     /Notarization command failed/,
   )
+})
+
+test("polls In Progress status to Accepted in one invocation without resubmitting", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const delays = []
+  let infoAttempts = 0
+  const { calls, runFile } = createNotaryRunner({
+    submit: { id, status: "In Progress" },
+    info: () => ({ id, status: ++infoAttempts === 1 ? "In Progress" : "Accepted" }),
+  })
+
+  const accepted = await submitAndWait({
+    artifactPath,
+    profile,
+    evidenceDir: root,
+    runFile,
+    waitFor: async (delayMs) => delays.push(delayMs),
+  })
+
+  assert.equal(accepted.status, "Accepted")
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 2)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 1)
+  assert.deepEqual(delays, [5_000])
+})
+
+test("keeps artifact-bound unknown evidence after bounded In Progress polling exhausts", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.dmg", "pending artifact")
+  const delays = []
+  const { calls, runFile } = createNotaryRunner({
+    submit: { id, status: "In Progress" },
+    info: { id, status: "In Progress" },
+  })
+
+  const unresolved = await submitAndWait({
+    artifactPath,
+    profile,
+    evidenceDir: root,
+    runFile,
+    waitFor: async (delayMs) => delays.push(delayMs),
+  })
+
+  assert.deepEqual(unresolved, {
+    submissionId: id,
+    status: "unknown",
+    artifactKind: "dmg",
+    artifactSha256: sha256("pending artifact"),
+  })
+  assert.deepEqual(delays, [5_000, 15_000, 30_000, 60_000])
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 5)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 0)
+  assert.deepEqual(
+    JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8")),
+    unresolved,
+  )
+})
+
+test("retains a persisted UUID when polling is interrupted and resumes without resubmitting", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip", "interrupted artifact")
+  const controller = new AbortController()
+  let infoAttempts = 0
+  const { calls, runFile } = createNotaryRunner({
+    submit: { id, status: "In Progress" },
+    info: () => ({ id, status: ++infoAttempts === 1 ? "In Progress" : "Accepted" }),
+  })
+
+  await assert.rejects(
+    submitAndWait({
+      artifactPath,
+      profile,
+      evidenceDir: root,
+      runFile,
+      signal: controller.signal,
+      waitFor: async () => {
+        controller.abort()
+        throw new Error(sentinel)
+      },
+    }),
+    /Notarization command failed/,
+  )
+
+  assert.deepEqual(JSON.parse(await readFile(join(root, "notarization-resume.json"), "utf8")), {
+    submissionId: id,
+    status: "unknown",
+    artifactKind: "app",
+    artifactSha256: sha256("interrupted artifact"),
+  })
+  const accepted = await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+
+  assert.equal(accepted.status, "Accepted")
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "info").length, 2)
+  assert.equal(calls.filter(({ arguments_ }) => arguments_[1] === "log").length, 1)
 })
 
 test("preserves only artifact-bound unknown evidence after a recovered AbortError", async () => {

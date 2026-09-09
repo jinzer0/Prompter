@@ -138,7 +138,7 @@ test("retains an accepted app ZIP until a fresh invocation successfully retries 
     createHash("sha256").update(submittedBytes).digest("hex"),
   )
   assert.equal(first.calls.indexOf("app-log") < first.calls.indexOf("app-staple"), true)
-  assert.equal(first.calls.filter((stage) => stage === "app-staple").length, 3)
+  assert.equal(first.calls.filter((stage) => stage === "app-staple").length, 5)
   assert.equal(first.calls.includes("dmg-create"), false)
   const second = await fixture({ pendingAppStatus: "Accepted", shared: first.shared })
   const result = await second.run()

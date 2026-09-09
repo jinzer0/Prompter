@@ -135,25 +135,6 @@ test("accepts a contained executable npm-bin alias when its canonical target is 
   )
 })
 
-test("ignores an initially foreign native payload while retaining Mach-O targets", async () => {
-  const paths = await fixture()
-  const foreignNative = await realpath(paths.native)
-  const mainPath = await realpath(paths.main)
-  const targets = await discoverSignableCode({
-    appPath: paths.appPath,
-    runFile: createSigningRunner({ foreignPaths: [foreignNative] }),
-  })
-
-  assert.equal(
-    targets.some(({ path }) => path === foreignNative),
-    false,
-  )
-  assert.equal(
-    targets.some(({ path }) => path === mainPath),
-    true,
-  )
-})
-
 test("discovers a non-executable extensionless Mach-O payload by file magic", async () => {
   const paths = await fixture({ hiddenMachO: true })
   const hiddenMachO = await realpath(paths.hiddenMachO)
@@ -190,7 +171,7 @@ test.each([
   )
 })
 
-test("rejects a post-sign unsigned native object and suppresses the outer signature", async () => {
+test("rejects a post-sign non-Mach-O native object and suppresses the outer signature", async () => {
   const paths = await fixture()
   const calls = []
   const nativePath = await realpath(paths.native)
@@ -201,7 +182,7 @@ test("rejects a post-sign unsigned native object and suppresses the outer signat
       entitlementsPath: paths.entitlements,
       runFile: createSigningRunner({ calls, foreignAfterSigningPaths: [nativePath] }),
     }),
-    /Signable code changed during signing/,
+    /Native-code suffix is not a Mach-O payload/,
   )
   assert.equal(
     calls.some(
@@ -215,7 +196,7 @@ test("rejects a post-sign unsigned native object and suppresses the outer signat
 test("rejects a post-sign Mach-O addition and suppresses the outer signature", async () => {
   const paths = await fixture()
   const calls = []
-  const nativePath = await realpath(paths.native)
+  const toolPath = await realpath(paths.tool)
   await assert.rejects(
     signAppBundle({
       appPath: paths.appPath,
@@ -223,8 +204,8 @@ test("rejects a post-sign Mach-O addition and suppresses the outer signature", a
       entitlementsPath: paths.entitlements,
       runFile: createSigningRunner({
         calls,
-        textPaths: [nativePath],
-        machOAfterSigningPaths: [nativePath],
+        textPaths: [toolPath],
+        machOAfterSigningPaths: [toolPath],
       }),
     }),
     /Signable code changed during signing/,

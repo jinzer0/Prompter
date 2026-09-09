@@ -60,8 +60,7 @@ export async function createCoordinatorFixture({
     await mkdir(join(releaseRoot, "v0.1.1"))
     await writeFile(join(releaseRoot, "v0.1.1", "stale"), "stale")
   }
-  const [calls, rawCalls] = [[], []]
-  const observedTempRoots = new Set()
+  const [calls, rawCalls, observedTempRoots] = [[], [], new Set()]
   let candidateExistsDuringProfile = false
   const runFile = async (command, arguments_, options = {}) => {
     const stage = commandStage(command, arguments_)
@@ -185,6 +184,7 @@ export async function createCoordinatorFixture({
         arch: "arm64",
         signingIdentity,
         notaryProfile: "SYNTHETIC_PROFILE",
+        staplerWaitFor: async () => undefined,
         paths: {
           sourceRoot,
           packageJsonPath: join(sourceRoot, "package.json"),
@@ -212,7 +212,7 @@ function xcrunResult(arguments_, pendingAppStatus, pendingDmgStatus, warningLog,
     return {
       stdout: JSON.stringify({
         id: isDmg ? dmgSubmissionId : appSubmissionId,
-        status: isDmg ? (pendingDmgStatus ?? "In Progress") : (pendingAppStatus ?? "In Progress"),
+        status: isDmg ? (pendingDmgStatus ?? "Accepted") : (pendingAppStatus ?? "Accepted"),
       }),
       stderr: "",
     }

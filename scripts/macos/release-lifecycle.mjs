@@ -22,6 +22,7 @@ export function createReleaseState(release, run, version) {
       dmgEvidenceDirectory,
       notaryProfile: release.notaryProfile,
       signal: release.signal,
+      staplerWaitFor: release.staplerWaitFor,
       run,
       assets: [],
       attemptHandlingStarted: false,

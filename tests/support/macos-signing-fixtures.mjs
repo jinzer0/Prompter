@@ -153,6 +153,7 @@ export function createSigningRunner({
   architectureOutputsAfterSigning = new Map(),
   listing = identityListing(),
   calls = [],
+  fileDescriptions = new Map(),
   unsignedAfterSigning = false,
   textPaths = [],
   foreignPaths = [],
@@ -168,6 +169,8 @@ export function createSigningRunner({
     if (command === "/usr/bin/security") return { stdout: listing }
     if (command === "/usr/bin/plutil") return { stdout: "" }
     if (command === "/usr/bin/file") {
+      if (fileDescriptions.has(arguments_[1]))
+        return { stdout: fileDescriptions.get(arguments_[1]) }
       if (signed && machOAfterSigningPaths.includes(arguments_[1])) {
         return { stdout: "Mach-O 64-bit executable" }
       }

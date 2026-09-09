@@ -68,7 +68,7 @@ export async function writeFinalNotarizationEvidence(root, artifactKind) {
 export function createNotaryRunner({
   submit = { id: notarizationSubmissionId, status: "Accepted" },
   log = { issues: [] },
-  info = { id: notarizationSubmissionId, status: "In Progress" },
+  info = { id: notarizationSubmissionId, status: "Accepted" },
   fail,
 } = {}) {
   const calls = []
@@ -80,7 +80,9 @@ export function createNotaryRunner({
     if (arguments_[1] === "history") return { stdout: "{}" }
     if (arguments_[1] === "submit") return { stdout: JSON.stringify(submit) }
     if (arguments_[1] === "log") return { stdout: JSON.stringify(log) }
-    if (arguments_[1] === "info") return { stdout: JSON.stringify(info) }
+    if (arguments_[1] === "info") {
+      return { stdout: JSON.stringify(typeof info === "function" ? info() : info) }
+    }
     return { stdout: "", stderr: "" }
   }
   return { calls, runFile }

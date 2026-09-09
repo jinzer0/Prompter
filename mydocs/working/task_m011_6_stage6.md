@@ -32,7 +32,7 @@ package-root ownership과 cached-Accepted precedence를 교정해 report-inclusi
 asset label과 달리 Mach-O payload의 arm64 slice를 강제하지 않는 product blocker를 확인했다. QA와 Code
 Quality는 APPROVE였다. Goal은 review worktree EPERM으로 BLOCKED였고 Security는 stale detached review
 SHA 때문에 REJECT했으므로 두 결과는 product finding이 아닌 procedural review-integrity block으로
-기록한다. Stage 6.13은 모든 canonical Mach-O에 exact arm64 slice를 요구했고 report-inclusive head
+기록했다. Stage 6.13은 모든 canonical Mach-O에 exact arm64 slice를 요구했고 report-inclusive head
 `d91526008f8532e31cb48cc703547d790c59f0e6`로 게시됐다. 그 exact-head review는 Goal, QA,
 Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context의 P1 discussion
 `3967875371`은 cached Accepted가 terminal outcome으로 무효화된 뒤 retained evidence가 남아 다음
@@ -55,7 +55,10 @@ retry blocker를 확인했다. Stage 6.17은 deterministic identity error를 aff
 `7fdd85ff467862c64a673f47216743a9f3ec7348`로 게시됐다. 그 exact-head review는 Goal, QA,
 Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context는 구현 결함이 아니라 이미 완료된
 Stage 6.17 publication, PR link 교정, detached review worktree 생성을 향후 작업으로 남긴 stale report
-wording만 blocker로 확인했다.
+wording만 blocker로 확인했다. Stage 6.18 report-only head
+`dc108f9a09a36674471d32e53c258c1899267360`은 정상 게시됐지만 closure 자체에 future-tense wording을 남긴
+verification failure가 확인됐다. 해당 잔여 wording은 현재 Stage 6.19 report-only closure 계보에서
+completed-state wording으로 교정됐다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -77,14 +80,14 @@ wording만 blocker로 확인했다.
 | `tests/package-macos-coordinator-signing-identity-recovery.test.mjs`, coordinator fixtures/support, `vitest.config.ts` | resumed app/DMG match, missing/duplicate/malformed/mismatch cleanup, sibling-kind preservation, transient display failure retention, third-run success와 direct suite 등록을 고정했다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
-| `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록한다. |
-| `mydocs/report/task_m011_6_report.md` | Stage 1-5와 failed-review chronology를 보존한 최종 보고서로 갱신한다. |
+| `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
+| `mydocs/report/task_m011_6_report.md` | Stage 1-5와 failed-review chronology를 보존한 최종 보고서로 갱신했다. |
 
 ## 본문 변경 정도 / 본문 무손실 여부
 
 Stage 6.7은 Stage 6.2부터 6.6의 history와 approved plan을 rewrite하지 않고 release path
 source, direct regression tests, `docs/release-macos.md`, `docs/qa-checklist.md`, 본 보고서와
-최종 보고서만 교정한다. PR #8 remediation은 old head
+최종 보고서만 교정했다. PR #8 remediation은 old head
 `1185a7365f441dee3dc9b7b19acd9be5c4bfe7c6` 뒤 Stage 6.7 remediation history는 ownership
 `e940e29d4c9ae946b6705fafe70dee822a454fba`, app assembly
 `a81fe8664701435bbfc2fc100cbc9b7eff29ac0f`, signing discovery
@@ -123,7 +126,7 @@ lane은 Goal과 Security REJECT, QA, Quality, Context APPROVE였다. package roo
 (https://github.com/jinzer0/Prompter/pull/8#discussion_r3967071415)와 fresh `In Progress`보다
 cached `Accepted`가 우선될 수 있다는 discussion `3967071424`
 (https://github.com/jinzer0/Prompter/pull/8#discussion_r3967071424)를 publication blocker로
-기록한다. Stage 6.12는 package root를 소유한 실제 디렉터리로 제한하고, fresh non-terminal
+기록했다. Stage 6.12는 package root를 소유한 실제 디렉터리로 제한하고, fresh non-terminal
 상태의 cached acceptance를 폐기하며, terminal cleanup을 accepted retention보다 우선하도록
 교정했다.
 
@@ -266,7 +269,7 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   250 pure LOC 이하, 최대 209 pure LOC로 낮췄다. Atlas는 contract 35/35, focused release 151/151,
   full 919/919, typecheck, lint, `git diff --check`를 독립 재현했다. Context report/link blocker는 본
   additive report 갱신과 final head 고정 PR link 교정으로 처리했다. 당시 report-inclusive final head의
-  fresh five-lane review는 pending이었으며, 이후 `0900ba9` review 결과는 아래에 이어서 기록한다.
+fresh five-lane review는 pending이었으며, 이후 `0900ba9` review 결과는 아래에 이어서 기록했다.
 - REJECT RECORDED: Stage 6.8 report-inclusive head
   `0900ba94d507f8117126d21af2aab5325f344c14`의 fresh review는 Goal REJECT, QA APPROVE,
   Quality REJECT, Context APPROVE, Security procedural REJECT였다. Goal은 DMG Gatekeeper argv에
@@ -370,7 +373,7 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   invocation의 clean rebuild를 막는 결함을 확인했다.
 - OK: Stage 6.14는 three-run retry를 고정했다. 첫 invocation이 cached Accepted attempt를 만들고, 두 번째
   invocation의 terminal outcome이 affected attempt evidence root만 폐기하며, 세 번째 invocation은 새 app
-  submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release artifact를 생성한다. terminal
+submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release artifact를 생성하도록 고정했다. terminal
   cleanup은 sibling DMG evidence, version sentinel, caller sentinel과 nested symlink 밖 sentinel을 보존한다.
 - OK: 이미 완료된 authoritative verification은 full Vitest 145 files/945 tests, typecheck, lint, build,
   unsigned package와 smoke 49/49다. cached-accepted direct suite는 최종 rerun 17/17이 통과했다. 최초 full
@@ -383,7 +386,7 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   (https://github.com/jinzer0/Prompter/pull/8#discussion_r3970365453)는 malformed retained evidence가 affected
   artifact kind와 evidence-disposal intent 없이 generic failure로 축약되어 stale evidence를 남기는 retry
   blocker를 확인했다. DMG terminal rejection이 app cleanup loop에도 적용되어 accepted app evidence를
-  삭제하는 other-kind blocker도 기록한다.
+삭제하는 other-kind blocker도 기록했다.
 - OK: Stage 6.15는 `acceptAttempt`의 submission failure와 retained-evidence inspection failure에 affected
   `artifactKind`를 전파한다. malformed evidence failure는 `discardEvidence`도 전달하고 cleanup은 error의
   artifact kind와 현재 attempt kind가 일치할 때만 terminal evidence root를 제거한다. 따라서 terminal DMG
@@ -432,6 +435,11 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   exact-head review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를 기록했다. Context
   blocker는 구현이나 검증 결함이 아니라 완료된 Stage 6.17 publication lifecycle을 향후 작업으로 적은 두
   report의 stale wording이다.
+- REJECT RECORDED: Stage 6.18 report-only head
+  `dc108f9a09a36674471d32e53c258c1899267360` verification은 두 report가 closure 자체에서 stale
+  future-tense wording을 남긴 completion-state 결함을 확인했다. five-lane review는 시작하지 않았다.
+- OK: 해당 잔여 future tense는 현재 Stage 6.19 report-only closure 계보에서 completed-state wording으로
+  교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다.
 
 ## 잔여 위험
 
@@ -448,14 +456,15 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   `7fdd85ff467862c64a673f47216743a9f3ec7348`로 `publish/task6`와 PR #8에 게시됐다. PR #8
   immutable links와 temp detached review worktree도 같은 exact head로 갱신됐다.
 - `7fdd85f`의 fresh exact-head review는 Goal, QA, Code Quality, Security APPROVE와 Context REJECT를
-  기록했다. 유일한 blocker인 두 report의 stale lifecycle wording은 Stage 6.18 report-only closure에서
-  교정한다.
-- Stage 6.18 report-only head의 fresh five-lane exact-head review, PR #8 merge,
+  기록했다. 유일한 blocker인 두 report의 stale lifecycle wording과 Stage 6.18에 남은 future tense는 현재
+  Stage 6.19 report-only closure 계보에서 completed-state wording으로 교정됐다.
+- Stage 6.19 report-only head의 fresh five-lane exact-head review, PR #8 merge,
   `origin/master` containment verification만 pending이다. Todo 8은 그 전까지 `진행중`이다.
 
 ## 승인 요청
 
 - 작업지시자의 최신 명시 지시에 따라 `7fdd85f` review의 유일한 Context blocker인 두 report의 stale
-  lifecycle wording을 Stage 6.18 report-only commit으로 교정한다. 이 commit은 자신의 exact SHA를
-  재귀적으로 주장하지 않으며 publication, PR #8 링크, detached review worktree의 exact 결과는 commit 뒤
-  ignored receipt에 기록한다. 그 exact head의 fresh five-lane review가 다음 gate다.
+  lifecycle wording과 Stage 6.18에 남은 future tense는 현재 Stage 6.19 report-only closure 계보에서
+  completed-state wording으로 교정됐다. 이 commit은 자신의 exact SHA를 재귀적으로 주장하지 않으며
+  publication, PR #8 링크, detached review worktree의 exact 결과에 대한 source of truth는 ignored
+  receipt다. 그 exact head의 fresh five-lane review가 다음 gate다.

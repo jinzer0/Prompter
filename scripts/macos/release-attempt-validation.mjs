@@ -168,13 +168,23 @@ export async function removeAttempt(attempt) {
   await rm(attempt.directory, { recursive: true })
 }
 
+async function removeAttemptEvidence(attempt) {
+  const evidenceCanonical = await validateAttemptEvidenceDirectory(attempt)
+  if (evidenceCanonical === undefined) return
+  await rm(evidenceCanonical, { recursive: true })
+}
+
 export async function cleanupReleaseAttempts(attempts, error, attemptHandlingStarted) {
   if (!attemptHandlingStarted) return
   for (const attempt of [attempts.app, attempts.dmg]) {
     let retain = false
+    let discardEvidence = false
     if (error !== undefined) {
       try {
         const retained = await readBoundAttempt(attempt)
+        discardEvidence =
+          retained !== undefined &&
+          (error.blocksPublication || terminalAttemptErrors.has(error.message))
         retain =
           retained !== undefined &&
           !error.blocksPublication &&
@@ -186,6 +196,7 @@ export async function cleanupReleaseAttempts(attempts, error, attemptHandlingSta
         retain = false
       }
     }
-    if (!retain) await removeAttempt(attempt)
+    if (discardEvidence) await removeAttemptEvidence(attempt)
+    else if (!retain) await removeAttempt(attempt)
   }
 }

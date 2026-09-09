@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import { renameElectronApp as renameAppBundle } from "./macos/app-bundle.mjs"
+import { releaseInputNames } from "./macos/release-inputs.mjs"
 
 const runFile = promisify(execFile)
 
@@ -18,7 +19,6 @@ const electronApp = join(root, "node_modules", "electron", "dist", "Electron.app
 const outputRoot = join(root, "release")
 const packageRoot = join(outputRoot, `${appName}-darwin-${process.arch}`)
 const packagedApp = join(packageRoot, appBundleName)
-const releaseInputNames = ["PROMPTER_SIGNING_IDENTITY", "PROMPTER_NOTARY_PROFILE"]
 
 export async function renameElectronApp(appPath = packagedApp, version) {
   return renameAppBundle({ appName, appPath, bundleExecutableKey, bundleIdentifier, version })
@@ -165,7 +165,7 @@ async function runReleasePreflight() {
   await readPackageVersion(join(root, "package.json"))
   resolveReleaseMacOSArchitecture()
 
-  const missingInput = releaseInputNames.find(
+  const missingInput = Object.values(releaseInputNames).find(
     (name) => typeof process.env[name] !== "string" || process.env[name].trim() === "",
   )
   if (missingInput !== undefined) {

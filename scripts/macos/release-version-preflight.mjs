@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
+import { releaseInputNames } from "./release-inputs.mjs"
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
 async function main() {
@@ -11,6 +13,10 @@ async function main() {
   } catch {
     throw new Error("Invalid package version")
   }
+  const missingInput = Object.values(releaseInputNames).find(
+    (name) => typeof process.env[name] !== "string" || process.env[name].trim() === "",
+  )
+  if (missingInput !== undefined) throw new Error(`Missing required release input: ${missingInput}`)
 }
 
 await main()

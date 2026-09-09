@@ -12,6 +12,7 @@ import {
   prepareReleaseDmg,
 } from "./macos/release-attempt.mjs"
 import { validateReleaseAttemptDirectories } from "./macos/release-attempt-validation.mjs"
+import { releaseInputNames } from "./macos/release-inputs.mjs"
 import {
   cleanupRelease,
   createReleaseState,
@@ -206,8 +207,8 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(
       platform: process.platform,
       arch: process.arch,
       paths: defaultPaths(),
-      signingIdentity: process.env.PROMPTER_SIGNING_IDENTITY,
-      notaryProfile: process.env.PROMPTER_NOTARY_PROFILE,
+      signingIdentity: process.env[releaseInputNames.signingIdentity],
+      notaryProfile: process.env[releaseInputNames.notaryProfile],
       signal: controller.signal,
     })
     console.log("macOS release artifacts are ready.")

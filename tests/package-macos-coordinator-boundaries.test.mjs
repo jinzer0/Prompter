@@ -65,11 +65,30 @@ test("rejects every signed release version except 0.1.1 before the first externa
 })
 
 test("rejects a wrong package version at the npm release entrypoint before build or downstream mutation", async () => {
-  await assertReleaseEntrypointRejectsBeforeMutation("0.1.2")
+  await assertReleaseEntrypointRejectsBeforeMutation({
+    errorMessage: "Invalid package version",
+    version: "0.1.2",
+  })
 })
 
 test("rejects a missing package version at the npm release entrypoint before build or downstream mutation", async () => {
-  await assertReleaseEntrypointRejectsBeforeMutation(undefined)
+  await assertReleaseEntrypointRejectsBeforeMutation({
+    errorMessage: "Invalid package version",
+  })
+})
+
+test.each([
+  ["missing signing identity", "PROMPTER_SIGNING_IDENTITY", undefined],
+  ["blank signing identity", "PROMPTER_SIGNING_IDENTITY", "   "],
+  ["missing notary profile", "PROMPTER_NOTARY_PROFILE", undefined],
+  ["blank notary profile", "PROMPTER_NOTARY_PROFILE", "   "],
+])("rejects a %s at the npm release entrypoint before build or downstream mutation", async (_label, inputName, inputValue) => {
+  await assertReleaseEntrypointRejectsBeforeMutation({
+    errorMessage: `Missing required release input: ${inputName}`,
+    inputName,
+    inputValue,
+    version: "0.1.1",
+  })
 })
 
 test("maps bounded timeout and an AbortSignal to production execFile options", async () => {

@@ -51,9 +51,10 @@ export async function createPackageFixture() {
 export async function createReleaseEntrypointFixture(version) {
   const root = await mkdtemp(join(tmpdir(), "prompter-release-entrypoint-test-"))
   await mkdir(join(root, "scripts", "macos"), { recursive: true })
-  await cp(
-    join(repositoryRoot, "scripts", "macos", "release-version-preflight.mjs"),
-    join(root, "scripts", "macos", "release-version-preflight.mjs"),
+  await Promise.all(
+    ["release-inputs.mjs", "release-version-preflight.mjs"].map((name) =>
+      cp(join(repositoryRoot, "scripts", "macos", name), join(root, "scripts", "macos", name)),
+    ),
   )
   await writeFile(
     join(root, "package.json"),
@@ -81,15 +82,36 @@ export async function createReleaseEntrypointFixture(version) {
   return { root, temporaryDirectories: [root] }
 }
 
-export async function assertReleaseEntrypointRejectsBeforeMutation(version) {
+export async function assertReleaseEntrypointRejectsBeforeMutation({
+  errorMessage,
+  inputName,
+  inputValue,
+  version,
+}) {
   const fixture = await createReleaseEntrypointFixture(version)
   try {
+    const environment = {
+      ...process.env,
+      PROMPTER_SIGNING_IDENTITY: "fixture-signing-identity",
+      PROMPTER_NOTARY_PROFILE: "fixture-notary-profile",
+    }
+    if (inputName !== undefined) {
+      if (inputValue === undefined) delete environment[inputName]
+      else environment[inputName] = inputValue
+    }
+    let output = ""
     await assert.rejects(
-      executeFile("npm", ["run", "package:release:macos"], { cwd: fixture.root }),
-      (error) =>
-        error instanceof Error &&
-        `${error.stdout ?? ""}\n${error.stderr ?? ""}`.includes("Invalid package version"),
+      executeFile("npm", ["run", "package:release:macos"], {
+        cwd: fixture.root,
+        env: environment,
+      }),
+      (error) => {
+        output = `${error.stdout ?? ""}\n${error.stderr ?? ""}`
+        return error instanceof Error && output.includes(errorMessage)
+      },
     )
+    assert.equal(output.includes("fixture-signing-identity"), false)
+    assert.equal(output.includes("fixture-notary-profile"), false)
     for (const path of [
       "build-ran",
       "downstream-ran",

@@ -3,9 +3,20 @@ import { defineConfig } from "vitest/config"
 export default defineConfig({
   test: {
     include: [
-      "tests/package-macos.test.mjs",
-      "tests/package-macos-signing.test.mjs",
-      "tests/package-macos-notarization.test.mjs",
+      "tests/package-macos-package.test.mjs",
+      "tests/package-macos-coordinator-success.test.mjs",
+      "tests/package-macos-coordinator-failures.test.mjs",
+      "tests/package-macos-coordinator-boundaries.test.mjs",
+      "tests/package-macos-coordinator-app-recovery.test.mjs",
+      "tests/package-macos-coordinator-dmg-recovery.test.mjs",
+      "tests/package-macos-signing-flow.test.mjs",
+      "tests/package-macos-signing-discovery.test.mjs",
+      "tests/package-macos-notarization-submission.test.mjs",
+      "tests/package-macos-notarization-log-review.test.mjs",
+      "tests/package-macos-notarization-timeout.test.mjs",
+      "tests/package-macos-notarization-resume.test.mjs",
+      "tests/package-macos-notarization-commands.test.mjs",
+      "tests/package-macos-notarization-evidence.test.mjs",
       "tests/privacy-guard-service.test.ts",
       "tests/privacy-guard-integration.test.ts",
       "tests/privacy-guard-analyze-integration.test.ts",

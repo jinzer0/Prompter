@@ -1,6 +1,16 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { access, chmod, cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises"
+import {
+  access,
+  chmod,
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -50,32 +60,29 @@ export async function createPackageFixture() {
 
 export async function createReleaseEntrypointFixture(version) {
   const root = await mkdtemp(join(tmpdir(), "prompter-release-entrypoint-test-"))
+  const fixturePackageJson = JSON.parse(
+    await readFile(join(repositoryRoot, "package.json"), "utf8"),
+  )
+  if (version === undefined) delete fixturePackageJson.version
+  else fixturePackageJson.version = version
+  fixturePackageJson.scripts = {
+    ...fixturePackageJson.scripts,
+    build: "node build-marker.mjs",
+  }
   await mkdir(join(root, "scripts", "macos"), { recursive: true })
   await Promise.all(
     ["release-inputs.mjs", "release-version-preflight.mjs"].map((name) =>
       cp(join(repositoryRoot, "scripts", "macos", name), join(root, "scripts", "macos", name)),
     ),
   )
-  await writeFile(
-    join(root, "package.json"),
-    JSON.stringify({
-      name: "release-entrypoint-fixture",
-      private: true,
-      ...(version === undefined ? {} : { version }),
-      scripts: {
-        build: "node build-marker.mjs",
-        "package:release:macos":
-          "node scripts/macos/release-version-preflight.mjs && npm run build && node downstream-marker.mjs",
-      },
-    }),
-  )
+  await writeFile(join(root, "package.json"), JSON.stringify(fixturePackageJson))
   await Promise.all([
     writeFile(
       join(root, "build-marker.mjs"),
       'await import("node:fs/promises").then(({ writeFile }) => writeFile("build-ran", "1"))',
     ),
     writeFile(
-      join(root, "downstream-marker.mjs"),
+      join(root, "scripts", "release-macos.mjs"),
       'await import("node:fs/promises").then(({ writeFile }) => writeFile("downstream-ran", "1"))',
     ),
   ])

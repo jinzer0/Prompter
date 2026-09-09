@@ -9,6 +9,7 @@ import { runner } from "../scripts/macos/release-support.mjs"
 import { createCoordinatorFixture } from "./support/macos-coordinator-fixtures.mjs"
 import {
   assertReleaseEntrypointRejectsBeforeMutation,
+  createReleaseEntrypointFixture,
   createTemporaryDirectoryTracker,
 } from "./support/macos-package-fixtures.mjs"
 
@@ -62,6 +63,19 @@ test("rejects every signed release version except 0.1.1 before the first externa
   )
   await assert.rejects(release.run(), /Invalid package version/)
   assert.deepEqual(release.calls, [])
+})
+
+test("uses the production macOS release command unchanged in the entrypoint fixture", async () => {
+  const release = temporaryDirectories.track(await createReleaseEntrypointFixture("0.1.1"))
+  const [fixturePackageJson, productionPackageJson] = await Promise.all([
+    readFile(join(release.root, "package.json"), "utf8"),
+    readFile("package.json", "utf8"),
+  ])
+
+  assert.equal(
+    JSON.parse(fixturePackageJson).scripts?.["package:release:macos"],
+    JSON.parse(productionPackageJson).scripts?.["package:release:macos"],
+  )
 })
 
 test("rejects a wrong package version at the npm release entrypoint before build or downstream mutation", async () => {

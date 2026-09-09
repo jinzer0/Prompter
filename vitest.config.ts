@@ -9,6 +9,7 @@ export default defineConfig({
       "tests/package-macos-coordinator-boundaries.test.mjs",
       "tests/package-macos-coordinator-app-recovery.test.mjs",
       "tests/package-macos-coordinator-dmg-recovery.test.mjs",
+      "tests/package-macos-coordinator-cached-accepted.test.mjs",
       "tests/package-macos-signing-flow.test.mjs",
       "tests/package-macos-signing-discovery.test.mjs",
       "tests/package-macos-notarization-submission.test.mjs",

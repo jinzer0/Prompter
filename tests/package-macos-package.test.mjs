@@ -113,6 +113,28 @@ test("assembleMacOSApp preserves installed npm-bin relative link text", async ()
   )
 })
 
+test("rejects a symlinked package root before app assembly can delete external content", async () => {
+  const electron = await electronFixture()
+  const output = await packageFixture()
+  const externalPackageRoot = join(output.temporaryDirectories[0], "external-package-root")
+  const externalAppPath = join(externalPackageRoot, "Prompter.app")
+  const externalSentinelPath = join(externalAppPath, "external-sentinel")
+  const packageRoot = join(output.outputDirectory, `Prompter-darwin-${process.arch}`)
+  await mkdir(externalAppPath, { recursive: true })
+  await writeFile(externalSentinelPath, "retain")
+  await symlink(externalPackageRoot, packageRoot)
+
+  await assert.rejects(
+    assembleMacOSApp({
+      appPath: join(packageRoot, "Prompter.app"),
+      electronAppPath: electron.appPath,
+      packageJsonPath: output.packageJsonPath,
+      sourceRoot: output.outputDirectory,
+    }),
+  )
+  assert.equal(await readFile(externalSentinelPath, "utf8"), "retain")
+})
+
 test("uses versioned arm64 and x64 DMG names", async () => {
   for (const architecture of ["arm64", "x64"]) {
     const fixture = await packageFixture()

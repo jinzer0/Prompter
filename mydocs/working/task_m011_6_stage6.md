@@ -83,6 +83,16 @@ entrypoint fixture는 `f95640b4cd3e3ce3b7ba160538d26f8388b6e216`, accepted-pendi
 retention은 `5f9b3dd269ffd5993e6ac10f81b5db72f93c1be8`로 구분했다. 본 보고서와 최종 보고서만
 그 뒤 별도 reporting commit으로 묶는다.
 
+Stage 6.11 report-inclusive old head `783b7984115e7af5e537286ca2f4c018c2853405`의 5개 review
+lane은 Goal과 Security REJECT, QA, Quality, Context APPROVE였다. package root symlink가 외부
+`Prompter.app`을 삭제할 수 있다는 discussion `3967071415`
+(https://github.com/jinzer0/Prompter/pull/8#discussion_r3967071415)와 fresh `In Progress`보다
+cached `Accepted`가 우선될 수 있다는 discussion `3967071424`
+(https://github.com/jinzer0/Prompter/pull/8#discussion_r3967071424)를 publication blocker로
+기록한다. Stage 6.12는 package root를 소유한 실제 디렉터리로 제한하고, fresh non-terminal
+상태의 cached acceptance를 폐기하며, terminal cleanup을 accepted retention보다 우선하도록
+교정했다.
+
 ## 검증 결과
 
 Stage 6 계열에서 실행 및 보존한 validation surface는 다음과 같다.
@@ -253,6 +263,20 @@ npm test -- tests/package-macos-notarization-commands.test.mjs tests/package-mac
   142 files/929 tests, typecheck, lint, changed-file syntax, pure LOC maximum 246, `git diff --check`를
   통과했다. LSP는 Stage 6.11 seven paths 모두 sibling-worktree request-root 제한으로 거부되어 PASS로
   기록하지 않는다. 새 report-inclusive final head의 fresh five-lane review는 pending이다.
+- REJECT RECORDED: Stage 6.11 report-inclusive old head
+  `783b7984115e7af5e537286ca2f4c018c2853405` review는 Goal REJECT, Security REJECT, QA APPROVE,
+  Quality APPROVE, Context APPROVE였다. discussion `3967071415`는 package root symlink가 가리키는
+  외부 `Prompter.app` 삭제 가능성을, discussion `3967071424`는 fresh `In Progress`에 대한 stale
+  cached `Accepted` 우선 적용을 blocker로 확인했다.
+- FAILING-FIRST: 외부 package-root symlink sentinel 회귀는 교정 전에 외부 artifact 삭제를 재현했고,
+  cached-Accepted 회귀는 교정 전에 5개 failure를 재현했다.
+- OK: Stage 6.12는 package-root ownership과 fresh-status normalization을 교정하고 terminal cleanup을
+  accepted retention보다 먼저 적용한다. 전체 Vitest 143 files/935 tests, typecheck, lint, build,
+  unsigned package, smoke 49/49가 통과했다. signed missing-input 검증은 mutation 전에 nonzero로
+  거절되고 외부 sentinel을 보존했다. generated output은 모두 제거했으며 live Apple Notarization,
+  release upload, publish는 수행하지 않았다.
+- MISS(환경 제한): Stage 6.12 LSP diagnostics도 sibling worktree 제한으로 실행하지 못했으며 PASS로
+  기록하지 않는다.
 - MISS(환경 제한): sibling worktree markdown LSP diagnostics는 request-root 제한으로 실행하지 못했다.
   typecheck, lint, markdown/template section review, syntax/import, tests, build, package, smoke,
   whitespace check를 대체 근거로 사용했다.
@@ -268,9 +292,9 @@ npm test -- tests/package-macos-notarization-commands.test.mjs tests/package-mac
 
 ## 다음 단계 영향
 
-- Stage 6.7부터 Stage 6.10까지 `e940e29`부터 `4a647e6`까지 `publish/task6`에 게시했다. Stage 6.11
-  behavior remediation은 `f95640b`, `5f9b3dd`로 commit했다. 본 보고서와 최종 보고서를 별도 report commit으로
-  추가하고 기존 PR #8을 새 final head에 고정한 뒤 fresh five-lane review를 다시 실행한다.
+- Stage 6.7부터 Stage 6.11 report-inclusive head `783b798`까지 `publish/task6`에 게시했다. Stage 6.12
+  release ownership과 cached acceptance 교정 및 두 보고서를 하나의 publication commit으로 추가하고
+  기존 PR #8을 새 final head에 고정한 뒤 fresh five-lane review를 다시 실행한다.
 - PR #8 review/merge와 `origin/master` containment verification은 명시적으로 pending이다. Todo 8은
   아직 완료로 표시하지 않는다.
 - Issue #6 close와 Issue #7 진입은 Task #6 PR이 merge되고 `origin/master`에 포함된 뒤에만 진행한다.
@@ -278,6 +302,6 @@ npm test -- tests/package-macos-notarization-commands.test.mjs tests/package-mac
 
 ## 승인 요청
 
-- 작업지시자의 최신 명시 지시에 따라 Stage 6.11 behavior/report commits, 정상 publication push,
-  기존 PR #8 final-head immutable-link 교정을 진행한다. report-inclusive exact-head re-review, PR merge,
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.12 behavior/report commit, 정상 publication push,
+  기존 PR #8 final-head immutable-link 교정을 진행한다. 새 exact-head re-review, PR merge,
   containment verification, Issue #6 close, Issue #7 진입, tag/release/upload는 수행하지 않는다.

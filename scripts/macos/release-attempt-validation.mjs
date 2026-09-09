@@ -177,11 +177,11 @@ export async function cleanupReleaseAttempts(attempts, error, attemptHandlingSta
         const retained = await readBoundAttempt(attempt)
         retain =
           retained !== undefined &&
+          !error.blocksPublication &&
+          !terminalAttemptErrors.has(error.message) &&
           (retained.saved.status === "Accepted" ||
-            (retained.saved.status === "accepted" &&
-              !error?.blocksPublication &&
-              !terminalAttemptErrors.has(error?.message)) ||
-            resumableErrors.has(error?.message))
+            retained.saved.status === "accepted" ||
+            resumableErrors.has(error.message))
       } catch {
         retain = false
       }

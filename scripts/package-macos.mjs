@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import { renameElectronApp as renameAppBundle } from "./macos/app-bundle.mjs"
+import { ensureOwnedDirectory, validateOwnedDirectory } from "./macos/owned-directory.mjs"
 import { releaseInputNames } from "./macos/release-inputs.mjs"
 
 const runFile = promisify(execFile)
@@ -66,11 +67,17 @@ export async function assembleMacOSApp({
   packageJsonPath = join(root, "package.json"),
   sourceRoot = root,
 } = {}) {
+  const packageRoot = dirname(appPath)
+  const packageRootOptions = {
+    trustedAnchor: dirname(dirname(packageRoot)),
+    targetPath: packageRoot,
+  }
+  await validateOwnedDirectory(packageRootOptions)
   const version = await readPackageVersion(packageJsonPath)
   const resourcesPath = join(appPath, "Contents", "Resources", "app")
 
+  await ensureOwnedDirectory(packageRootOptions)
   await rm(appPath, { recursive: true, force: true })
-  await mkdir(dirname(appPath), { recursive: true })
   try {
     await cp(electronAppPath, appPath, { recursive: true, verbatimSymlinks: true })
     await renameElectronApp(appPath, version)
@@ -78,6 +85,7 @@ export async function assembleMacOSApp({
     await access(join(appPath, "Contents", "MacOS", appName))
     return appPath
   } catch (error) {
+    await ensureOwnedDirectory(packageRootOptions)
     await rm(appPath, { recursive: true, force: true })
     throw error
   }

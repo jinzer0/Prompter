@@ -118,6 +118,11 @@ verification을 additive하게 이어서 기록한다. Stage 6.10 report-inclusi
 | Stage 6.11 remediation | OK — fixture는 exact production release script를 보존하고 build/downstream implementation만 교체한다. valid bound lowercase-accepted bytes는 malformed/service-error refresh를 위해 보존한다. warning/error logs는 terminal publication blocker이고 Rejected status도 계속 cleanup된다. |
 | Stage 6.11 verification | OK — targeted six files/90 tests, focused release 15 files/161 tests, full Vitest 142 files/929 tests, typecheck, lint, changed syntax, pure LOC maximum 246, `git diff --check`가 통과했다. LSP는 seven paths 모두 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
 | Stage 6.11 review gate | PENDING FOR REPORT-INCLUSIVE FINAL HEAD — behavior commits `f95640b`, `5f9b3dd`와 본 report commit을 포함한 새 final head에서 fresh five-lane review를 다시 수행해야 한다. PR merge, containment, Issue #6 closure, Issue #7 entry와 Todo 8 완료는 pending이다. |
+| `783b798` fresh review lanes | REJECT RECORDED — Goal REJECT, Security REJECT, QA APPROVE, Quality APPROVE, Context APPROVE. discussion `3967071415`는 package-root symlink가 외부 `Prompter.app`을 삭제할 수 있는 ownership 결함을, discussion `3967071424`는 fresh `In Progress`보다 stale cached `Accepted`가 우선될 수 있는 상태 결함을 확인했다. |
+| Stage 6.12 failing-first evidence | RECORDED — 외부 package-root symlink sentinel은 교정 전 외부 artifact 삭제를 재현했고, cached-Accepted 회귀는 교정 전 5개 failure를 재현했다. |
+| Stage 6.12 remediation | OK — package root를 소유한 실제 디렉터리로 제한하고 fresh non-terminal 상태의 cached acceptance를 폐기하며 terminal cleanup을 accepted retention보다 먼저 적용한다. |
+| Stage 6.12 verification | OK — 전체 Vitest 143 files/935 tests, typecheck, lint, build, unsigned package, smoke 49/49가 통과했다. signed missing-input은 mutation 전에 nonzero로 거절되고 외부 sentinel을 보존했다. generated output은 제거했으며 live Apple Notarization, release upload, publish는 수행하지 않았다. LSP는 sibling worktree 제한으로 미실행했으며 PASS로 기록하지 않는다. |
+| Stage 6.12 review gate | PENDING FOR NEW EXACT HEAD — Stage 6.12 publication 뒤 새 immutable head에서 fresh five-lane review를 수행해야 한다. PR merge, containment, Issue #6 closure, Issue #7 entry와 Todo 8 완료는 pending이다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 pending이다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -141,6 +146,9 @@ verification을 additive하게 이어서 기록한다. Stage 6.10 report-inclusi
 - Stage 6.11: 같은 Stage 6 보고서에 `4a647e6` Goal/Security/Context approval, transient-rebuild QA
   rejection, synthetic-script Quality rejection, live accepted-pending P2, 두 failing-first proof,
   targeted 90/90, focused 161/161, full 929/929, LOC 246과 pending fresh final-head review를 추가했다.
+- Stage 6.12: 같은 Stage 6 보고서에 `783b798` Goal/Security rejection과 QA/Quality/Context approval,
+  두 PR discussion, 외부 sentinel 및 cached-Accepted failing-first proof, package-root ownership과
+  fresh-status 교정, full 935/935, unsigned package, smoke 49/49와 pending new-head review를 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -158,8 +166,8 @@ verification을 additive하게 이어서 기록한다. Stage 6.10 report-inclusi
 
 ### 후속 작업 후보
 
-- Stage 6.7부터 Stage 6.10 commits는 기존 PR #8에 게시됐고 Stage 6.11 behavior commits를 추가했다.
-  본 report commit과 final-head immutable-link 교정 뒤 fresh exact-head five-lane review, PR #8 merge,
+- Stage 6.7부터 Stage 6.11 report-inclusive head `783b798`까지 기존 PR #8에 게시됐다. Stage 6.12
+  behavior/report commit과 final-head immutable-link 교정 뒤 fresh exact-head five-lane review, PR #8 merge,
   `origin/master` containment verification은 pending이다.
 - Issue #7은 이 Task #6 implementation PR이 `origin/master`에 merge된 뒤에만 진입한다.
 - Issue #7에서 live Developer ID signing, Apple Notarization, staple, Gatekeeper assessment, tag, GitHub
@@ -168,9 +176,9 @@ verification을 additive하게 이어서 기록한다. Stage 6.10 report-inclusi
 
 ## 작업지시자 승인 기록 및 요청
 
-- 작업지시자의 최신 명시 지시에 따라 Stage 6.11 behavior commits 뒤 두 report의 rejected review와
-  remediation chronology를 별도 commit하고 기존 PR #8 publication branch와 final-head immutable links를
-  갱신한다. fresh exact-head review는 그 report-inclusive publication 뒤의 다음 gate다.
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.12 behavior와 두 report의 rejected review 및 remediation
+  chronology를 하나의 commit으로 묶고 기존 PR #8 publication branch와 final-head immutable links를
+  갱신한다. fresh exact-head review는 그 publication 뒤의 다음 gate다.
 - 승인 범위 밖 작업은 수행하지 않는다. PR merge, containment verification, Issue #6 close,
   branch/worktree cleanup, Issue #7 진입, tag, release, upload, live Apple operations는 남아 있다.
   Todo 8도 merge와 `origin/master` containment verification 전까지 완료로 주장하지 않는다.

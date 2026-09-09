@@ -77,7 +77,9 @@ export async function submitAndWait(options) {
         ...(signal === undefined ? {} : { signal }),
       })
     }
-    if (status === "In Progress") return saved
+    if (status === "In Progress") {
+      return saved.status === "Accepted" ? evidence.saveAcceptedPending(saved.submissionId) : saved
+    }
     failNotarization("Notarization submission was not accepted")
   }
   const result = await notary.submit({ artifactPath: value.artifactPath, profile })

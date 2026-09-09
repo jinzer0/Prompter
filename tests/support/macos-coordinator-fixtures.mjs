@@ -26,8 +26,8 @@ export async function createCoordinatorFixture({
   const root = shared?.root ?? (await mkdtemp(join(tmpdir(), "prompter-release-test-")))
   const sourceRoot = shared?.sourceRoot ?? join(root, "source")
   const nativeSourcePath = join(sourceRoot, "node_modules", "native", "build", "addon.node")
-  const releaseRoot = shared?.releaseRoot ?? join(root, "release")
-  const evidenceRoot = shared?.evidenceRoot ?? join(root, "evidence")
+  const releaseRoot = shared?.releaseRoot ?? join(root, "release-parent", "release")
+  const evidenceRoot = shared?.evidenceRoot ?? join(root, "evidence-parent", "evidence")
   const electron = shared?.electron ?? (await createElectronAppFixture())
   const fakeArtifacts = shared?.fakeArtifacts ?? {
     directory: join(root, "fake-artifacts"),

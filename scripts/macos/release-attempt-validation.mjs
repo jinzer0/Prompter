@@ -6,6 +6,7 @@ import {
   identifyNotarizationArtifact,
   validateFinalNotarizationEvidence,
 } from "./notarization-evidence.mjs"
+import { validateOwnedDirectory } from "./owned-directory.mjs"
 
 const resumableErrors = new Set([
   "Notarization command failed",
@@ -61,20 +62,23 @@ export async function identifyRetainedAttempt(attempt) {
 }
 
 export async function validateAttemptEvidenceDirectory(attempt) {
-  const rootMetadata = await metadata(attempt.evidenceRoot)
-  if (rootMetadata === undefined) return undefined
-  if (!rootMetadata.isDirectory() || rootMetadata.isSymbolicLink()) fail()
-  const rootCanonical = await realpath(attempt.evidenceRoot)
+  const rootCanonical = await validateOwnedDirectory({
+    trustedAnchor: attempt.trustedAnchor,
+    targetPath: attempt.evidenceRoot,
+  })
+  if (rootCanonical === undefined) return undefined
   const parentPath = dirname(attempt.evidenceDirectory)
-  const parentMetadata = await metadata(parentPath)
-  if (parentMetadata === undefined) return undefined
-  if (!parentMetadata.isDirectory() || parentMetadata.isSymbolicLink()) fail()
-  const parentCanonical = await realpath(parentPath)
+  const parentCanonical = await validateOwnedDirectory({
+    trustedAnchor: attempt.trustedAnchor,
+    targetPath: parentPath,
+  })
+  if (parentCanonical === undefined) return undefined
   if (!isContained(rootCanonical, parentCanonical)) fail()
-  const evidenceMetadata = await metadata(attempt.evidenceDirectory)
-  if (evidenceMetadata === undefined) return undefined
-  if (!evidenceMetadata.isDirectory() || evidenceMetadata.isSymbolicLink()) fail()
-  const evidenceCanonical = await realpath(attempt.evidenceDirectory)
+  const evidenceCanonical = await validateOwnedDirectory({
+    trustedAnchor: attempt.trustedAnchor,
+    targetPath: attempt.evidenceDirectory,
+  })
+  if (evidenceCanonical === undefined) return undefined
   if (!isContained(rootCanonical, evidenceCanonical)) fail()
   return evidenceCanonical
 }

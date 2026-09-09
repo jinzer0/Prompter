@@ -1,10 +1,11 @@
 import { constants } from "node:fs"
 import { copyFile, mkdir, mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { basename, dirname, join } from "node:path"
+import { basename, join } from "node:path"
 
 import { assembleMacOSApp, createDmgArchive, createZipArchive } from "../package-macos.mjs"
 import { stapleAndValidate, submitAndWait } from "./notarization.mjs"
+import { ensureOwnedDirectory } from "./owned-directory.mjs"
 import {
   identifyRetainedAttempt,
   validateAttemptEvidenceDirectory,
@@ -22,7 +23,7 @@ function fail() {
   throw new Error("Invalid retained notarization attempt")
 }
 
-function descriptor(evidenceRoot, evidenceDirectory, artifactKind, artifactName) {
+function descriptor(trustedAnchor, evidenceRoot, evidenceDirectory, artifactKind, artifactName) {
   if (
     basename(artifactName) !== artifactName ||
     !artifactName.endsWith(artifactKind === "app" ? ".zip" : ".dmg")
@@ -37,22 +38,34 @@ function descriptor(evidenceRoot, evidenceDirectory, artifactKind, artifactName)
     directory,
     evidenceDirectory,
     evidenceRoot,
+    trustedAnchor,
   })
 }
 
 export function createReleaseAttempts(options) {
   return Object.freeze({
-    app: descriptor(options.evidenceRoot, options.appEvidenceDirectory, "app", options.zipName),
-    dmg: descriptor(options.evidenceRoot, options.dmgEvidenceDirectory, "dmg", options.dmgName),
+    app: descriptor(
+      options.trustedAnchor,
+      options.evidenceRoot,
+      options.appEvidenceDirectory,
+      "app",
+      options.zipName,
+    ),
+    dmg: descriptor(
+      options.trustedAnchor,
+      options.evidenceRoot,
+      options.dmgEvidenceDirectory,
+      "dmg",
+      options.dmgName,
+    ),
   })
 }
 
 async function prepareAttempt(attempt) {
-  await mkdir(attempt.evidenceRoot, { recursive: true })
-  await validateAttemptEvidenceDirectory(attempt)
-  await mkdir(dirname(attempt.evidenceDirectory), { recursive: true })
-  await validateAttemptEvidenceDirectory(attempt)
-  await mkdir(attempt.evidenceDirectory, { recursive: true })
+  await ensureOwnedDirectory({
+    trustedAnchor: attempt.trustedAnchor,
+    targetPath: attempt.evidenceDirectory,
+  })
   if ((await validateAttemptEvidenceDirectory(attempt)) === undefined) fail()
   try {
     await mkdir(attempt.directory)

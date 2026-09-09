@@ -1,6 +1,7 @@
-import { lstat, mkdir, rm } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
+import { ensureOwnedDirectory, validateOwnedDirectory } from "./owned-directory.mjs"
 import { cleanupReleaseAttempts, createReleaseAttempts } from "./release-attempt.mjs"
 
 function fail(message) {
@@ -16,6 +17,7 @@ export function createReleaseState(release, run, version) {
   return {
     state: {
       candidateDirectory,
+      trustedAnchor: dirname(release.paths.sourceRoot),
       appEvidenceDirectory,
       dmgEvidenceDirectory,
       notaryProfile: release.notaryProfile,
@@ -25,6 +27,7 @@ export function createReleaseState(release, run, version) {
       attemptHandlingStarted: false,
       attempts: createReleaseAttempts({
         evidenceRoot: release.paths.notarizationEvidenceRoot,
+        trustedAnchor: dirname(release.paths.sourceRoot),
         appEvidenceDirectory,
         dmgEvidenceDirectory,
         zipName,
@@ -40,9 +43,12 @@ export function createReleaseState(release, run, version) {
 export async function validateReleaseRoot(state) {
   const releaseRoot = dirname(state.candidateDirectory)
   try {
-    const metadata = await lstat(releaseRoot)
-    if (!metadata.isDirectory() || metadata.isSymbolicLink()) fail("Release root is unavailable")
-    return true
+    return (
+      (await validateOwnedDirectory({
+        trustedAnchor: state.trustedAnchor,
+        targetPath: releaseRoot,
+      })) !== undefined
+    )
   } catch (error) {
     if (error?.code === "ENOENT") return false
     fail("Release root is unavailable")
@@ -52,7 +58,9 @@ export async function validateReleaseRoot(state) {
 export async function prepareReleaseCandidate(state) {
   const releaseRoot = dirname(state.candidateDirectory)
   try {
-    if (!(await validateReleaseRoot(state))) await mkdir(releaseRoot)
+    if (!(await validateReleaseRoot(state))) {
+      await ensureOwnedDirectory({ trustedAnchor: state.trustedAnchor, targetPath: releaseRoot })
+    }
     if (!(await validateReleaseRoot(state))) fail("Release root is unavailable")
     await mkdir(state.candidateDirectory)
     state.candidateCreated = true

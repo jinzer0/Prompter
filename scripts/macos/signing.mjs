@@ -82,6 +82,31 @@ async function verifyTargets(targets, runFile) {
   }
 }
 
+async function verifyArtifactIdentity(path, identity, runFile) {
+  if (identity === undefined) return
+  if (
+    typeof identity !== "string" ||
+    identity.length === 0 ||
+    identity.trim() !== identity ||
+    /[\0\r\n]/u.test(identity)
+  ) {
+    throw new SigningInputError("Recovered artifact signing identity is invalid")
+  }
+  const { stdout, stderr } = await runFile(codesignCommand, ["--display", "--verbose=4", path], {})
+  if (typeof stdout !== "string" || typeof stderr !== "string")
+    throw new SigningInputError("Recovered artifact signing identity is invalid")
+  const authorities = []
+  for (const line of `${stdout}\n${stderr}`.split(/\r?\n/u)) {
+    if (!line.startsWith("Authority")) continue
+    const match = line.match(/^Authority=([^\r\n]+)$/u)
+    if (match === null)
+      throw new SigningInputError("Recovered artifact signing identity is invalid")
+    if (match[1].startsWith("Developer ID Application: ")) authorities.push(match[1])
+  }
+  if (authorities.length !== 1 || authorities[0] !== identity)
+    throw new SigningInputError("Recovered artifact signing identity is invalid")
+}
+
 export async function signAppBundle({ appPath, identity, entitlementsPath, runFile }) {
   const executeFile = requireRunner(runFile)
   const signingIdentity = await requireIdentity(identity, executeFile)
@@ -118,18 +143,20 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   return rootPath
 }
 
-export async function verifyAppSignature({ appPath, runFile }) {
+export async function verifyAppSignature({ appPath, identity, runFile }) {
   const executeFile = requireRunner(runFile)
   const rootPath = await realpath(resolve(appPath))
   const targets = await discoverSignableCode({ appPath: rootPath, runFile: executeFile })
   await verifyTargets(targets, executeFile)
   await executeFile(codesignCommand, ["--verify", "--deep", "--strict", rootPath], {})
+  await verifyArtifactIdentity(rootPath, identity, executeFile)
   return rootPath
 }
 
-export async function verifyDmgSignature({ dmgPath, runFile }) {
+export async function verifyDmgSignature({ dmgPath, identity, runFile }) {
   const executeFile = requireRunner(runFile)
   const canonicalPath = await realpath(resolve(dmgPath))
   await executeFile(codesignCommand, ["--verify", "--strict", canonicalPath], {})
+  await verifyArtifactIdentity(canonicalPath, identity, executeFile)
   return canonicalPath
 }

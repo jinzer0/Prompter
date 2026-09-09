@@ -13,6 +13,9 @@ import {
 import { createElectronAppFixture } from "./macos-package-fixtures.mjs"
 
 export async function createCoordinatorFixture({
+  displayOutput,
+  signingIdentity = syntheticIdentity,
+  displayIdentity = signingIdentity,
   failure,
   identityListing = "one",
   label = "default",
@@ -57,8 +60,7 @@ export async function createCoordinatorFixture({
     await mkdir(join(releaseRoot, "v0.1.1"))
     await writeFile(join(releaseRoot, "v0.1.1", "stale"), "stale")
   }
-  const calls = []
-  const rawCalls = []
+  const [calls, rawCalls] = [[], []]
   const observedTempRoots = new Set()
   let candidateExistsDuringProfile = false
   const runFile = async (command, arguments_, options = {}) => {
@@ -103,9 +105,18 @@ export async function createCoordinatorFixture({
     if (stage === "identity") {
       const matches = identityListing === "multiple" ? 2 : identityListing === "none" ? 0 : 1
       return {
-        stdout: `${Array.from({ length: matches }, (_, index) => `  ${index + 1}) ${"a".repeat(40)} "${syntheticIdentity}"`).join("\n")}\n  ${matches} valid identities found\n`,
+        stdout: `${Array.from({ length: matches }, (_, index) => `  ${index + 1}) ${"a".repeat(40)} "${signingIdentity}"`).join("\n")}\n  ${matches} valid identities found\n`,
         stderr: "",
       }
+    }
+    if (stage === "signer-display") {
+      options.finalDmgExistsDuringSignerDisplay = await access(
+        join(releaseRoot, "v0.1.1", "Prompter-0.1.1-mac-arm64.dmg"),
+      ).then(
+        () => true,
+        () => false,
+      )
+      return displayOutput ?? { stdout: "", stderr: `Authority=${displayIdentity}\n` }
     }
     if (stage === "worktree" && failure === "candidate-race") {
       await mkdir(join(releaseRoot, "v0.1.1"))
@@ -172,7 +183,7 @@ export async function createCoordinatorFixture({
         runFile,
         platform: "darwin",
         arch: "arm64",
-        signingIdentity: syntheticIdentity,
+        signingIdentity,
         notaryProfile: "SYNTHETIC_PROFILE",
         paths: {
           sourceRoot,

@@ -33,6 +33,7 @@ export function commandStage(command, arguments_) {
   if (command === "/usr/bin/hdiutil" && arguments_[0] === "attach") return "attach"
   if (command === "/usr/bin/hdiutil" && arguments_[0] === "detach") return "detach"
   if (command === "/usr/bin/shasum") return "checksum"
+  if (command === "/usr/bin/codesign" && arguments_[0] === "--display") return "signer-display"
   if (
     command === "/usr/bin/codesign" &&
     arguments_.at(-1).endsWith(".dmg") &&

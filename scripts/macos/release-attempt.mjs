@@ -122,7 +122,11 @@ export async function prepareReleaseApp({ attempt, release, resumed, state }) {
       {},
     )
     const recoveredAppPath = await contained(state.appStageDirectory, appPath)
-    await verifyAppSignature({ appPath: recoveredAppPath, runFile: state.run })
+    await verifyAppSignature({
+      appPath: recoveredAppPath,
+      identity: release.signingIdentity,
+      runFile: state.run,
+    })
   } else {
     await assembleMacOSApp({
       appPath,
@@ -186,6 +190,13 @@ export async function prepareReleaseDmg({ appPath, attempt, release, resumed, st
     await verifyPreparedAttempt(attempt, artifactPath)
   }
   await acceptAttempt(attempt, state)
+  if (resumed) {
+    await verifyDmgSignature({
+      dmgPath: attempt.artifactPath,
+      identity: release.signingIdentity,
+      runFile: state.run,
+    })
+  }
   state.assets.push(targetPath)
   await copyFile(attempt.artifactPath, targetPath, constants.COPYFILE_EXCL)
   await stapleAndValidate({

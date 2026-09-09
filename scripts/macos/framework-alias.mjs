@@ -1,4 +1,4 @@
-import { lstat, realpath } from "node:fs/promises"
+import { realpath } from "node:fs/promises"
 import { basename, relative, resolve, sep } from "node:path"
 
 const directoryAliases = new Set(["Resources", "Headers", "Modules", "Helpers", "Libraries"])
@@ -76,23 +76,4 @@ export function createFrameworkAliasPolicy(rootPath) {
       )
     },
   })
-}
-
-export async function sameFrameworkBinaryAlias(candidatePath, targetPath, rootPath) {
-  return createFrameworkAliasPolicy(rootPath).binary(candidatePath, targetPath)
-}
-
-export async function sameFrameworkDirectoryAlias(candidatePath, targetPath, rootPath) {
-  if (!(await lstat(candidatePath)).isSymbolicLink()) return candidatePath === targetPath
-  return createFrameworkAliasPolicy(rootPath).directory(candidatePath, targetPath)
-}
-
-export async function assertFrameworkDirectoryAlias(
-  candidateMetadata,
-  candidatePath,
-  targetPath,
-  rootPath,
-  policy = createFrameworkAliasPolicy(rootPath),
-) {
-  return !candidateMetadata.isSymbolicLink() || (await policy.directory(candidatePath, targetPath))
 }

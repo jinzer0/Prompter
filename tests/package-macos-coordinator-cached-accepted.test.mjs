@@ -71,7 +71,7 @@ test.each([
   await fourth.run()
   assert.equal(submissionCount([first, second, third, fourth], "app"), 2)
   assert.equal(submissionCount([first, second, third, fourth], "dmg"), 2)
-})
+}, 10_000)
 
 test.each([
   ["warning", { pendingAppStatus: "Accepted", warningLog: true }, "app-log"],

@@ -90,7 +90,7 @@ test("fails closed when markSubmitting reads a malformed current claim", async (
 
 test("publishes a complete owner-aware guard before reclaiming a dead claim", async () => {
   const root = await temporaryDirectories.create()
-  const { claimPath } = storagePaths(root)
+  const { claimPath, guardPath } = storagePaths(root)
   const staleOwnerId = ownerId(8)
   const id = ownerId(1)
   await writeState(claimPath, { ownerId: staleOwnerId, pid: deadPid, phase: "pre-submit" })
@@ -98,8 +98,10 @@ test("publishes a complete owner-aware guard before reclaiming a dead claim", as
   const claim = createClaim(root, id, {
     isOwnerAlive: () => false,
     linkClaimFile: async (sourcePath, targetPath) => {
-      publishedGuard = await readState(sourcePath)
-      await assert.rejects(readFile(targetPath), { code: "ENOENT" })
+      if (targetPath === guardPath) {
+        publishedGuard = await readState(sourcePath)
+        await assert.rejects(readFile(targetPath), { code: "ENOENT" })
+      }
       await link(sourcePath, targetPath)
     },
   })

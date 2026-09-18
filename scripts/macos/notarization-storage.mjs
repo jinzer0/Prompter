@@ -3,6 +3,9 @@ import { link, mkdir, open, readFile, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 import { failNotarization } from "./notarization-contract.mjs"
+import { syncDirectory, writeSyncedExclusive } from "./notarization-durable-storage.mjs"
+
+export { writeAtomicJson } from "./notarization-durable-storage.mjs"
 
 const claimFileName = ".notarization-submit.claim"
 const reclaimFileName = ".notarization-submit.reclaim"
@@ -83,29 +86,6 @@ function sameRecord(left, right, fields) {
   return left !== null && fields.every((field) => left[field] === right[field])
 }
 
-async function writeSyncedExclusive(path, value, openFile) {
-  let handle
-  try {
-    handle = await openFile(path, "wx", 0o600)
-    await handle.writeFile(`${JSON.stringify(value)}\n`)
-    await handle.sync()
-  } finally {
-    await handle?.close()
-  }
-}
-
-export async function writeAtomicJson({ directory, fileName, value, renameFile = rename }) {
-  await mkdir(directory, { recursive: true })
-  const targetPath = join(directory, fileName)
-  const temporaryPath = join(directory, `.${fileName}.${randomUUID()}.tmp`)
-  try {
-    await writeSyncedExclusive(temporaryPath, value, open)
-    await renameFile(temporaryPath, targetPath)
-  } finally {
-    await rm(temporaryPath, { force: true })
-  }
-}
-
 export function createSubmissionClaim(
   directory,
   {
@@ -160,7 +140,14 @@ export function createSubmissionClaim(
   }
 
   async function writeClaim() {
-    await writeSyncedExclusive(claimPath, claim, openClaimFile)
+    const temporaryPath = join(directory, `.${claimFileName}.${ownerId}.tmp`)
+    try {
+      await writeSyncedExclusive(temporaryPath, claim, openClaimFile)
+      await linkClaimFile(temporaryPath, claimPath)
+      await syncDirectory(directory, openClaimFile)
+    } finally {
+      await removeClaimFile(temporaryPath, { force: true })
+    }
   }
 
   async function publishGuard(guard) {
@@ -168,6 +155,7 @@ export function createSubmissionClaim(
     try {
       await writeSyncedExclusive(temporaryPath, guard, openClaimFile)
       await linkClaimFile(temporaryPath, guardPath)
+      await syncDirectory(directory, openClaimFile)
     } finally {
       await removeClaimFile(temporaryPath, { force: true })
     }
@@ -205,14 +193,17 @@ export function createSubmissionClaim(
   return Object.freeze({
     async acquire() {
       await mkdir(directory, { recursive: true })
-      try {
-        await writeClaim()
-        return
-      } catch (error) {
-        if (error?.code !== "EEXIST") failNotarization("Notarization evidence is unavailable")
+      let staleClaim = await readClaim()
+      if (staleClaim === null) {
+        try {
+          await writeClaim()
+          return
+        } catch (error) {
+          if (error?.code !== "EEXIST") failNotarization("Notarization evidence is unavailable")
+        }
+        staleClaim = await readClaim()
       }
 
-      const staleClaim = await readClaim()
       if (
         staleClaim === null ||
         staleClaim.phase !== "pre-submit" ||

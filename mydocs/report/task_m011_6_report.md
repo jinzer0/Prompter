@@ -49,6 +49,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.27 / current remediation lineage | notarization command/identity/storage, release-attempt validation, coordinator fixtures, direct regressions, as-built implementation plan, reports | `3d73e93` Goal/Quality/Context blockers 교정 | signed-release offline contracts |
 | 6.28 / current remediation lineage | notarization storage/service/evidence, final receipt, release-attempt validation, coordinator/claim/storage regressions, maintainer docs, Vitest config, reports | `269bd48` Goal/Quality/Security/Context blockers와 discussions `4044349962`, `4044349966` 교정 | signed-release offline contracts |
 | 6.29 / current remediation lineage | release-attempt validation, exact storage-remnant matcher, info-recovery/final-receipt regressions, coordinator response fixtures, Vitest config, reports | `6380d77` Goal/Quality/Context blockers와 discussion `4044666887` 교정 | signed-release offline contracts |
+| 6.30 / current remediation lineage | macOS package assembly, signing discovery fixture, notarization durability/storage guards, remnant cleanup set, reports | `6e1ad240ee342671c366934413c164c78eac09fc` Goal/Security/Context blockers 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -160,17 +161,23 @@ immutable link 교정, temp detached exact-head review worktree 생성까지 완
 REJECT와 Security/QA APPROVE를 기록했다. unknown attempt loss, generated storage remnants와 stale PR body
 chronology는 Stage 6.29 remediation 계보에서 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를
 재귀적으로 기록하지 않는다.
+Stage 6.29 reviewed head는 `6e1ad240ee342671c366934413c164c78eac09fc`다. 그 review는 Goal REJECT,
+Security REJECT, Context REJECT와 QA/Quality APPROVE를 기록했다. Goal은 copied foreign/tooling native
+payload가 package에 남는 문제를, Security는 parent-directory durability 누락을, Context는 이 final report의
+stale staging claim을 포함한 reporting drift를 확인했다. Stage 6.30 remediation은 해당 findings를 교정했지만
+자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다. Governance 기준 commit은
+`25bf302429b52c2c2d470b79c8d3a0e31e7ed800`이다.
 
 ## 변경 전·후 정량 비교
 
 | 지표 | 변경 전 | 변경 후 |
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
-| focused release regression | Stage 1 40 tests | Stage 6.14 cached-Accepted direct rerun 17/17 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.29 152 files, 1026/1026 tests passed |
+| focused release regression | Stage 1 40 tests | Stage 6.30 packaging/signing 47/47, notarization/coordinator 50/50, remnant set 31/31 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.30 154 files, 1035/1035 tests passed |
 | ARM64 Mach-O integrity | asset 이름만 arm64 | 모든 canonical Mach-O에 exact `arm64` slice 강제; universal x86_64+arm64 허용 |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
-| installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
+| installed Electron discovery | 미확인 | actual runtime package roots exactly 3; only required ARM64 addon retained under `better-sqlite3/build`; zero signing/Apple service calls |
 | signed missing-input candidate/evidence mutation | candidate mutation 0건 | candidate/evidence absent, command nonzero, mutation 0건 |
 | final validation artifacts left | release/dist/build/smoke output 0개 | release/dist/build/smoke output 0개 |
 
@@ -181,11 +188,11 @@ chronology는 Stage 6.29 remediation 계보에서 교정됐다. 이 closure는 �
 | Stage 1-5 reports와 승인된 commits 보존 | OK — Stage 1부터 Stage 5 report와 commits를 rewrite하지 않고 Stage 6 report에서 failed-review chronology를 보존했다. |
 | Stage 6.2부터 Stage 6.5 remediation history 보존 | OK — `ce079c2`, `654b044`, `4fefcd0`, `0ffa654`, `5114a1e`, `c3d7173`, `63a35d4`, `fa6ef98e783d53995ced53de34a1460b244b5064`, `81faa9869c9ae06b6f782093671d333449a42578`를 구분해 기록했고 지우지 않았다. |
 | PR #8 old head 이후 remediation 상태 | OK — old head `1185a7365f441dee3dc9b7b19acd9be5c4bfe7c6` 뒤 교정으로 literal `issues: null`, premature pre-notarization Gatekeeper assessment, immutable restart-safe retained attempts, accepted app lifecycle retention, candidate-copy DMG stapling, evidence-root symlink ownership, pre-recovery cleanup ownership, release-root symlink rejection을 고정했다. |
-| Stage 6.7 exact-head remediation | OK — release/evidence root의 symlinked ancestor를 trusted anchor 아래 component walk로 차단하고, anchor 위 macOS alias는 canonicalize해 허용한다. assembly는 npm-bin relative link text를 보존한다. signing discovery는 실제 file type이 Mach-O인 target만 선택하므로 initially foreign ELF/PE/text native payload는 package에 남고 signing 대상에서 제외된다. Mach-O alias/path/duplicate validation과 signing 전후 target-set 비교는 fail closed로 유지된다. |
+| Stage 6.7 exact-head remediation | OK — release/evidence root의 symlinked ancestor를 trusted anchor 아래 component walk로 차단하고, anchor 위 macOS alias는 canonicalize해 허용한다. assembly는 npm-bin relative link text를 보존한다. Stage 6.30 기준 assembly는 optional, tooling, foreign build payload를 제외하고 runtime closure만 staging한다. signing discovery는 실제 file type이 Mach-O인 required runtime target만 선택한다. Mach-O alias/path/duplicate validation과 signing 전후 target-set 비교는 fail closed로 유지된다. |
 | exact `0.1.1`, preflight-before-candidate, artifact-bound resume, timeout/abort, DMG runtime, detach cleanup | OK — focused tests, full tests, typecheck, lint, build, unsigned package, signed missing-input mutation-zero와 smoke가 모두 통과했다. |
 | arbitrary framework alias fail-closed | OK — arbitrary `Versions/*` binary aliases fail before signing while conventional Current-bound root binary aliases remain supported. |
 | Notarization issue severity taxonomy | OK — empty array 또는 exact lowercase `info` issue record만 허용하고 unknown/malformed values는 live log와 final evidence에서 fail closed한다. |
-| installed Electron 43 compatibility | OK — source bundle은 23 canonical targets/15 inspections, actual assembled installed dependency tree는 63 signable targets/236 real `/usr/bin/file` inspections로 완료됐다. packaged foreign ELF `.node`는 삭제하지 않고 target에서만 제외했으며 signing/Apple service call은 0회였다. |
+| installed Electron 43 compatibility | OK — actual assembled runtime package roots는 `better-sqlite3`, `bindings`, `file-uri-to-path` 정확히 세 개다. `better-sqlite3/build` 아래에는 `build/Release/better_sqlite3.node`만 남고, real-tool discovery는 그 required ARM64 addon만 signing target으로 retained한다. signing/Apple service call은 0회였다. |
 | dead wrappers and oversized tests | OK — unused framework-alias wrapper exports were removed. Oversized package/coordinator, signing, and notarization test modules were split while preserving title inventories and Vitest registration. |
 | Stage 6.8 oversized Electron contract remediation | OK — changed 1,867-pure-LOC `tests/electron-contract.test.ts`의 35 tests를 13 direct modules로 분리했다. 모든 changed/new module은 250 pure LOC 이하이고 최대 209이며 title multiset 919개를 그대로 보존했다. |
 | package, build, test totals | OK — contract split 13 files/35 tests, focused release 15 files/151 tests, full Vitest 142 files/919 tests, smoke 49/49가 통과했다. Stage 6.8 뒤 Atlas가 contract 35/35, focused 151/151, full 919/919, typecheck, lint, `git diff --check`를 독립 재현했다. Stage 6.7의 `npm run build`와 unsigned `npm run package` 통과 근거도 유지한다. |
@@ -277,7 +284,13 @@ chronology는 Stage 6.29 remediation 계보에서 교정됐다. 이 closure는 �
 | Stage 6.29 unknown retention | OK — valid bound `unknown`/`accepted`/`Accepted` attempt는 affected error가 nonterminal, non-discard이면 message allowlist 없이 보존된다. app/DMG malformed/service-error `info` 다음 run은 submit 없이 `info`/`log`로 완료한다. |
 | Stage 6.29 storage-remnant cleanup | OK — exact matcher가 atomic resume/final/log temps, guard temp, claim/guard tombstones만 인식한다. success cleanup은 owned direct files/symlinks만 제거하고 near-match/sibling/external/caller sentinels를 보존한다. |
 | Stage 6.29 verification | OK — targeted 10 files/79 tests, full Vitest 152 files/1026 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. lint는 기존 Biome deprecation info만 출력했다. delta가 recovery와 synthetic fixture/config에 한정돼 Stage 6.28 build, unsigned package, smoke 49/49와 missing-input fail-closed evidence를 보존하며 재실행했다고 주장하지 않는다. LSP 7건은 sibling-worktree 제한으로 거부되어 PASS로 기록하지 않는다. |
-| Stage 6.29 review gate | CURRENT BOUNDARY — report-inclusive publication receipt가 exact head의 source of truth다. fresh exact-head review, PR merge, `origin/master` containment는 서로 분리된 후속 gate다. |
+| Stage 6.29 review gate | REJECT RECORDED — reviewed head는 `6e1ad240ee342671c366934413c164c78eac09fc`다. Goal은 copied foreign/tooling native payload가 package에 남는 문제를 REJECT했고, Security는 parent-directory durability 누락을 REJECT했다. Context는 stale report claim을 포함해 REJECT했다. QA/Quality는 APPROVE였다. |
+| Stage 6.30 red evidence | RECORDED — packaging은 교정 전 2 failures/10 tests였다. durability는 최초 7/7 failures였고, Oracle initial REJECT 뒤 Mach-O `.o`/`.a` staging 및 pre-sync final claim publication 문제가 드러났다. 강화된 red evidence는 packaging 2 failures/10 tests와 durability 4 failures/28 tests였다. |
+| Stage 6.30 remediation | OK — package assembly는 runtime package roots를 `better-sqlite3`, `bindings`, `file-uri-to-path` 세 개로 제한하고, `better-sqlite3/build` 아래 `build/Release/better_sqlite3.node`만 남긴다. discovery는 fail closed로 유지된다. atomic evidence와 fresh/replacement claim/guard publication은 file sync/close 뒤 rename 또는 hard-link, parent directory sync/close, continuation 순서를 따른다. UUID sync failure는 `submitting`을 유지하고 exact claim temp remnants도 cleanup set에 포함한다. |
+| Stage 6.30 verification | OK — focused packaging/signing 47/47, notarization/coordinator 50/50, remnant set 31/31, typecheck, lint, syntax, protected diff, diff check, full Vitest 154 files/1035 tests, build, unsigned package, signed missing-input exit 1 with no candidate/tracked mutation, smoke 49/49가 통과했다. lint는 기존 Biome deprecation info만 출력했다. unsigned package의 actual ARM64 addon은 `file`에서 Mach-O arm64, `lipo`에서 arm64로 확인했다. generated outputs는 제거했다. |
+| Stage 6.30 full-suite timeout investigation | RECORDED — cached-Accepted 11/11 isolated pass를 확인했고 production fixture는 all node_modules가 아니라 실제 three-package closure로 좁혔다. one four-lifecycle test watchdog은 assertion, retry, sleep 변경 없이 10s로 올렸다. final full suite는 154 files/1035 tests로 통과했다. |
+| Stage 6.30 Oracle gate | APPROVE RECORDED — Oracle session `ses_f4c5a6464ffeFkCw93QqS36NZH`는 initial REJECT 뒤 final APPROVE를 기록했다. |
+| Stage 6.30 LSP diagnostics | MISS (environment limitation) — sibling-worktree request-root 제한으로 사용할 수 없어 PASS로 기록하지 않는다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 당시 pending이었다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -355,6 +368,10 @@ chronology는 Stage 6.29 remediation 계보에서 교정됐다. 이 closure는 �
 - Stage 6.29: `6380d77` Goal/Quality/Context REJECT와 Security/QA APPROVE, discussion `4044666887`,
   nonterminal unknown/accepted retention, app/DMG malformed/service-error no-resubmit recovery, exact generated
   storage-remnant cleanup과 sentinel containment, targeted 79/79, full 1026/1026와 LSP refusal을 추가했다.
+- Stage 6.30: `6e1ad240ee342671c366934413c164c78eac09fc` Goal/Security/Context REJECT와 QA/Quality APPROVE,
+  copied foreign/tooling native payload exclusion, parent-directory-durable evidence/claim/guard publication,
+  exact runtime package closure, exact claim temp remnant cleanup, focused 47/47, 50/50, 31/31, full 1035/1035,
+  build/package/smoke, signed missing-input mutation-zero proof, Oracle final APPROVE와 LSP refusal을 추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -362,7 +379,8 @@ chronology는 Stage 6.29 remediation 계보에서 교정됐다. 이 closure는 �
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact inspection,
   tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.29 unknown attempt retention과 exact storage-remnant cleanup, Stage 6.28 owner-aware claim/guard
+- Stage 6.30 exact runtime package closure와 parent-directory-durable evidence publication, Stage 6.29 unknown
+  attempt retention과 exact storage-remnant cleanup, Stage 6.28 owner-aware claim/guard
   recovery와 sanitized durable final receipt, Stage 6.27 coherent success
   cleanup과 typed finalization drift cleanup, Stage 6.26
   final-artifact certificate fingerprint
@@ -419,9 +437,11 @@ chronology는 Stage 6.29 remediation 계보에서 교정됐다. 이 closure는 �
 - Stage 6.28 remediation은 `6380d7758f0cf02176eb3bbd957ad8c5e7154fe8`로 게시됐고 PR #8 immutable
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 review의 Goal/Quality/Context
   REJECT와 Security/QA APPROVE는 Stage 6.29 remediation의 입력으로 보존됐다.
-- Stage 6.29 unknown-retention/storage-remnant remediation과 direct regressions은 통합 검증 완료 상태다.
-- Stage 6.29 report-inclusive publication receipt가 exact head의 source of truth다. fresh exact-head review,
-  PR #8 merge와 `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
+- Stage 6.29 reviewed head `6e1ad240ee342671c366934413c164c78eac09fc`의 Goal/Security/Context REJECT와
+  QA/Quality APPROVE는 Stage 6.30 remediation 입력으로 보존됐다.
+- Stage 6.30 packaging/durability/remnant remediation과 focused, full-suite, build, package, smoke validation은
+  완료됐다. Stage 6.30 fresh exact-head review에서 다섯 lane 모두 exact-head approval을 주고, PR #8 merge와
+  `origin/master` containment verification을 마칠 때까지 Task #6과 Todo 8은 `진행중`이다.
 
 ## 작업지시자 승인 기록 및 요청
 
@@ -469,8 +489,10 @@ chronology는 Stage 6.29 remediation 계보에서 교정됐다. 이 closure는 �
   containment는 서로 분리된 후속 gate다.
 - 작업지시자의 최신 명시 지시에 따라 `6380d77` review와 discussion `4044666887`의 malformed/service-error
   unknown-attempt loss, generated storage-remnant survival과 stale PR chronology는 Stage 6.29
-  source/test/config, 두 report와 PR body에서 교정된다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지
-  않는다. publication receipt가 exact head의 source of truth이며 fresh exact-head review, PR merge,
-  containment는 서로 분리된 후속 gate다.
-- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.29 fresh exact-head review, PR merge,
-  `origin/master` containment verification은 완료로 주장하지 않고 Todo 8은 `진행중`으로 유지한다.
+  source/test/config, 두 report와 PR body에서 교정됐다. Stage 6.29 reviewed head
+  `6e1ad240ee342671c366934413c164c78eac09fc`의 copied foreign/tooling native payload, parent-directory durability,
+  stale report claim findings는 Stage 6.30 source/test와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를
+  재귀적으로 주장하지 않는다. Stage 6.30 five-lane fresh exact-head approvals, PR merge, containment는 서로
+  분리된 후속 gate다.
+- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.30 fresh exact-head review, PR merge,
+  `origin/master` containment verification은 완료로 주장하지 않고 Task #6과 Todo 8은 `진행중`으로 유지한다.

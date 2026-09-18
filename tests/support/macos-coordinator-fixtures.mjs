@@ -43,7 +43,14 @@ export async function createCoordinatorFixture({
 } = {}) {
   const root = shared?.root ?? (await mkdtemp(join(tmpdir(), "prompter-release-test-")))
   const sourceRoot = shared?.sourceRoot ?? join(root, "source")
-  const nativeSourcePath = join(sourceRoot, "node_modules", "native", "build", "addon.node")
+  const nativeSourcePath = join(
+    sourceRoot,
+    "node_modules",
+    "better-sqlite3",
+    "build",
+    "Release",
+    "better_sqlite3.node",
+  )
   const releaseRoot = shared?.releaseRoot ?? join(root, "release-parent", "release")
   const evidenceRoot = shared?.evidenceRoot ?? join(root, "evidence-parent", "evidence")
   const electron = shared?.electron ?? (await createElectronAppFixture())
@@ -62,13 +69,22 @@ export async function createCoordinatorFixture({
       mkdir(releaseRoot, { recursive: true }),
       mkdir(evidenceRoot, { recursive: true }),
       mkdir(fakeArtifacts.directory, { recursive: true }),
-      ...["dist", "dist-electron", "drizzle", "node_modules"].map((name) =>
-        mkdir(join(sourceRoot, name), { recursive: true }),
-      ),
+      ...[
+        "dist",
+        "dist-electron",
+        "drizzle",
+        "node_modules/bindings",
+        "node_modules/file-uri-to-path",
+      ].map((name) => mkdir(join(sourceRoot, name), { recursive: true })),
     ])
     await Promise.all([
       writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.1" })),
       writeFile(nativeSourcePath, "native"),
+      writeFile(join(sourceRoot, "node_modules", "bindings", "bindings.js"), "bindings"),
+      writeFile(
+        join(sourceRoot, "node_modules", "file-uri-to-path", "index.js"),
+        "file-uri-to-path",
+      ),
       writeFile(join(releaseRoot, "caller-sentinel"), "retain"),
       writeFile(join(evidenceRoot, "caller-sentinel"), "retain"),
     ])
@@ -105,9 +121,10 @@ export async function createCoordinatorFixture({
           "Resources",
           "app",
           "node_modules",
-          "native",
+          "better-sqlite3",
           "build",
-          "addon.node",
+          "Release",
+          "better_sqlite3.node",
         ),
       )
       calls.splice(calls.length - 1, 0, "native-copied")

@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process"
 import { access, cp, mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
@@ -20,6 +20,8 @@ const electronApp = join(root, "node_modules", "electron", "dist", "Electron.app
 const outputRoot = join(root, "release")
 const packageRoot = join(outputRoot, `${appName}-darwin-${process.arch}`)
 const packagedApp = join(packageRoot, appBundleName)
+const runtimePackageRoots = ["better-sqlite3", "bindings", "file-uri-to-path"]
+const betterSqlite3NativeAddon = join("build", "Release", "better_sqlite3.node")
 
 export async function renameElectronApp(appPath = packagedApp, version) {
   return renameAppBundle({ appName, appPath, bundleExecutableKey, bundleIdentifier, version })
@@ -27,14 +29,41 @@ export async function renameElectronApp(appPath = packagedApp, version) {
 
 async function copyAppSource(resourcesPath, sourceRoot = root) {
   await mkdir(resourcesPath, { recursive: true })
+  const sourceModulesPath = join(sourceRoot, "node_modules")
+  const appModulesPath = join(resourcesPath, "node_modules")
+  await mkdir(appModulesPath)
   await Promise.all([
-    ...["dist", "dist-electron", "drizzle", "node_modules"].map((name) =>
+    ...["dist", "dist-electron", "drizzle"].map((name) =>
       cp(join(sourceRoot, name), join(resourcesPath, name), {
         recursive: true,
         verbatimSymlinks: true,
       }),
     ),
     cp(join(sourceRoot, "package.json"), join(resourcesPath, "package.json")),
+    ...runtimePackageRoots.map((packageName) => {
+      const sourcePackagePath = join(sourceModulesPath, packageName)
+      return cp(sourcePackagePath, join(appModulesPath, packageName), {
+        recursive: true,
+        verbatimSymlinks: true,
+        filter:
+          packageName === "better-sqlite3"
+            ? (sourcePath) => {
+                const packagePath = relative(sourcePackagePath, sourcePath)
+                if (packagePath.split(/[/\\]/)[0] === "build") {
+                  return (
+                    packagePath === "build" ||
+                    packagePath === join("build", "Release") ||
+                    packagePath === betterSqlite3NativeAddon
+                  )
+                }
+                return (
+                  !packagePath.toLowerCase().endsWith(".node") ||
+                  packagePath === betterSqlite3NativeAddon
+                )
+              }
+            : undefined,
+      })
+    }),
   ])
 }
 

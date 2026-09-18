@@ -136,6 +136,10 @@ test("removes only generated storage remnants after successful recovery", async 
         "remove log temp",
       ),
       writeFile(
+        join(attempt.evidenceDirectory, `..notarization-submit.claim.${ownerId}.tmp`),
+        "remove claim temp",
+      ),
+      writeFile(
         join(attempt.evidenceDirectory, `..notarization-submit.reclaim.${ownerId}.tmp`),
         "remove guard temp",
       ),

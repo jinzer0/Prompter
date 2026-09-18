@@ -13,24 +13,17 @@ import {
   submissionArtifactKind,
   validArtifactIdentity,
 } from "./notarization-contract.mjs"
+import {
+  createFinalNotarizationReceipt,
+  finalNotarizationReceiptFileName,
+  hasSafeNotarizationIssues,
+  parseFinalNotarizationReceipt,
+} from "./notarization-final-receipt.mjs"
 import { writeAtomicJson } from "./notarization-storage.mjs"
 
 const resumeFileName = "notarization-resume.json"
 
-export function hasSafeNotarizationIssues(value) {
-  return (
-    Array.isArray(value) &&
-    value.every(
-      (issue) =>
-        issue !== null &&
-        typeof issue === "object" &&
-        !Array.isArray(issue) &&
-        Reflect.ownKeys(issue).length === 1 &&
-        Object.hasOwn(issue, "severity") &&
-        issue.severity === "info",
-    )
-  )
-}
+export { hasSafeNotarizationIssues }
 
 function json(output, label) {
   if (typeof output !== "string" || output.trim() === "") {
@@ -138,12 +131,18 @@ export function createNotarizationEvidence(options) {
         logPath: notarizationLogPath(submissionId),
         ...artifactIdentity,
       }
+      const receipt = createFinalNotarizationReceipt({
+        submissionId,
+        artifactIdentity,
+        issues,
+      })
       await save(evidenceDir, reviewed.logPath, {
         submissionId,
         ...artifactIdentity,
         issues,
       })
       await save(evidenceDir, resumeFileName, reviewed)
+      await save(evidenceDir, finalNotarizationReceiptFileName, receipt)
       return reviewed
     },
     async saveAcceptedPending(submissionIdValue) {
@@ -177,37 +176,19 @@ export async function validateFinalNotarizationEvidence(options) {
     failNotarization("Invalid final notarization evidence")
   }
   const evidenceDir = evidenceDirectory(value.evidenceDir)
-  let saved
   let receipt
   try {
-    saved = resume(json(await readFile(join(evidenceDir, resumeFileName), "utf8"), "resume state"))
-    receipt = json(await readFile(join(evidenceDir, saved.logPath), "utf8"), "notarization receipt")
+    receipt = parseFinalNotarizationReceipt(
+      json(
+        await readFile(join(evidenceDir, finalNotarizationReceiptFileName), "utf8"),
+        "final notarization receipt",
+      ),
+    )
   } catch {
     failNotarization("Invalid final notarization evidence")
   }
-  if (
-    saved.status !== "Accepted" ||
-    saved.artifactKind !== value.artifactKind ||
-    !Array.isArray(receipt.issues) ||
-    receipt.submissionId !== saved.submissionId ||
-    receipt.artifactKind !== saved.artifactKind ||
-    receipt.artifactSha256 !== saved.artifactSha256
-  ) {
+  if (receipt.artifactKind !== value.artifactKind) {
     failNotarization("Invalid final notarization evidence")
   }
-  exactNotarizationObject(
-    receipt,
-    ["submissionId", "artifactKind", "artifactSha256", "issues"],
-    "Invalid final notarization evidence",
-  )
-  if (
-    !validArtifactIdentity({
-      artifactKind: receipt.artifactKind,
-      artifactSha256: receipt.artifactSha256,
-    }) ||
-    !hasSafeNotarizationIssues(receipt.issues)
-  ) {
-    failNotarization("Invalid final notarization evidence")
-  }
-  return saved
+  return receipt
 }

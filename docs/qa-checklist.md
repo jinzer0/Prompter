@@ -116,8 +116,9 @@ MOUNT_DIR="$(mktemp -d)"
   Expected files are `Prompter-0.1.1-mac-arm64.zip`,
   `Prompter-0.1.1-mac-arm64.dmg`, and `SHA256SUMS`.
 
-- [ ] The app notarization evidence and DMG notarization evidence are separate, sanitized, and
-       show `Accepted` plus warning-free and error-free log receipts:
+- [ ] The app and DMG evidence roots each retain a separate sanitized `notarization-final.json`
+       receipt with `Accepted` plus warning-free and error-free issues. The validator reads these
+       final receipts directly, so active resume, log, attempt, and claim files are not required:
 
   The shared validator verifies matching `submissionId`, `artifactKind`, and `artifactSha256`
   fields rather than duplicating the final-evidence schema in this checklist.

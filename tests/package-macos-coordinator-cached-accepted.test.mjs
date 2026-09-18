@@ -29,29 +29,6 @@ function statusOption(artifactKind, status) {
   return artifactKind === "app" ? { pendingAppStatus: status } : { pendingDmgStatus: status }
 }
 
-test("allows a clean rerun after a completed release candidate is removed", async () => {
-  const first = await fixture()
-  await first.run()
-  const app = notarizationAttempt(first, "app")
-  const dmg = notarizationAttempt(first, "dmg")
-  await rm(first.candidate, { recursive: true })
-
-  const second = await fixture({ shared: first.shared })
-  const result = await second.run()
-
-  assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
-    "SHA256SUMS",
-  ])
-  assert.equal(submissionCount([first, second], "app"), 2)
-  assert.equal(submissionCount([first, second], "dmg"), 2)
-  await assert.rejects(access(app.evidenceDirectory))
-  await assert.rejects(access(dmg.evidenceDirectory))
-  assert.equal(await readFile(join(first.releaseRoot, "caller-sentinel"), "utf8"), "retain")
-  assert.equal(await readFile(join(first.evidenceRoot, "caller-sentinel"), "utf8"), "retain")
-})
-
 test.each([
   "app",
   "dmg",
@@ -108,6 +85,7 @@ test.each([
   const first = await fixture(acceptedFailure("app"))
   await assert.rejects(first.run())
   const attempt = notarizationAttempt(first, "app")
+  await access(join(attempt.evidenceDirectory, "notarization-final.json"))
   const second = await fixture({ ...options, shared: first.shared })
 
   await assert.rejects(second.run())
@@ -115,6 +93,7 @@ test.each([
   assertNoLaterReleaseStages(second.calls, stage)
   assert.equal(submissionCount([first, second], "app"), 1)
   await assert.rejects(access(attempt.directory))
+  await assert.rejects(access(join(attempt.evidenceDirectory, "notarization-final.json")))
 })
 
 test.each([
@@ -151,7 +130,7 @@ test.each([
   assert.equal(submissionCount([first, second, third], "app"), 2)
   assert.equal(submissionCount([first, second, third], "dmg"), 1)
   await assert.rejects(access(attempt.directory))
-  await assert.rejects(access(attempt.evidenceDirectory))
+  await access(join(attempt.evidenceDirectory, "notarization-final.json"))
 })
 
 test("removes only terminal app evidence and unlinks nested symlinks", async () => {
@@ -183,6 +162,7 @@ test("rebuilds a terminal DMG without discarding accepted app evidence", async (
   const first = await fixture({ failure: "dmg-mutating-validate-exhaustion" })
   await assert.rejects(first.run())
   const app = notarizationAttempt(first, "app")
+  await access(join(app.evidenceDirectory, "notarization-final.json"))
   const dmg = notarizationAttempt(first, "dmg")
   const versionDirectory = join(first.evidenceRoot, "v0.1.1")
   const outsideDirectory = join(first.shared.root, "outside-terminal-dmg-evidence")

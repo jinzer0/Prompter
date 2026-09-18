@@ -177,14 +177,15 @@ export async function submitAndWait(options) {
     throw error
   }
   let result
-  let unknown
   try {
     await claim.markSubmitting()
     result = await notary.submit({ artifactPath: value.artifactPath, profile })
-    unknown = await evidence.saveUnknown(result.submissionId)
-  } finally {
+  } catch (error) {
     await claim.release()
+    throw error
   }
+  const unknown = await evidence.saveUnknown(result.submissionId)
+  await claim.release()
   if (!["Accepted", "In Progress", "unknown"].includes(result.status)) {
     failNotarization("Notarization submission was not accepted")
   }

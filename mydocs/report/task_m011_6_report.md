@@ -47,6 +47,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.25 / `9edf7e5` | notarization command/service/signing, claim/submission/fingerprint regressions/support, maintainer docs, Vitest config, reports | `daab0ed` Goal/Quality/Security/Context blockers 교정 | signed-release offline contracts |
 | 6.26 / completed remediation lineage | notarization command/storage/service/identity, final signature callers, direct regressions, coordinator fixture split, as-built implementation plan, Vitest config, reports | `9edf7e5` Goal/Quality/Security/Context blockers 교정 | signed-release offline contracts |
 | 6.27 / current remediation lineage | notarization command/identity/storage, release-attempt validation, coordinator fixtures, direct regressions, as-built implementation plan, reports | `3d73e93` Goal/Quality/Context blockers 교정 | signed-release offline contracts |
+| 6.28 / current remediation lineage | notarization storage/service/evidence, final receipt, release-attempt validation, coordinator/claim/storage regressions, maintainer docs, Vitest config, reports | `269bd48` Goal/Quality/Security/Context blockers와 discussions `4044349962`, `4044349966` 교정 | signed-release offline contracts |
 
 ## 문서 위치 검증
 
@@ -148,6 +149,11 @@ immutable link 교정, temp detached exact-head review worktree 생성까지 완
 REJECT와 Security/QA APPROVE를 기록했다. timeout poll provenance, concurrent reclaim race, success cleanup
 inconsistency, missing/unreadable drift cleanup metadata와 stale implementation-plan row는 Stage 6.27 remediation
 계보에서 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를 재귀적으로 기록하지 않는다.
+Stage 6.27 publication head는 `269bd484ccf0b3641596fa37ad6ff617f60683ac`이며 정상 push, PR #8
+immutable link 교정, temp detached exact-head review worktree 생성까지 완료됐다. 그 review는 Goal/Quality/Security/Context
+REJECT와 QA APPROVE를 기록했다. acknowledged UUID duplicate-submit window, reclaim-guard crash wedge와 success
+receipt deletion은 Stage 6.28 remediation 계보에서 교정됐다. 이 closure는 자신의 아직 알 수 없는 exact SHA를
+재귀적으로 기록하지 않는다.
 
 ## 변경 전·후 정량 비교
 
@@ -155,7 +161,7 @@ inconsistency, missing/unreadable drift cleanup metadata와 stale implementation
 |---|---:|---:|
 | Electron contract regression | oversized changed suite 1개, 1,867 pure LOC | 13 direct files, 35/35 tests, 최대 209 pure LOC |
 | focused release regression | Stage 1 40 tests | Stage 6.14 cached-Accepted direct rerun 17/17 tests passed |
-| full Vitest | Stage 5 119 files, 817 tests | Stage 6.27 150 files, 1011/1011 tests passed |
+| full Vitest | Stage 5 119 files, 817 tests | Stage 6.28 151 files, 1021/1021 tests passed |
 | ARM64 Mach-O integrity | asset 이름만 arm64 | 모든 canonical Mach-O에 exact `arm64` slice 강제; universal x86_64+arm64 허용 |
 | Electron smoke | Stage 5 49 tests | Stage 6.7 49/49 tests passed |
 | installed Electron discovery | 미확인 | source bundle 23 targets/15 inspections; actual assembled installed tree 63 targets/236 inspections; zero signing/Apple service calls |
@@ -256,6 +262,11 @@ inconsistency, missing/unreadable drift cleanup metadata와 stale implementation
 | Stage 6.27 remediation | OK — timeout response는 `poll:true`를 보존하고 UUID를 먼저 저장한 뒤 bounded `info` polling한다. timeout fixtures는 recovery test에서 기본 unresolved 상태다. exclusive reclaim guard와 deterministic concurrent regression을 추가했다. success는 per-kind attempt/evidence subtree를 함께 제거하고 later rerun이 rebuild한다. missing/unreadable drift는 `artifactKind`/`discardEvidence`를 전달해 cleanup과 rebuild를 허용한다. implementation-plan row는 submit/persist/info poll로 정정했다. |
 | Stage 6.27 verification | OK — targeted 10 files/83 tests, full Vitest 150 files/1011 tests, typecheck, lint, changed-file syntax, `git diff --check`가 통과했다. lint는 기존 Biome deprecation info만 출력했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.27에서 재실행했다고 주장하지 않는다. LSP는 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
 | Stage 6.27 review gate | CURRENT BOUNDARY — report-inclusive publication receipt가 exact head의 source of truth다. Atlas fresh five-lane exact-head review, PR merge, `origin/master` containment는 서로 분리된 후속 gate다. |
+| `269bd48` review lanes | REJECT RECORDED — Goal REJECT `ses_f4ccb736fffeOgxDerK93gClfp`, Quality REJECT `ses_f4ccb6f05ffeozjpPPnNFLv8ZB`, Security REJECT `ses_f4ccb6d2fffeBJCjzIyfzzxJ5x`, QA APPROVE `ses_f4ccb70d4ffeT7S2hy2L1Z2U6l`, Context REJECT `ses_f4ccb6ab6ffeeW8e4ihdMBZzx0`. QA는 targeted 10 files/83 tests와 full 150 files/1011 tests를 독립 확인했다. Goal/Security와 discussions [4044349962](https://github.com/jinzer0/Prompter/pull/8#discussion_r4044349962), [4044349966](https://github.com/jinzer0/Prompter/pull/8#discussion_r4044349966)은 UUID acknowledgement 뒤 evidence write 실패의 duplicate-submit window와 success receipt deletion을, Quality는 interrupted reclaim guard crash wedge를 확인했다. |
+| Stage 6.28 claim durability | OK — exact owner-aware claim/guard schemas, atomic hard-link guard publication, live/stale/malformed owner policy, token-safe release와 interrupted-owner recovery를 고정했다. acknowledged UUID의 durable unknown evidence 저장이 성공할 때까지 submitting claim을 유지한다. |
+| Stage 6.28 final receipt | OK — active state cleanup 전에 strict sanitized per-kind `notarization-final.json`을 기록한다. validator/rerun은 receipt를 active state로 취급하지 않고 final-write failure는 active state를 보존한다. secret, local path와 transient claim/log는 receipt에서 제외된다. |
+| Stage 6.28 verification | OK — targeted 12 files/122 tests, full Vitest 151 files/1021 tests, typecheck, lint, changed-file syntax, `git diff --check`, build, unsigned package, smoke 49/49가 통과했다. lint는 기존 Biome deprecation info만 출력했다. signed missing-input entrypoint는 mutation 전에 expected nonzero로 실패했다. LSP 13건은 sibling-worktree request-root 제한으로 거부되어 PASS로 기록하지 않는다. |
+| Stage 6.28 review gate | CURRENT BOUNDARY — report-inclusive publication receipt가 exact head의 source of truth다. fresh exact-head review, PR merge, `origin/master` containment는 서로 분리된 후속 gate다. |
 | rejected exact-head lanes | RECORDED — Goal APPROVE `ses_f7c38fa94ffeIqtSd5du8FaKog`, QA APPROVE `ses_f7c38f90cffeW7qcLgxZGL4VO2`, Security APPROVE `ses_f7c38f6c9ffeAyqeeUqg2f2bHn`, Quality REJECT `ses_f7c38f7eaffds2b3oJhXiHIWjs`, Context REJECT `ses_f7c38f5aeffeCa6aE87Pc14jwv`. Stage 6.7은 두 REJECT blocker를 교정했고 fresh exact-head review는 당시 pending이었다. |
 | historical attribution | DISCLOSURE — `58207b0`, `0ffa654`, `5114a1e`, `63a35d4`에는 현재 git-master 기준 Sisyphus footer 또는 co-author marker 일부가 없다. 기존 history를 rewrite하지 않고 additive report로 공개한다. |
 | protected paths, secrets, generated artifacts, publication command boundary | OK — protected diff, secret scan, generated artifact scan을 재확인했고 Stage 6.7 publication commits에는 verified source/tests/docs와 reports만 포함한다. |
@@ -326,6 +337,10 @@ inconsistency, missing/unreadable drift cleanup metadata와 stale implementation
 - Stage 6.27: `3d73e93` Goal/Quality/Context REJECT와 Security/QA APPROVE, timeout UUID poll provenance,
   exclusive concurrent reclaim, coherent success cleanup, missing/unreadable drift cleanup, as-built plan row,
   targeted 83/83, full 1011/1011와 LSP refusal을 추가했다.
+- Stage 6.28: `269bd48` Goal/Quality/Security/Context REJECT와 QA APPROVE, discussions `4044349962`,
+  `4044349966`, acknowledged UUID claim durability, atomic owner-aware reclaim guard, sanitized final receipt,
+  active-state cleanup/final-write recovery, targeted 122/122, full 1021/1021, build/package/smoke와 LSP refusal을
+  추가했다.
 
 ## 잔여 위험과 후속 작업
 
@@ -333,7 +348,8 @@ inconsistency, missing/unreadable drift cleanup metadata와 stale implementation
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact inspection,
   tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.27 exclusive reclaim, coherent success cleanup, typed finalization drift cleanup과 Stage 6.26
+- Stage 6.28 owner-aware claim/guard recovery와 sanitized durable final receipt, Stage 6.27 coherent success
+  cleanup과 typed finalization drift cleanup, Stage 6.26
   final-artifact certificate fingerprint
   continuity는 확인된 submission/evidence/signing continuity 결함을 fail closed하지만 같은 사용자 권한의
   임의 filesystem mutation 가능성 전체를 제거했다고 주장하지 않는다.
@@ -382,10 +398,12 @@ inconsistency, missing/unreadable drift cleanup metadata와 stale implementation
 - Stage 6.26 remediation은 `3d73e93aa7419b9b10522a98b40693f0a43c7a96`로 게시됐고 PR #8 immutable
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 review의 Goal/Quality/Context
   REJECT와 Security/QA APPROVE는 Stage 6.27 remediation의 입력으로 보존됐다.
-- Stage 6.27 poll/reclaim/cleanup/drift/plan remediation과 direct regressions은 통합 검증 완료 상태다.
-- Stage 6.27 report-inclusive publication receipt가 exact head의 source of truth다. Atlas fresh five-lane review,
-  PR #8 merge와
-  `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
+- Stage 6.27 remediation은 `269bd484ccf0b3641596fa37ad6ff617f60683ac`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 review의 Goal/Quality/Security/Context
+  REJECT와 QA APPROVE는 Stage 6.28 remediation의 입력으로 보존됐다.
+- Stage 6.28 claim durability/final receipt remediation과 direct regressions은 통합 검증 완료 상태다.
+- Stage 6.28 report-inclusive publication receipt가 exact head의 source of truth다. fresh exact-head review,
+  PR #8 merge와 `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
 
 ## 작업지시자 승인 기록 및 요청
 
@@ -426,5 +444,10 @@ inconsistency, missing/unreadable drift cleanup metadata와 stale implementation
   두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않는다. publication
   receipt가 exact head의 source of truth이며 Atlas fresh five-lane review, PR merge, containment는 서로
   분리된 후속 gate다.
-- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.27 fresh exact-head review, PR merge,
+- 작업지시자의 최신 명시 지시에 따라 `269bd48` review와 discussions `4044349962`, `4044349966`의
+  acknowledged UUID duplicate-submit window, reclaim-guard crash wedge, success receipt deletion은 Stage 6.28
+  source/test/docs/config와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지
+  않는다. publication receipt가 exact head의 source of truth이며 fresh exact-head review, PR merge,
+  containment는 서로 분리된 후속 gate다.
+- 승인 범위 밖 작업은 수행하지 않는다. Stage 6.28 fresh exact-head review, PR merge,
   `origin/master` containment verification은 완료로 주장하지 않고 Todo 8은 `진행중`으로 유지한다.

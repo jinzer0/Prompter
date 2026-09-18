@@ -6,6 +6,7 @@ import {
   identifyNotarizationArtifact,
   validateFinalNotarizationEvidence,
 } from "./notarization-evidence.mjs"
+import { finalNotarizationReceiptFileName } from "./notarization-final-receipt.mjs"
 import { validateOwnedDirectory } from "./owned-directory.mjs"
 
 const resumableErrors = new Set([
@@ -13,6 +14,13 @@ const resumableErrors = new Set([
   "Notarization submission is unresolved",
 ])
 const terminalAttemptErrors = new Set(["Notarization submission was not accepted"])
+const transientEvidenceFileNames = new Set([
+  "notarization-resume.json",
+  ".notarization-submit.claim",
+  ".notarization-submit.reclaim",
+])
+const activeLogFileName =
+  /^notary-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.json$/u
 
 function fail() {
   throw new Error("Invalid retained notarization attempt")
@@ -132,6 +140,12 @@ async function savedEvidenceStatus(attempt) {
       await readFile(join(attempt.evidenceDirectory, "notarization-resume.json"), "utf8"),
     )
     if (value?.status !== "Accepted") return "pending"
+    try {
+      await readFile(join(attempt.evidenceDirectory, finalNotarizationReceiptFileName), "utf8")
+    } catch (error) {
+      if (error?.code === "ENOENT") return "Accepted"
+      throw error
+    }
     await validateFinalNotarizationEvidence({
       evidenceDir: attempt.evidenceDirectory,
       artifactKind: attempt.artifactKind,
@@ -187,11 +201,27 @@ async function removeAttemptEvidence(attempt) {
   await rm(evidenceCanonical, { recursive: true })
 }
 
+async function removeTransientAttemptEvidence(attempt) {
+  const evidenceCanonical = await validateAttemptEvidenceDirectory(attempt)
+  if (evidenceCanonical === undefined) return
+  await removeAttempt(attempt)
+  const entries = await readdir(evidenceCanonical, { withFileTypes: true })
+  await Promise.all(
+    entries
+      .filter(
+        (entry) =>
+          (transientEvidenceFileNames.has(entry.name) || activeLogFileName.test(entry.name)) &&
+          (entry.isFile() || entry.isSymbolicLink()),
+      )
+      .map((entry) => unlink(join(evidenceCanonical, entry.name))),
+  )
+}
+
 export async function cleanupReleaseAttempts(attempts, error, attemptHandlingStarted) {
   if (!attemptHandlingStarted) return
   for (const attempt of [attempts.app, attempts.dmg]) {
     if (error === undefined) {
-      await removeAttemptEvidence(attempt)
+      await removeTransientAttemptEvidence(attempt)
       continue
     }
     let retain = false

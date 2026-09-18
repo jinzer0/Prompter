@@ -47,22 +47,15 @@ export function sha256(contents) {
 
 export async function writeFinalNotarizationEvidence(root, artifactKind) {
   const artifactSha256 = sha256(`${artifactKind} evidence`)
-  const resume = {
-    submissionId: notarizationSubmissionId,
-    status: "Accepted",
-    logPath: `notary-${notarizationSubmissionId}.json`,
-    artifactKind,
-    artifactSha256,
-  }
   const receipt = {
     submissionId: notarizationSubmissionId,
+    status: "Accepted",
     artifactKind,
     artifactSha256,
     issues: [],
   }
-  await writeFile(join(root, "notarization-resume.json"), JSON.stringify(resume))
-  await writeFile(join(root, resume.logPath), JSON.stringify(receipt))
-  return { receipt, resume }
+  await writeFile(join(root, "notarization-final.json"), JSON.stringify(receipt))
+  return receipt
 }
 
 export function createNotaryRunner({

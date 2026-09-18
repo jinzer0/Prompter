@@ -115,10 +115,14 @@ errors before the next release step can run.
 Each submission gate is strict: `Accepted` plus an empty issues array or only exact lowercase `info` issue records.
 
 Evidence is stored under ignored local paths beneath `.omo/evidence/release-macos/v0.1.1/app` and
-`.omo/evidence/release-macos/v0.1.1/dmg`. Each resume and final receipt binds `submissionId`,
-`artifactKind`, and `artifactSha256`; final evidence also records `Accepted` and warning-free,
-error-free issues. It must not contain identity values, profile values, private keys, credential
-values, local key paths, full environment dumps, or raw notary payloads.
+`.omo/evidence/release-macos/v0.1.1/dmg`. During recovery, the retained artifact bytes, active
+notary log, resume record, and submit claim files are transient state. After success they are
+removed. Each per-kind root retains only `notarization-final.json`, an audit receipt with exactly
+`submissionId`, `status: "Accepted"`, `artifactKind`, `artifactSha256`, and warning-free,
+error-free `issues`. Final receipts are not resumable state: they remain available for post-release
+QA and do not prevent a later clean rerun from creating fresh app and DMG submissions. They must
+not contain identity values, profile values, private keys, credential values, local key paths, full
+environment dumps, or raw notary payloads.
 
 `notarytool submit` returns an acknowledgement UUID, which is saved as artifact-bound state before
 bounded `notarytool info` polling and log retrieval. If polling or log retrieval fails, resume with

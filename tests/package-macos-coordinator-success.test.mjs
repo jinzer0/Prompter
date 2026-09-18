@@ -1,8 +1,9 @@
 import assert from "node:assert/strict"
-import { access, readFile, stat } from "node:fs/promises"
+import { access, readdir, readFile, stat } from "node:fs/promises"
 
 import { afterEach, test } from "vitest"
 
+import { validateFinalNotarizationEvidence } from "../scripts/macos/notarization-evidence.mjs"
 import { createCoordinatorFixture } from "./support/macos-coordinator-fixtures.mjs"
 import {
   assertNoLaterReleaseStages,
@@ -105,6 +106,21 @@ test("rejects pre-notarization Gatekeeper and orders final artifact checks", asy
   assert.equal(submissions.length, 2)
   assert.equal(submissions[0] === submissions[1], false)
   for (const temporaryRoot of release.observedTempRoots) await assert.rejects(access(temporaryRoot))
+})
+
+test("retains only validated final receipts after a successful release", async () => {
+  const release = await fixture()
+  await release.run()
+
+  for (const artifactKind of ["app", "dmg"]) {
+    const attempt = notarizationAttempt(release, artifactKind)
+    await validateFinalNotarizationEvidence({
+      evidenceDir: attempt.evidenceDirectory,
+      artifactKind,
+    })
+    await assert.rejects(access(attempt.directory))
+    assert.deepEqual(await readdir(attempt.evidenceDirectory), ["notarization-final.json"])
+  }
 })
 
 test("atomically reserves a candidate before loser assembly, Apple work, evidence, and final mutations", async () => {

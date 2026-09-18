@@ -5,6 +5,7 @@ export default defineConfig({
     include: [
       "tests/package-macos-package.test.mjs",
       "tests/package-macos-coordinator-success.test.mjs",
+      "tests/package-macos-coordinator-final-receipts.test.mjs",
       "tests/package-macos-coordinator-failures.test.mjs",
       "tests/package-macos-coordinator-boundaries.test.mjs",
       "tests/package-macos-coordinator-app-recovery.test.mjs",

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { afterEach, test } from "vitest"
@@ -45,6 +45,39 @@ test("releases the claim after a pre-ack submit failure", async () => {
   await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile: recovered.runFile })
 
   assert.equal(recovered.calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
+})
+
+test("retains the submitting claim when an acknowledged UUID cannot be persisted", async () => {
+  const root = await temporaryDirectories.create()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const resumePath = join(root, "notarization-resume.json")
+  const claimPath = join(root, ".notarization-submit.claim")
+  let submitCalls = 0
+  const runFile = async (_command, arguments_) => {
+    if (arguments_[1] === "history") return { stdout: "{}" }
+    if (arguments_[1] === "submit") {
+      submitCalls += 1
+      await mkdir(resumePath)
+      return { stdout: JSON.stringify({ id, status: "Accepted" }) }
+    }
+    if (arguments_[1] === "info") return { stdout: JSON.stringify({ id, status: "Accepted" }) }
+    return { stdout: JSON.stringify({ issues: [] }) }
+  }
+
+  await assert.rejects(submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }))
+  await rm(resumePath, { recursive: true })
+  let retryError
+  try {
+    await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile })
+  } catch (error) {
+    retryError = error
+  }
+
+  assert.equal(submitCalls, 1)
+  assert.match(retryError?.message ?? "", /Notarization submission is already in progress/)
+  const claim = JSON.parse(await readFile(claimPath, "utf8"))
+  assert.equal(claim.pid, process.pid)
+  assert.equal(claim.phase, "submitting")
 })
 
 test("allows only one concurrent initial submit for shared evidence", async () => {

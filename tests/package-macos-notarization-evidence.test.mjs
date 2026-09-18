@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { writeFile } from "node:fs/promises"
+import { access, mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { afterEach, test } from "vitest"
@@ -10,6 +10,7 @@ import {
   createNotarizationArtifact as artifact,
   createNotarizationDirectoryTracker,
   createNotaryRunner,
+  notarizationSubmissionId as id,
   notarizationProfile as profile,
   sha256,
   unsafeIssueSets,
@@ -40,14 +41,38 @@ test.each([
   ["lowercase info", [{ severity: "info" }]],
 ])("accepts %s final notarization evidence", async (_label, issues) => {
   const root = await evidence()
-  const { receipt, resume } = await writeFinalNotarizationEvidence(root, "app")
+  const receipt = await writeFinalNotarizationEvidence(root, "app")
   receipt.issues = issues
-  await writeFile(join(root, resume.logPath), JSON.stringify(receipt))
+  await writeFile(join(root, "notarization-final.json"), JSON.stringify(receipt))
 
   assert.deepEqual(
     await validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind: "app" }),
-    resume,
+    receipt,
   )
+})
+
+test("validates a final receipt without active resume or log state", async () => {
+  const root = await evidence()
+  const receipt = await writeFinalNotarizationEvidence(root, "app")
+
+  assert.deepEqual(
+    await validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind: "app" }),
+    receipt,
+  )
+})
+
+test("keeps active Accepted state resumable when writing the final receipt fails", async () => {
+  const root = await evidence()
+  const artifactPath = await artifact(root, "Prompter.zip")
+  const { runFile } = createNotaryRunner()
+  await mkdir(join(root, "notarization-final.json"))
+
+  await assert.rejects(submitAndWait({ artifactPath, profile, evidenceDir: root, runFile }))
+
+  await Promise.all([
+    access(join(root, "notarization-resume.json")),
+    access(join(root, `notary-${id}.json`)),
+  ])
 })
 
 test("rejects final notarization evidence for the wrong requested artifact kind", async () => {
@@ -61,7 +86,7 @@ test("rejects final notarization evidence for the wrong requested artifact kind"
 })
 
 test.each([
-  ["missing resume field", (resume, _receipt) => delete resume.artifactSha256],
+  ["missing receipt field", (_resume, receipt) => delete receipt.status],
   [
     "extra receipt field",
     (_resume, receipt) => {
@@ -69,21 +94,9 @@ test.each([
     },
   ],
   [
-    "mismatched submission",
-    (_resume, receipt) => {
-      receipt.submissionId = "123e4567-e89b-42d3-a456-426614174001"
-    },
-  ],
-  [
     "mismatched artifact kind",
     (_resume, receipt) => {
       receipt.artifactKind = "dmg"
-    },
-  ],
-  [
-    "mismatched artifact hash",
-    (_resume, receipt) => {
-      receipt.artifactSha256 = sha256("different artifact")
     },
   ],
   [
@@ -104,10 +117,9 @@ test.each([
   ]),
 ])("rejects final notarization evidence with %s", async (_label, mutate) => {
   const root = await evidence()
-  const { receipt, resume } = await writeFinalNotarizationEvidence(root, "app")
-  mutate(resume, receipt)
-  await writeFile(join(root, "notarization-resume.json"), JSON.stringify(resume))
-  await writeFile(join(root, resume.logPath), JSON.stringify(receipt))
+  const receipt = await writeFinalNotarizationEvidence(root, "app")
+  mutate({}, receipt)
+  await writeFile(join(root, "notarization-final.json"), JSON.stringify(receipt))
 
   await assert.rejects(
     validateFinalNotarizationEvidence({ evidenceDir: root, artifactKind: "app" }),

@@ -1285,15 +1285,15 @@ Test/support/config candidates:
 - `tests/package-macos-package.test.mjs`
 - `tests/package-macos-production-staging.test.mjs`
 - `tests/package-macos-signing-flow.test.mjs`
+- `tests/package-macos-signing-discovery.test.mjs`
 - `tests/package-macos-notarization-durability.test.mjs`
 - `tests/package-macos-coordinator-success.test.mjs`
 - `tests/package-macos-coordinator-failures.test.mjs`
-- `tests/package-macos-native-staging-adversarial.test.mjs` (필요 시 신규)
 - `tests/package-macos-notarization-publication-rollback.test.mjs` (필요 시 신규)
 - `tests/package-macos-dmg-staging.test.mjs` (필요 시 신규)
 - `tests/support/macos-package-tree.mjs`
+- `tests/support/macos-signing-fixtures.mjs`
 - `tests/support/macos-notarization-durability-probe.mjs`
-- `tests/support/macos-coordinator-artifacts.mjs`
 - `tests/support/macos-coordinator-fixtures.mjs`
 - `tests/support/macos-coordinator-support.mjs`
 - `vitest.config.ts` (신규 suite 등록이 필요할 때만)
@@ -1329,6 +1329,114 @@ Red-first tests와 production remediation, validation 뒤 누적 보고서는 St
 계보로 고정한다. validation과 report diff 승인 전 push하지 않고, fresh five-lane unanimous exact-head
 approval 전 merge하지 않는다. merge 뒤 `origin/master` containment 확인 전 orders/Todo 8 완료나 Issue #7
 진입을 주장하지 않는다.
+
+## Stage 6.32 - Stage 6.31 exact-head 재검토 blocker 교정 addendum
+
+Reviewed head는 정확히 `9097e124ed5d991e1802a03096f718115fa170ce`로 기록한다. 해당 head의
+fresh review verdict는 Goal FAIL, QA PASS, Code Quality FAIL, Security HIGH FAIL, Context FAIL이다.
+Stage 6.31 remediation과 reporting은 완료됐지만, Stage 6.32의 exact-head remediation, review,
+merge, containment는 아직 pending이다. 같은 report-inclusive exact head에서 Goal, QA, Code Quality,
+Security, Context 다섯 lane이 모두 승인하기 전까지 normal non-force push 이후 PR #8 merge, orders/Todo
+8 완료, Issue #7 진입은 blocked다.
+
+### Stage 6.32 blocker 매핑
+
+| Blocking finding | 필수 교정 | 소유 파일 | red-first 증거 |
+|---|---|---|---|
+| generic Mach-O discovery expands signing authority | discovery는 detector로 남기고 권한 원천은 exact Electron 43 manifest와 sole SQLite addon manifest로 제한한다. signing과 verification은 같은 manifest policy를 사용한다. | `scripts/macos/electron-signing-target-policy.mjs`, `scripts/macos/signing.mjs`, `scripts/macos/runtime-native-policy.mjs` | generic Mach-O가 discovery에 잡혀도 authority로 승격되지 않고 첫 mutating signing 전에 실패한다. |
+| `verifyAppSignature` lacks manifest parity | verification mismatch는 deterministic failure와 app discard metadata를 함께 남긴다. | `scripts/macos/signing.mjs`, `tests/package-macos-signing-discovery.test.mjs`, `tests/support/macos-signing-fixtures.mjs` | signing manifest와 verification manifest가 다르면 대상 app discard metadata와 함께 실패한다. |
+| replacement-owner restoration lacks directory sync | owner-swap restoration 뒤 containing directory sync를 수행하고 exact owner만 교체한다. | `scripts/macos/notarization-storage.mjs`, `tests/package-macos-notarization-publication-rollback.test.mjs` | replacement owner 복구 뒤 directory sync가 빠지면 retry race가 red로 고정된다. |
+| post-durable temp cleanup can falsely fail or orphan live record | post-linearization temp cleanup은 non-fatal이며 durable live record를 orphan으로 취급하지 않는다. | `scripts/macos/notarization-storage.mjs`, `scripts/macos/notarization-publication.mjs` | cleanup 실패가 live record success를 false failure로 바꾸지 않는다. |
+| mounted stapler timeout/signal missing | mounted app stapler validate timeout은 `600000`이고 AbortSignal을 전달한다. | `scripts/macos/apple-command-policy.mjs`, `scripts/macos/notarization-command.mjs`, `scripts/release-macos.mjs`, `tests/package-macos-coordinator-failures.test.mjs` | timeout과 signal 누락을 fake runner trace로 실패 재현한다. |
+| QA checklist stale, order note stale, duplicate DMG registration, Stage 6.31 expected files/accounting stale | QA checklist와 order note를 현재 상태로 고치고, duplicate import를 제거하되 direct Vitest registration은 유지한다. Stage 6.31 file accounting은 fresh unique counts만 기록한다. | `mydocs/working/task_m011_6_stage6.md`, `mydocs/report/task_m011_6_report.md`, `mydocs/orders/20260908.md`, `vitest.config.ts`, 이 구현계획서 | stale claim, 중복 suite accounting, unchanged candidate 포함이 남지 않는다. |
+
+### Stage 6.32 source policy
+
+- governance commit 전에는 Stage 6 governance 문서와 active order note만 수정한다.
+- discovery는 detector 역할만 맡고, exact Electron 43 구조와 sole SQLite addon manifest가 signing authority다.
+- signing과 verification은 동일 policy를 공유하며 verification mismatch는 deterministic failure와 app discard
+  metadata를 남긴다.
+- owner-swap restoration은 directory sync까지 포함하고, post-linearization temp cleanup 실패는 durable 성공을
+  뒤집지 않는다.
+- mounted stapler validate는 timeout `600000`과 AbortSignal을 요구한다.
+- duplicate DMG import는 제거하되 direct Vitest registration은 유지한다.
+- Stage 6.31 accounting은 fresh unique counts만 사용한다.
+- changed source/test/support module은 250 pure LOC 이하를 유지한다.
+- LSP는 JavaScript `.mjs` coverage 제한 때문에 MISS로만 기록하고 PASS로 승격하지 않는다.
+- live Apple signing, Keychain, Notarization, stapler mutation, Gatekeeper, tag, release, upload, force push는
+  실행하지 않는다.
+- Issue #7은 PR #8 merge와 `origin/master` containment 확인 전까지 blocked다.
+
+### Stage 6.32 expected files
+
+Governance:
+
+- `mydocs/plans/task_m011_6_impl.md`
+- `mydocs/orders/20260908.md`
+
+Source candidates:
+
+- `scripts/macos/electron-signing-target-policy.mjs` (신규)
+- `scripts/macos/runtime-native-policy.mjs`
+- `scripts/macos/signing.mjs`
+- `scripts/macos/notarization-storage.mjs`
+- `scripts/macos/notarization-publication.mjs`
+- `scripts/macos/apple-command-policy.mjs` (신규)
+- `scripts/macos/notarization-command.mjs`
+- `scripts/release-macos.mjs`
+
+Test/support/config candidates:
+
+- `tests/support/macos-electron-app-fixture.mjs` (신규)
+- `tests/support/macos-package-fixtures.mjs`
+- `tests/support/macos-signing-target-fixtures.mjs` (신규)
+- `tests/support/macos-signing-fixtures.mjs`
+- `tests/package-macos-signing-flow.test.mjs`
+- `tests/package-macos-signing-discovery.test.mjs`
+- `tests/package-macos-signing-target-policy.test.mjs` (신규)
+- `tests/package-macos-coordinator-signing-target-recovery.test.mjs` (신규)
+- `tests/support/macos-coordinator-target-mutations.mjs` (신규)
+- `tests/support/macos-coordinator-fixtures.mjs`
+- `tests/package-macos-notarization-publication-rollback.test.mjs`
+- `tests/package-macos-coordinator-success.test.mjs`
+- `tests/package-macos-coordinator-failures.test.mjs`
+- `tests/package-macos-package.test.mjs`
+- `vitest.config.ts`
+
+Official documentation candidate:
+
+- `docs/qa-checklist.md`
+
+Validation 뒤 report candidates:
+
+- `mydocs/working/task_m011_6_stage6.md`
+- `mydocs/report/task_m011_6_report.md`
+- `mydocs/orders/20260908.md`
+
+### Stage 6.32 validation matrix
+
+| Check class | Required proof | PASS condition |
+|---|---|---|
+| manifest authority red/green | generic Mach-O discovery와 exact Electron 43 plus sole SQLite addon manifest fixture | discovery target은 authority가 아니며 signing과 verification이 같은 manifest policy로 fail closed한다. |
+| verification discard metadata | manifest mismatch fake app verification | deterministic failure와 app discard metadata가 함께 기록된다. |
+| owner restoration durability | replacement-owner restore와 directory sync fault injection | exact owner만 복구되고 containing directory sync 없이는 통과하지 않는다. |
+| cleanup non-fatal | post-linearization temp cleanup failure | durable live record success를 false failure로 바꾸거나 orphan 처리하지 않는다. |
+| mounted stapler bounds | fake runner timeout/signal trace | mounted stapler validate가 timeout `600000`과 AbortSignal을 받는다. |
+| accounting and registration | duplicate DMG registration 제거, direct Vitest registration 확인, fresh unique counts | stale QA/order/report claim과 duplicate count가 없다. |
+| focused/full/static | changed-domain Vitest, full `npm test`, typecheck, lint, build, package, smoke, protected diff scan | 모두 exit 0이거나 no-live-Apple boundary로 분류되고, pure LOC <=250이며 LSP는 MISS로 기록한다. |
+| reports/review | report-inclusive exact head five-lane review | 같은 exact head에서 Goal, QA, Code Quality, Security, Context가 unanimous PASS 전 merge하지 않는다. |
+
+### Stage 6.32 커밋과 gate
+
+Governance는 제품 변경 전에 다음 commit으로 고정한다.
+
+```text
+Task #6: Stage 6.32 교정 계획과 오늘할일 갱신
+```
+
+Red-first tests와 production remediation, validation, Stage 6 누적 보고 정정은 Stage 6.32 report-inclusive
+exact head로 고정한다. report-inclusive exact head의 unanimous five-lane gate 전에는 merge, orders/Todo 8
+완료, Issue #7 진입, live Apple operation, force push를 수행하지 않는다.
 
 ## UltraQA trigger 매핑
 

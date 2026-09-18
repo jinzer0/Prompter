@@ -1133,7 +1133,7 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
 | malformed inputs | malformed/missing package version, malformed plist, invalid notary JSON/status fixture | candidate 생성 전 descriptive failure, downstream 호출 0건 | Stage 1–2, task-2/3/4 evidence |
 | stale artifacts | non-empty `release/v0.1.1/`, 기존 final ZIP/DMG/SHA256SUMS fixture | overwrite/merge 없이 preflight 실패 | Stage 3–4, task-5/6 evidence |
 | dirty worktree | fake runner의 `git status --porcelain`에 tracked/untracked product change 반환 | assembly/sign/submit 0건 | Stage 3–5, task-5/8 evidence |
-| long Apple commands | delayed fake `notarytool --wait`, signal/timeout 주입, bounded stapler retry | premature success 없음, timeout은 unknown, 동일 bytes 자동 재제출 0건 | Stage 2/4, task-4/6 evidence |
+| long Apple commands | delayed fake `notarytool submit`, durable UUID persistence, bounded `notarytool info` polling, signal/timeout 주입, bounded stapler retry | premature success 없음, UUID는 artifact-bound evidence에 보존, timeout은 unknown, 동일 bytes 자동 재제출 0건 | Stage 2/4, task-4/6 evidence |
 | misleading success | exit 0 + malformed JSON, non-Accepted status, warning-bearing log, missing submission ID | success로 간주하지 않고 staple/archive/hash 차단 | Stage 2/4, task-4/6 evidence |
 | timeout/resume | submit timeout 후 saved submission ID로 `info`/`log` fake trace 실행 | 새 submit 0건, Accepted+warning-free log 전 진행 0건 | Stage 2/4, task-4/6 evidence |
 | interruption cleanup | coordinator 각 호출 지점에서 throw/signal 주입 | temp ZIP/extract/mount/partial final 제거, sanitized resume state만 보존 | Stage 3/4, task-5/6 evidence |

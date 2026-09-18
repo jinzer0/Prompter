@@ -190,27 +190,28 @@ async function removeAttemptEvidence(attempt) {
 export async function cleanupReleaseAttempts(attempts, error, attemptHandlingStarted) {
   if (!attemptHandlingStarted) return
   for (const attempt of [attempts.app, attempts.dmg]) {
+    if (error === undefined) {
+      await removeAttemptEvidence(attempt)
+      continue
+    }
     let retain = false
-    let discardEvidence = false
-    if (error !== undefined) {
-      const affectedAttempt = error?.artifactKind === attempt.artifactKind
-      const dependentAttempt = error?.dependentArtifactKind === attempt.artifactKind
-      const invalidatedAttempt = affectedAttempt || dependentAttempt
-      const terminalError = error?.blocksPublication || terminalAttemptErrors.has(error?.message)
-      discardEvidence = invalidatedAttempt && (error?.discardEvidence === true || terminalError)
-      try {
-        const retained = await readBoundAttempt(attempt)
-        retain =
-          retained !== undefined &&
-          (!invalidatedAttempt ||
-            (!terminalError &&
-              error?.discardEvidence !== true &&
-              (retained.saved.status === "Accepted" ||
-                retained.saved.status === "accepted" ||
-                resumableErrors.has(error.message))))
-      } catch {
-        retain = false
-      }
+    const affectedAttempt = error?.artifactKind === attempt.artifactKind
+    const dependentAttempt = error?.dependentArtifactKind === attempt.artifactKind
+    const invalidatedAttempt = affectedAttempt || dependentAttempt
+    const terminalError = error?.blocksPublication || terminalAttemptErrors.has(error?.message)
+    const discardEvidence = invalidatedAttempt && (error?.discardEvidence === true || terminalError)
+    try {
+      const retained = await readBoundAttempt(attempt)
+      retain =
+        retained !== undefined &&
+        (!invalidatedAttempt ||
+          (!terminalError &&
+            error?.discardEvidence !== true &&
+            (retained.saved.status === "Accepted" ||
+              retained.saved.status === "accepted" ||
+              resumableErrors.has(error.message))))
+    } catch {
+      retain = false
     }
     if (discardEvidence) await removeAttemptEvidence(attempt)
     else if (!retain) await removeAttempt(attempt)

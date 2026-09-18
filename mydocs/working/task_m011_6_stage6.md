@@ -91,7 +91,11 @@ unknown status early return과 `info`/`log` 사이 artifact mutation drift를 �
 report-inclusive head `9edf7e59c7c758de3dccc7c1151fb17220d1e480`로 게시됐다. 그 exact-head review는
 QA APPROVE와 Goal/Quality/Security/Context REJECT를 기록했다. Stage 6.26은 statusless timeout `{id}`와
 explicit unknown poll provenance를 허용하되 malformed present-status를 거부하고, PID/phase claim recovery,
-typed artifact-drift cleanup/rebuild, final ZIP app·final DMG·mounted app fingerprint 검증을 추가했다.
+typed artifact-drift cleanup/rebuild, final ZIP app·final DMG·mounted app fingerprint 검증을 추가해
+report-inclusive head `3d73e93aa7419b9b10522a98b40693f0a43c7a96`로 게시됐다. 그 exact-head review는
+Goal, Quality, Context REJECT와 Security, QA APPROVE를 기록했다. Stage 6.27은 timeout poll provenance,
+exclusive stale-claim reclaim, success cleanup coherence, missing/unreadable artifact drift cleanup metadata와
+stale implementation-plan row를 교정했다.
 실제 Developer ID signing, Apple Notarization, Gatekeeper assessment, tag, GitHub Release, upload는 실행하지 않았다.
 
 ## 산출물
@@ -126,6 +130,7 @@ typed artifact-drift cleanup/rebuild, final ZIP app·final DMG·mounted app fing
 | Stage 6.25 notarization claim/submission과 coordinator signer-fingerprint tests, support fixtures, `vitest.config.ts` | claim cleanup, statusless `{id}` polling, unknown status continuation, `info`/`log` mutation rejection, SHA-1/SHA-256 exact certificate match, renewed/missing/malformed leaf rejection과 temporary extraction cleanup을 고정했다. |
 | Stage 6.26 notarization storage/claim, artifact-drift, signer-fingerprint tests와 coordinator fixtures, `vitest.config.ts` | live/dead/ambiguous claim phase, fresh/resumed `info`/`log` drift cleanup과 third-run rebuild, final ZIP/DMG/mounted-app fingerprint gates를 고정했다. coordinator fixture는 249 pure LOC, artifact helper는 34 pure LOC, direct drift suite는 69 pure LOC다. |
 | `mydocs/plans/task_m011_6_impl.md` | as-built Notarization contract를 `submit --wait`에서 UUID 제출·저장 후 bounded `info` polling으로 정정했다. |
+| Stage 6.27 notarization command/identity/storage, release-attempt validation, coordinator fixtures와 direct regressions | timeout UUID를 polling으로 유지하고 stale-claim reclaim을 exclusive하게 직렬화한다. success는 per-kind attempt/evidence subtree를 함께 제거하며 missing/unreadable drift도 typed cleanup 뒤 clean rebuild한다. timeout fixture는 recovery test에서 기본 `In Progress`를 유지한다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
@@ -606,12 +611,41 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   재실행했다고 주장하지 않는다.
 - MISS(환경 제한): Stage 6.26 source/test/plan/config paths와 두 report의 LSP diagnostics는
   sibling-worktree request-root 제한으로 17건 모두 거부됐으며 PASS로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.26 report-inclusive head
+  `3d73e93aa7419b9b10522a98b40693f0a43c7a96` review는 Goal REJECT
+  `ses_f77d0cae4ffdJvp2doD8CEUfPi`, Quality REJECT `ses_f77d0c653ffdCdIu18LwTL6Z4Y`, Security APPROVE
+  `ses_f77d0c4afffd9KNCLoqC0NdvVX`, QA APPROVE `ses_f77d0c891ffeCggL6Yg3ce7zjd`, Context REJECT
+  `ses_f77d0c312ffe3s2jCRDkz8KAza`를 기록했다. QA는 exact head에서 full Vitest 150 files/1003 tests를
+  독립 확인했다.
+- Goal은 statusless timeout UUID의 poll provenance 누락, concurrent dead-claim reclaimer가 새 live claim을
+  unlink할 수 있는 경쟁 조건, 성공 뒤 artifact만 제거하고 Accepted evidence를 남기는 cleanup 불일치를
+  확인했다. 성공 cleanup finding은 Context와 [discussion 3973417899](https://github.com/jinzer0/Prompter/pull/8#discussion_r3973417899)에도 중복 기록됐다.
+- Quality는 deleted/unreadable artifact identification failure가 `artifactKind`와 `discardEvidence`를 잃어
+  orphan evidence를 남기는 drift-cleanup blocker를 확인했다. Context는 이 product blocker와 별개로
+  implementation plan의 stale `notarytool --wait` row를 추가 확인했다.
+- OK: Stage 6.27은 timeout/Abort/recognized signal의 statusless UUID 응답에 `poll: true`를 보존하고 UUID를
+  evidence에 먼저 저장한 뒤 bounded `info` polling한다. synthetic timeout fixture는 명시 override가 없을 때
+  `In Progress`를 반환해 recovery tests의 first run을 unresolved로 유지한다.
+- OK: dead pre-submit claim takeover는 exclusive reclaim guard로 직렬화한다. deterministic two-reclaimer
+  regression은 하나만 claim을 획득하고 loser가 replacement claim을 삭제하지 않음을 고정한다.
+- OK: successful release cleanup은 app/DMG별 retained attempt와 evidence subtree를 함께 제거한다. candidate
+  제거 뒤 later rerun은 app/DMG를 clean rebuild한다. missing/unreadable fresh/resumed `info`/`log` drift도
+  `artifactKind`와 `discardEvidence=true`를 전달해 state를 정리하고 subsequent run에서 rebuild한다.
+- OK: implementation plan의 long-command row는 `submit`, durable UUID persistence, bounded `info` polling으로
+  정정돼 as-built behavior와 일치한다.
+- OK: authoritative Stage 6.27 verification은 targeted 10 files/83 tests, full Vitest 150 files/1011 tests,
+  typecheck, lint, changed-file syntax, `git diff --check`다. lint는 기존 Biome deprecated-config info만
+  출력했다. Stage 6.14 build, unsigned package, smoke 49/49 evidence는 보존하며 Stage 6.27에서 재실행했다고
+  주장하지 않는다.
+- MISS(환경 제한): Stage 6.27 source/test/plan paths와 두 report의 LSP diagnostics는 sibling-worktree
+  request-root 제한으로 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact manual
   inspection, tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.26의 PID/phase claim recovery, typed finalization drift cleanup, final-artifact certificate fingerprint
+- Stage 6.27의 exclusive reclaim, typed finalization drift cleanup, coherent success cleanup과 Stage 6.26의
+  final-artifact certificate fingerprint
   continuity는 확인된 submission/evidence/signing continuity 결함을 fail closed하지만, 같은 사용자 권한의
   임의 filesystem mutation 가능성 전체를 제거했다고 주장하지 않는다.
 - non-Apple command abortability는 nonblocking residual risk다. 장시간 Apple trust command는 bounded
@@ -654,9 +688,12 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 head review는 QA APPROVE와
   Goal/Quality/Security/Context REJECT를 기록했고 final recovery, claim recovery, coordinator cleanup,
   final-artifact fingerprint, plan drift와 fixture size가 blocker였다.
-- Stage 6.26 final notarization recovery와 final-artifact fingerprint remediation, direct regressions, as-built
-  plan correction, fixture split 및 config registration은 검증 완료 상태다.
-- Stage 6.26 report-inclusive publication과 exact-head review는 분리된 후속 gate다. PR #8 merge와
+- Stage 6.26 remediation은 `3d73e93aa7419b9b10522a98b40693f0a43c7a96`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 review의 Goal/Quality/Context
+  REJECT와 Security/QA APPROVE는 Stage 6.27 remediation의 입력으로 보존됐다.
+- Stage 6.27 poll/reclaim/cleanup/drift/plan remediation과 direct regressions은 통합 검증 완료 상태다.
+- Stage 6.27 report-inclusive publication receipt가 exact head의 source of truth다. Atlas fresh five-lane review,
+  PR #8 merge와
   `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
 
 ## 승인 요청
@@ -693,3 +730,8 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   6.26 source/test/plan/config와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로
   주장하지 않는다. publication receipt가 exact head의 source of truth이며 Atlas exact-head review, PR merge,
   containment는 서로 분리된 후속 gate다.
+- 작업지시자의 최신 명시 지시에 따라 `3d73e93` review의 timeout poll provenance, concurrent reclaim race,
+  success cleanup inconsistency, missing/unreadable drift metadata와 stale plan row는 Stage 6.27 source/test/plan과
+  두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않는다. publication
+  receipt가 exact head의 source of truth이며 Atlas fresh five-lane review, PR merge, containment는 서로
+  분리된 후속 gate다.

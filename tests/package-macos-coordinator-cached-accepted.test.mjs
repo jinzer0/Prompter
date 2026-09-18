@@ -1,5 +1,5 @@
 import assert from "node:assert/strict"
-import { access, mkdir, readFile, symlink, writeFile } from "node:fs/promises"
+import { access, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { afterEach, test } from "vitest"
@@ -29,6 +29,29 @@ function statusOption(artifactKind, status) {
   return artifactKind === "app" ? { pendingAppStatus: status } : { pendingDmgStatus: status }
 }
 
+test("allows a clean rerun after a completed release candidate is removed", async () => {
+  const first = await fixture()
+  await first.run()
+  const app = notarizationAttempt(first, "app")
+  const dmg = notarizationAttempt(first, "dmg")
+  await rm(first.candidate, { recursive: true })
+
+  const second = await fixture({ shared: first.shared })
+  const result = await second.run()
+
+  assert.deepEqual(result.artifacts, [
+    "Prompter-0.1.1-mac-arm64.dmg",
+    "Prompter-0.1.1-mac-arm64.zip",
+    "SHA256SUMS",
+  ])
+  assert.equal(submissionCount([first, second], "app"), 2)
+  assert.equal(submissionCount([first, second], "dmg"), 2)
+  await assert.rejects(access(app.evidenceDirectory))
+  await assert.rejects(access(dmg.evidenceDirectory))
+  assert.equal(await readFile(join(first.releaseRoot, "caller-sentinel"), "utf8"), "retain")
+  assert.equal(await readFile(join(first.evidenceRoot, "caller-sentinel"), "utf8"), "retain")
+})
+
 test.each([
   "app",
   "dmg",
@@ -56,6 +79,21 @@ test.each([
       .status,
     "accepted",
   )
+
+  const third = await fixture({
+    pendingAppStatus: "Accepted",
+    pendingDmgStatus: "Accepted",
+    shared: first.shared,
+  })
+  await third.run()
+  assert.equal(submissionCount([first, second, third], "app"), 1)
+  assert.equal(submissionCount([first, second, third], "dmg"), 1)
+
+  await rm(third.candidate, { recursive: true })
+  const fourth = await fixture({ shared: first.shared })
+  await fourth.run()
+  assert.equal(submissionCount([first, second, third, fourth], "app"), 2)
+  assert.equal(submissionCount([first, second, third, fourth], "dmg"), 2)
 })
 
 test.each([
@@ -113,11 +151,7 @@ test.each([
   assert.equal(submissionCount([first, second, third], "app"), 2)
   assert.equal(submissionCount([first, second, third], "dmg"), 1)
   await assert.rejects(access(attempt.directory))
-  const finalResume = JSON.parse(
-    await readFile(join(attempt.evidenceDirectory, "notarization-resume.json"), "utf8"),
-  )
-  assert.equal(finalResume.status, "Accepted")
-  await access(join(attempt.evidenceDirectory, finalResume.logPath))
+  await assert.rejects(access(attempt.evidenceDirectory))
 })
 
 test("removes only terminal app evidence and unlinks nested symlinks", async () => {

@@ -1,3 +1,5 @@
+import { constants } from "node:os"
+
 import {
   exactNotarizationObject,
   failNotarization,
@@ -12,6 +14,7 @@ import { hasSafeNotarizationIssues } from "./notarization-evidence.mjs"
 import { createStaplingClient } from "./notarization-stapling.mjs"
 
 const appleCommandTimeoutMs = 10 * 60 * 1000
+const terminationSignals = new Set(Object.keys(constants.signals))
 const xcrunCommand = "/usr/bin/xcrun"
 const spctlCommand = "/usr/sbin/spctl"
 
@@ -207,9 +210,12 @@ export function createNotarizationClient(options) {
         return submission(json(response?.stdout, "notarization submission"), true)
       } catch (error) {
         if (isNotarizationError(error)) throw error
-        const timedOut = error?.code === "ETIMEDOUT" || error?.name === "AbortError"
+        const timedOut =
+          error?.code === "ETIMEDOUT" ||
+          error?.name === "AbortError" ||
+          (typeof error?.signal === "string" && terminationSignals.has(error.signal))
         const submissionId = timedOut ? timeoutId(error) : undefined
-        if (submissionId !== undefined) return { submissionId, status: "unknown" }
+        if (submissionId !== undefined) return { submissionId, status: "unknown", poll: true }
         commandError()
       }
     },

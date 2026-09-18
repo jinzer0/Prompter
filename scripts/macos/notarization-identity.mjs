@@ -6,8 +6,8 @@ function sameArtifact(left, right) {
 }
 
 export async function verifyNotarizationArtifact(artifactPath, artifactIdentity) {
-  if (sameArtifact(artifactIdentity, await identifyNotarizationArtifact(artifactPath))) return
   try {
+    if (sameArtifact(artifactIdentity, await identifyNotarizationArtifact(artifactPath))) return
     failNotarization("Notarization artifact changed")
   } catch (error) {
     error.artifactKind = artifactIdentity.artifactKind

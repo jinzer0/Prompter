@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { failNotarization } from "./notarization-contract.mjs"
 
 const claimFileName = ".notarization-submit.claim"
+const reclaimFileName = ".notarization-submit.reclaim"
 
 function ownerAlive(pid) {
   try {
@@ -15,18 +16,18 @@ function ownerAlive(pid) {
   }
 }
 
-async function stalePreSubmitClaim(claimPath) {
+async function stalePreSubmitClaim(claimPath, readClaimFile = readFile) {
   try {
-    const claim = JSON.parse(await readFile(claimPath, "utf8"))
+    const claim = JSON.parse(await readClaimFile(claimPath, "utf8"))
     return claim?.phase === "pre-submit" && Number.isInteger(claim.pid) && !ownerAlive(claim.pid)
   } catch {
     return false
   }
 }
 
-async function liveClaim(claimPath) {
+async function liveClaim(claimPath, readClaimFile = readFile) {
   try {
-    const claim = JSON.parse(await readFile(claimPath, "utf8"))
+    const claim = JSON.parse(await readClaimFile(claimPath, "utf8"))
     return Number.isInteger(claim?.pid) && ownerAlive(claim.pid)
   } catch {
     return false
@@ -51,29 +52,65 @@ export async function writeAtomicJson({ directory, fileName, value, renameFile =
   }
 }
 
-export function createSubmissionClaim(directory) {
+export function createSubmissionClaim(
+  directory,
+  { openClaimFile = open, readClaimFile = readFile, removeClaimFile = rm } = {},
+) {
   const claimPath = join(directory, claimFileName)
+  const reclaimPath = join(directory, reclaimFileName)
+
+  async function writeClaim() {
+    let handle
+    try {
+      handle = await openClaimFile(claimPath, "wx", 0o600)
+      await handle.writeFile(`${JSON.stringify({ pid: process.pid, phase: "pre-submit" })}\n`)
+      await handle.sync()
+    } finally {
+      await handle?.close()
+    }
+  }
+
+  async function rejectExistingClaim() {
+    if (await liveClaim(claimPath, readClaimFile))
+      failNotarization("Notarization submission is already in progress")
+    failNotarization("Notarization submission requires manual recovery")
+  }
+
   return Object.freeze({
     async acquire() {
       await mkdir(directory, { recursive: true })
-      let handle
       try {
-        handle = await open(claimPath, "wx", 0o600)
-        await handle.writeFile(`${JSON.stringify({ pid: process.pid, phase: "pre-submit" })}\n`)
-        await handle.sync()
+        await writeClaim()
+        return
       } catch (error) {
-        if (error?.code === "EEXIST") {
-          if (await stalePreSubmitClaim(claimPath)) {
-            await rm(claimPath, { force: true })
-            return this.acquire()
-          }
-          if (await liveClaim(claimPath))
-            failNotarization("Notarization submission is already in progress")
-          failNotarization("Notarization submission requires manual recovery")
-        }
+        if (error?.code !== "EEXIST") failNotarization("Notarization evidence is unavailable")
+      }
+      if (!(await stalePreSubmitClaim(claimPath, readClaimFile))) {
+        return rejectExistingClaim()
+      }
+
+      let reclaimHandle
+      try {
+        reclaimHandle = await openClaimFile(reclaimPath, "wx", 0o600)
+      } catch (error) {
+        if (error?.code === "EEXIST")
+          failNotarization("Notarization submission is already in progress")
         failNotarization("Notarization evidence is unavailable")
+      }
+      try {
+        if (!(await stalePreSubmitClaim(claimPath, readClaimFile))) {
+          return rejectExistingClaim()
+        }
+        await removeClaimFile(claimPath, { force: true })
+        try {
+          await writeClaim()
+        } catch (error) {
+          if (error?.code === "EEXIST") return rejectExistingClaim()
+          failNotarization("Notarization evidence is unavailable")
+        }
       } finally {
-        await handle?.close()
+        await reclaimHandle?.close()
+        await removeClaimFile(reclaimPath, { force: true })
       }
     },
     async release() {

@@ -1,5 +1,18 @@
-import { readdir } from "node:fs/promises"
-import { join, relative } from "node:path"
+import { cp, mkdir, readdir } from "node:fs/promises"
+import { dirname, join, relative } from "node:path"
+
+export async function copyRequiredRuntimeAddon(sourceRoot, nativeFixture) {
+  const addonPath = join(
+    sourceRoot,
+    "node_modules",
+    "better-sqlite3",
+    "build",
+    "Release",
+    "better_sqlite3.node",
+  )
+  await mkdir(dirname(addonPath), { recursive: true })
+  await cp(nativeFixture, addonPath)
+}
 
 export async function listFilesRecursively(rootPath) {
   async function listDirectory(directoryPath) {
@@ -8,7 +21,7 @@ export async function listFilesRecursively(rootPath) {
     for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
       const entryPath = join(directoryPath, entry.name)
       if (entry.isDirectory()) files.push(...(await listDirectory(entryPath)))
-      else if (entry.isFile()) files.push(relative(rootPath, entryPath))
+      else if (entry.isFile() || entry.isSymbolicLink()) files.push(relative(rootPath, entryPath))
     }
     return files
   }

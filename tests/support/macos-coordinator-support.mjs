@@ -27,11 +27,18 @@ export function commandStage(command, arguments_) {
     return arguments_[2] === dmgSubmissionId ? "dmg-info" : "app-info"
   if (command === "/usr/bin/xcrun" && arguments_[1] === "log")
     return arguments_[2] === dmgSubmissionId ? "dmg-log" : "app-log"
-  if (command === "/usr/bin/xcrun" && arguments_[0] === "stapler")
-    return arguments_[2].endsWith(".dmg") ? "dmg-staple" : "app-staple"
-  if (command === "/usr/bin/ditto" && arguments_[0] === "-x") return "zip-extract"
-  if (command === "/usr/bin/ditto" && arguments_[0] === "-c")
-    return arguments_.at(-1).includes("notarization-attempt") ? "temporary-zip" : "final-zip"
+  if (command === "/usr/bin/xcrun" && arguments_[0] === "stapler") {
+    if (arguments_[2].endsWith(".dmg")) return "dmg-staple"
+    if (arguments_[1] === "validate" && arguments_[2].includes("prompter-release-mount-"))
+      return "mounted-app-stapler-validate"
+    return "app-staple"
+  }
+  if (command === "/usr/bin/ditto") {
+    if (arguments_[0] === "-x") return "zip-extract"
+    if (arguments_[0] === "-c")
+      return arguments_.at(-1).includes("notarization-attempt") ? "temporary-zip" : "final-zip"
+    return "dmg-stage"
+  }
   if (command === "/usr/bin/hdiutil" && arguments_[0] === "create") return "dmg-create"
   if (command === "/usr/bin/hdiutil" && arguments_[0] === "verify") return "dmg-verify"
   if (command === "/usr/bin/hdiutil" && arguments_[0] === "attach") return "attach"
@@ -126,6 +133,7 @@ export const releaseStages = [
   "dmg-staple",
   "dmg-gatekeeper",
   "attach",
+  "mounted-app-stapler-validate",
   "app-verify-3",
   "mounted-app-gatekeeper",
   "detach",

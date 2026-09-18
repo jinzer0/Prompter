@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { access, readdir, readFile, stat } from "node:fs/promises"
+import { basename } from "node:path"
 
 import { afterEach, test } from "vitest"
 
@@ -106,6 +107,53 @@ test("rejects pre-notarization Gatekeeper and orders final artifact checks", asy
   assert.equal(submissions.length, 2)
   assert.equal(submissions[0] === submissions[1], false)
   for (const temporaryRoot of release.observedTempRoots) await assert.rejects(access(temporaryRoot))
+})
+
+test("validates the mounted app staple before final mounted-app checks and release completion", async () => {
+  const release = await fixture()
+  const result = await release.run()
+  const attachIndex = release.rawCalls.findIndex(
+    ({ command, arguments_ }) => command === "/usr/bin/hdiutil" && arguments_[0] === "attach",
+  )
+  assert.notEqual(attachIndex, -1)
+  const mountDirectory = release.rawCalls[attachIndex].arguments_[4]
+  const mountName = basename(mountDirectory)
+  const mountedStapleIndex = release.rawCalls.findIndex(
+    ({ command, arguments_ }) =>
+      command === "/usr/bin/xcrun" &&
+      arguments_[0] === "stapler" &&
+      arguments_[1] === "validate" &&
+      arguments_[2].includes(`/${mountName}/`) &&
+      arguments_[2].endsWith("/Prompter.app"),
+  )
+  assert.notEqual(mountedStapleIndex, -1)
+  const mountedApp = release.rawCalls[mountedStapleIndex].arguments_[2]
+  const mountedSignatureIndex = release.rawCalls.findIndex(
+    ({ command, arguments_ }) =>
+      command === "/usr/bin/codesign" &&
+      arguments_.includes("--deep") &&
+      arguments_.at(-1) === mountedApp,
+  )
+  const mountedGatekeeperIndex = release.rawCalls.findIndex(
+    ({ command, arguments_ }) => command.endsWith("/spctl") && arguments_.at(-1) === mountedApp,
+  )
+  const detachIndex = release.rawCalls.findIndex(
+    ({ command, arguments_ }) =>
+      command === "/usr/bin/hdiutil" &&
+      arguments_[0] === "detach" &&
+      arguments_[1] === mountDirectory,
+  )
+  const checksumIndex = release.rawCalls.findIndex(({ command }) => command === "/usr/bin/shasum")
+
+  assert.equal(
+    attachIndex < mountedStapleIndex &&
+      mountedStapleIndex < mountedSignatureIndex &&
+      mountedStapleIndex < mountedGatekeeperIndex &&
+      mountedStapleIndex < detachIndex &&
+      mountedStapleIndex < checksumIndex,
+    true,
+  )
+  assert.equal(result.artifacts.includes("SHA256SUMS"), true)
 })
 
 test("retains only validated final receipts after a successful release", async () => {

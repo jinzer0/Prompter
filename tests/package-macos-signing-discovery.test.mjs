@@ -237,6 +237,6 @@ test("uses strict deep verification only after discovery without mutating the bu
   ])
   assert.equal(
     (await discoverSignableCode({ appPath: paths.appPath, runFile: createSigningRunner() })).length,
-    10,
+    11,
   )
 })

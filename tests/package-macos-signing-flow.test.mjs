@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
-import { realpath } from "node:fs/promises"
-import { relative } from "node:path"
+import { mkdir, realpath, writeFile } from "node:fs/promises"
+import { dirname, join, relative } from "node:path"
 
 import { afterEach, test } from "vitest"
 
@@ -48,6 +48,7 @@ test("signs every nested code object deterministically before the outer app with
   const canonicalAppPath = await realpath(paths.appPath)
   const targets = signed.map(({ arguments_ }) => relative(canonicalAppPath, arguments_.at(-1)))
   assert.deepEqual(targets, [
+    "Contents/Resources/app/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
     "Contents/Frameworks/Prompter Helper.app/Contents/MacOS/Prompter Helper",
     "Contents/XPCServices/Worker.xpc/Contents/MacOS/Worker",
     "Contents/Frameworks/Kit.framework/Kit",
@@ -80,6 +81,26 @@ test("signs every nested code object deterministically before the outer app with
     command: "/usr/bin/codesign",
     arguments_: ["--verify", "--deep", "--strict", canonicalAppPath],
   })
+})
+
+test("rejects a missing required runtime addon before first mutable codesign", async () => {
+  const paths = await fixture({ missingRuntimeAddon: true })
+  const calls = []
+  await assert.rejects(
+    signAppBundle({
+      appPath: paths.appPath,
+      identity: signingIdentity,
+      entitlementsPath: paths.entitlements,
+      runFile: createSigningRunner({ calls }),
+    }),
+    /Unexpected runtime native signing target/,
+  )
+  assert.equal(
+    calls.some(
+      ({ command, arguments_ }) => command === "/usr/bin/codesign" && arguments_[0] === "--force",
+    ),
+    false,
+  )
 })
 
 test("requires exactly one well-formed signing identity before any signing mutation", async () => {
@@ -140,4 +161,44 @@ test("coalesces only same-framework version aliases and signs their canonical ta
       arguments_.at(-1) === canonicalFrameworkBinary,
   )
   assert.equal(signedFrameworks.length, 1)
+})
+
+test.each([
+  "better-sqlite3",
+  "bindings",
+  "file-uri-to-path",
+])("rejects an unexpected signable runtime payload in %s before first mutable codesign", async (packageName) => {
+  const paths = await fixture()
+  const foreignPayload = join(
+    paths.appPath,
+    "Contents",
+    "Resources",
+    "app",
+    "node_modules",
+    packageName,
+    "foreign-native",
+  )
+  await mkdir(dirname(foreignPayload), { recursive: true })
+  await writeFile(foreignPayload, Buffer.from([0xcf, 0xfa, 0xed, 0xfe]))
+  const calls = []
+  const outcome = await signAppBundle({
+    appPath: paths.appPath,
+    identity: signingIdentity,
+    entitlementsPath: paths.entitlements,
+    runFile: createSigningRunner({ calls }),
+  }).then(
+    () => undefined,
+    (error) => error,
+  )
+
+  assert.equal(
+    calls.some(
+      ({ command, arguments_ }) => command === "/usr/bin/codesign" && arguments_[0] === "--force",
+    ),
+    false,
+  )
+  assert.match(
+    outcome instanceof Error ? outcome.message : "",
+    /Unexpected runtime native signing target/,
+  )
 })

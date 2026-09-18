@@ -144,6 +144,7 @@ export async function runMacOSRelease(options) {
       state.mountDirectory,
       join(state.mountDirectory, appBundleName),
     )
+    await run("/usr/bin/xcrun", ["stapler", "validate", mountedApp], {})
     await verifyAppSignature({
       appPath: mountedApp,
       identity: release.signingIdentity,

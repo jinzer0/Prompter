@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import { access, cp, mkdir, realpath, writeFile } from "node:fs/promises"
-import { dirname, join, resolve } from "node:path"
+import { access, cp, mkdir, realpath, symlink, writeFile } from "node:fs/promises"
+import { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
@@ -14,12 +14,20 @@ import {
   createPackageFixture,
   createTemporaryDirectoryTracker,
 } from "./support/macos-package-fixtures.mjs"
-import { listFilesRecursively } from "./support/macos-package-tree.mjs"
+import { copyRequiredRuntimeAddon, listFilesRecursively } from "./support/macos-package-tree.mjs"
 
 const executeFile = promisify(execFile)
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const temporaryDirectories = createTemporaryDirectoryTracker()
 const allowedCommands = new Set(["/usr/bin/file", "/usr/bin/lipo"])
+const runtimePackageRoots = ["better-sqlite3", "bindings", "file-uri-to-path"]
+const foreignNativePayloads = [
+  "foreign.node",
+  "foreign.dylib",
+  "foreign.o",
+  "foreign.a",
+  "foreign-native",
+]
 
 afterEach(() => temporaryDirectories.cleanup())
 
@@ -158,6 +166,7 @@ test("production staging contains only the SQLite native addon for read-only dis
     "better-sqlite3",
     "build",
   )
+  const stagedModules = join(appPath, "Contents", "Resources", "app", "node_modules")
   const calls = []
   const targets = await discoverSignableCode({
     appPath,
@@ -168,9 +177,9 @@ test("production staging contains only the SQLite native addon for read-only dis
     },
   })
   const canonicalSQLiteAddon = await realpath(stagedSQLiteAddon)
-  const buildTargets = targets
-    .filter(({ path }) => path.startsWith(stagedBuildPath))
-    .map(({ path }) => path)
+  const runtimeTargets = targets
+    .filter(({ path }) => path.startsWith(stagedModules))
+    .map(({ path }) => relative(stagedModules, path))
 
   const discoveredCommands = [...new Set(calls.map(({ command }) => command))].sort()
   assert.deepEqual(discoveredCommands, [...allowedCommands].sort())
@@ -186,9 +195,65 @@ test("production staging contains only the SQLite native addon for read-only dis
     true,
   )
   assert.deepEqual(await listFilesRecursively(stagedBuildPath), ["Release/better_sqlite3.node"])
-  assert.deepEqual(buildTargets, [canonicalSQLiteAddon])
+  assert.deepEqual(runtimeTargets, ["better-sqlite3/build/Release/better_sqlite3.node"])
   assert.equal(
     calls.some(({ command }) => !allowedCommands.has(command)),
     false,
   )
 }, 30_000)
+
+test.each(
+  runtimePackageRoots,
+)("assembly excludes every foreign native payload from %s", async (packageName) => {
+  const electron = temporaryDirectories.track(await createElectronAppFixture())
+  const output = temporaryDirectories.track(await createPackageFixture())
+  const sourceRoot = join(output.outputDirectory, "source")
+  const sourcePackage = join(sourceRoot, "node_modules", packageName)
+  const stagedPackage = join(
+    output.appPath,
+    "Contents",
+    "Resources",
+    "app",
+    "node_modules",
+    packageName,
+  )
+  const nativeFixture = join(
+    repositoryRoot,
+    "node_modules",
+    "better-sqlite3",
+    "build",
+    "Release",
+    "better_sqlite3.node",
+  )
+  await Promise.all([
+    access(nativeFixture),
+    ...["dist", "dist-electron", "drizzle"].map((path) =>
+      mkdir(join(sourceRoot, path), { recursive: true }),
+    ),
+    ...runtimePackageRoots.map((name) =>
+      mkdir(join(sourceRoot, "node_modules", name), { recursive: true }),
+    ),
+    copyRequiredRuntimeAddon(sourceRoot, nativeFixture),
+  ])
+  await Promise.all([
+    writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.1" })),
+    ...runtimePackageRoots.map((name) =>
+      writeFile(join(sourceRoot, "node_modules", name, "index.js"), "runtime package"),
+    ),
+    ...foreignNativePayloads.map((name) => cp(nativeFixture, join(sourcePackage, name))),
+  ])
+  await symlink("foreign.node", join(sourcePackage, "foreign-native-link"))
+  await assembleMacOSApp({
+    appPath: output.appPath,
+    electronAppPath: electron.appPath,
+    packageJsonPath: join(sourceRoot, "package.json"),
+    sourceRoot,
+  })
+
+  assert.deepEqual(
+    await listFilesRecursively(stagedPackage),
+    packageName === "better-sqlite3"
+      ? ["build/Release/better_sqlite3.node", "index.js"]
+      : ["index.js"],
+  )
+})

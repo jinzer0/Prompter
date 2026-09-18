@@ -50,6 +50,15 @@ function createClaim(directory, id, options = {}) {
   return createSubmissionClaim(directory, { generateOwnerId: () => id, ...options })
 }
 
+function failOnce(publication, failure) {
+  let pending = true
+  return (observed) => {
+    if (!pending || observed !== publication) return undefined
+    pending = false
+    return failure
+  }
+}
+
 test("syncs the containing directory after atomically replacing JSON", async () => {
   const root = await temporaryDirectories.create()
   observeDirectory(root)
@@ -138,15 +147,14 @@ test("syncs a fresh claim directory before submitting", async () => {
   assert.ok(fsProbe.events.indexOf("claim publication") < fsProbe.events.indexOf("submit"))
 })
 
-test("prevents submit when fresh claim directory sync fails", async () => {
+test("rolls back a fresh final claim after directory sync fails and permits one retry", async () => {
   const root = await temporaryDirectories.create()
   const artifactPath = await artifact(root, "Prompter.zip")
+  const claimPath = join(root, ".notarization-submit.claim")
   const runner = createNotaryRunner()
+  const failure = Object.assign(new Error("synthetic final claim sync failure"), { code: "EIO" })
   observeDirectory(root)
-  fsProbe.directorySyncFailure = (publication) =>
-    publication === "claim temp"
-      ? Object.assign(new Error("synthetic claim sync failure"), { code: "EIO" })
-      : undefined
+  fsProbe.directorySyncFailure = failOnce("claim final", failure)
 
   await assert.rejects(
     submitAndWait({ artifactPath, profile, evidenceDir: root, runFile: runner.runFile }),
@@ -154,6 +162,12 @@ test("prevents submit when fresh claim directory sync fails", async () => {
   )
 
   assert.equal(runner.calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 0)
+  await assert.rejects(readFile(claimPath), { code: "ENOENT" })
+  assert.equal(fsProbe.events.filter((entry) => entry === "directory sync").length, 2)
+
+  await submitAndWait({ artifactPath, profile, evidenceDir: root, runFile: runner.runFile })
+
+  assert.equal(runner.calls.filter(({ arguments_ }) => arguments_[1] === "submit").length, 1)
 })
 
 test("suppresses claim publication and submit when temporary claim close fails", async () => {

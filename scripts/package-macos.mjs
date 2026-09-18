@@ -1,13 +1,18 @@
 import { execFile } from "node:child_process"
-import { access, cp, mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises"
+import { access, cp, lstat, mkdir, mkdtemp, readFile, rm, symlink } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join, relative, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
 import { renameElectronApp as renameAppBundle } from "./macos/app-bundle.mjs"
 import { ensureOwnedDirectory, validateOwnedDirectory } from "./macos/owned-directory.mjs"
 import { releaseInputNames } from "./macos/release-inputs.mjs"
+import {
+  allowedRuntimeNativePath,
+  runtimePackageRoots,
+  shouldStageRuntimePackagePath,
+} from "./macos/runtime-native-policy.mjs"
 
 const runFile = promisify(execFile)
 
@@ -20,8 +25,6 @@ const electronApp = join(root, "node_modules", "electron", "dist", "Electron.app
 const outputRoot = join(root, "release")
 const packageRoot = join(outputRoot, `${appName}-darwin-${process.arch}`)
 const packagedApp = join(packageRoot, appBundleName)
-const runtimePackageRoots = ["better-sqlite3", "bindings", "file-uri-to-path"]
-const betterSqlite3NativeAddon = join("build", "Release", "better_sqlite3.node")
 
 export async function renameElectronApp(appPath = packagedApp, version) {
   return renameAppBundle({ appName, appPath, bundleExecutableKey, bundleIdentifier, version })
@@ -45,26 +48,18 @@ async function copyAppSource(resourcesPath, sourceRoot = root) {
       return cp(sourcePackagePath, join(appModulesPath, packageName), {
         recursive: true,
         verbatimSymlinks: true,
-        filter:
-          packageName === "better-sqlite3"
-            ? (sourcePath) => {
-                const packagePath = relative(sourcePackagePath, sourcePath)
-                if (packagePath.split(/[/\\]/)[0] === "build") {
-                  return (
-                    packagePath === "build" ||
-                    packagePath === join("build", "Release") ||
-                    packagePath === betterSqlite3NativeAddon
-                  )
-                }
-                return (
-                  !packagePath.toLowerCase().endsWith(".node") ||
-                  packagePath === betterSqlite3NativeAddon
-                )
-              }
-            : undefined,
+        filter: (sourcePath) =>
+          shouldStageRuntimePackagePath({ packageName, sourcePackagePath, sourcePath }),
       })
     }),
   ])
+  const addonMetadata = await lstat(join(appModulesPath, allowedRuntimeNativePath)).catch(
+    (error) => {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+      throw error
+    },
+  )
+  if (addonMetadata?.isFile() !== true) throw new Error("Required runtime native addon is missing")
 }
 
 export function resolveMacOSArchitecture(architecture = process.arch) {
@@ -159,10 +154,7 @@ export async function createDmgArchive({
   try {
     await rm(dmgPath, { force: true })
     stagingDirectory = await mkdtemp(join(tmpdir(), `${appName}-dmg-`))
-    await cp(appPath, join(stagingDirectory, appBundleName), {
-      recursive: true,
-      verbatimSymlinks: true,
-    })
+    await executeFile("/usr/bin/ditto", [appPath, join(stagingDirectory, appBundleName)])
     await symlink("/Applications", join(stagingDirectory, "Applications"))
     await executeFile("/usr/bin/hdiutil", [
       "create",

@@ -41,6 +41,17 @@ export async function createSigningFixture(options = {}) {
     framework: join(appPath, "Contents", "Frameworks", "Kit.framework", "Kit"),
     dylib: join(appPath, "Contents", "Frameworks", `libfixture${dylibSuffix}`),
     native: join(appPath, "Contents", "Resources", "app", `fixture${nativeSuffix}`),
+    runtimeAddon: join(
+      appPath,
+      "Contents",
+      "Resources",
+      "app",
+      "node_modules",
+      "better-sqlite3",
+      "build",
+      "Release",
+      "better_sqlite3.node",
+    ),
     xpc: join(appPath, "Contents", "XPCServices", "Worker.xpc", "Contents", "MacOS", "Worker"),
     tool: join(appPath, "Contents", "MacOS", "native-tool"),
     entitlements: join(root, "entitlements.plist"),
@@ -51,6 +62,7 @@ export async function createSigningFixture(options = {}) {
         (path) =>
           path !== paths.appPath &&
           path !== paths.entitlements &&
+          (!options.missingRuntimeAddon || path !== paths.runtimeAddon) &&
           (!options.frameworkAliases || path !== paths.framework),
       )
       .map(executable),

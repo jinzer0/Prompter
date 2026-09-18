@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: [
       "tests/package-macos-package.test.mjs",
+      "tests/package-macos-dmg-staging.test.mjs",
       "tests/package-macos-production-staging.test.mjs",
       "tests/package-macos-coordinator-success.test.mjs",
       "tests/package-macos-coordinator-final-receipts.test.mjs",
@@ -29,6 +30,7 @@ export default defineConfig({
       "tests/package-macos-notarization-claim.test.mjs",
       "tests/package-macos-notarization-storage.test.mjs",
       "tests/package-macos-notarization-durability.test.mjs",
+      "tests/package-macos-notarization-publication-rollback.test.mjs",
       "tests/macos-release-contract.test.ts",
       "tests/privacy-guard-service.test.ts",
       "tests/privacy-guard-integration.test.ts",

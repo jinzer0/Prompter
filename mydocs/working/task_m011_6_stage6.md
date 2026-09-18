@@ -106,7 +106,7 @@ stale implementation-plan row를 교정했다.
 | `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-evidence.mjs`, `scripts/macos/notarization.mjs` | artifact kind/hash-bound resume, Accepted refresh, lowercase `info` 전용 severity taxonomy, strict final evidence validation을 고정했다. |
 | `scripts/macos/release-support.mjs`, `scripts/macos/release-lifecycle.mjs`, `scripts/release-macos.mjs` | exact `0.1.1`, preflight-before-candidate, detach-before-remove, bounded timeout/abort, DMG runtime argv와 downstream suppression을 고정했다. |
 | `scripts/macos/owned-directory.mjs`, release lifecycle/attempt modules | source-root parent를 canonical trusted anchor로 삼고 그 아래 모든 component의 no-symlink directory ownership을 creation과 recursive cleanup 전에 검증한다. anchor 위 macOS platform alias는 허용한다. |
-| `scripts/package-macos.mjs`, `scripts/macos/app-bundle.mjs`, `scripts/macos/signing.mjs`, `scripts/macos/signing-discovery.mjs` | package/app-bundle과 signing/discovery 책임을 분리했다. source copy는 npm-bin relative link text를 보존하고, discovery는 실제 file type이 Mach-O인 canonical target에만 `/usr/bin/lipo -archs`를 실행해 exact `arm64` token을 요구한다. 초기 ELF/PE/text native payload는 package에 남기되 signing 대상에서 제외하고, Mach-O alias/path/duplicate/architecture 검증과 signing 전후 target-set 불변성은 fail closed로 유지한다. |
+| `scripts/package-macos.mjs`, `scripts/macos/app-bundle.mjs`, `scripts/macos/signing.mjs`, `scripts/macos/signing-discovery.mjs` | HISTORICAL — package/app-bundle과 signing/discovery 책임을 분리했다. 당시 source copy는 npm-bin relative link text를 보존하고 초기 ELF/PE/text native payload를 package에 남기되 signing 대상에서 제외했다. 이 staging 동작은 Stage 6.30과 6.31의 exact runtime closure 및 native singleton policy로 supersede됐다. Mach-O alias/path/duplicate/architecture 검증과 signing 전후 target-set 불변성은 유지된다. |
 | `scripts/macos/release-version-preflight.mjs`, `package.json` | signed npm entrypoint가 build와 candidate mutation 전에 exact version preflight를 실행하게 했다. |
 | `scripts/macos/release-inputs.mjs`, release preflight/entrypoints | signed release input 이름을 한 곳에 고정하고 exact version 뒤 두 nonblank input을 build 전에 검사한다. runtime coordinator의 기존 input validation은 유지한다. |
 | `scripts/macos/notarization-command.mjs`, `scripts/macos/notarization-contract.mjs`, `scripts/macos/release-attempt-validation.mjs` | warning/error log는 terminal publication blocker로 유지하고, malformed/service-error retrieval 뒤 valid bound lowercase-accepted app/DMG bytes는 refresh를 위해 보존한다. |
@@ -131,6 +131,10 @@ stale implementation-plan row를 교정했다.
 | Stage 6.26 notarization storage/claim, artifact-drift, signer-fingerprint tests와 coordinator fixtures, `vitest.config.ts` | live/dead/ambiguous claim phase, fresh/resumed `info`/`log` drift cleanup과 third-run rebuild, final ZIP/DMG/mounted-app fingerprint gates를 고정했다. coordinator fixture는 249 pure LOC, artifact helper는 34 pure LOC, direct drift suite는 69 pure LOC다. |
 | `mydocs/plans/task_m011_6_impl.md` | as-built Notarization contract를 `submit --wait`에서 UUID 제출·저장 후 bounded `info` polling으로 정정했다. |
 | Stage 6.27 notarization command/identity/storage, release-attempt validation, coordinator fixtures와 direct regressions | timeout UUID를 polling으로 유지하고 stale-claim reclaim을 exclusive하게 직렬화한다. success는 per-kind attempt/evidence subtree를 함께 제거하며 missing/unreadable drift도 typed cleanup 뒤 clean rebuild한다. timeout fixture는 recovery test에서 기본 `In Progress`를 유지한다. |
+| `scripts/macos/runtime-native-policy.mjs`, `scripts/package-macos.mjs`, `scripts/macos/signing.mjs` | Stage 6.31은 세 runtime package root 안의 foreign `.node`, `.dylib`, `.o`, `.a`, extensionless Mach-O와 native symlink를 staging에서 제외하고 first codesign 전 required addon singleton을 검사한다. |
+| `scripts/macos/notarization-publication.mjs`, `scripts/macos/notarization-storage.mjs` | post-link directory-sync failure에서 final owner record가 exact match일 때만 tombstone으로 제거하고 directory를 sync한다. replacement owner와 stale claim은 보존한다. |
+| `scripts/package-macos.mjs`, `scripts/release-macos.mjs` | DMG app copy를 `/usr/bin/ditto`로 수행해 xattr를 보존하고 mounted app `stapler validate` 성공 뒤에만 signature, Gatekeeper, checksum으로 진행한다. |
+| Stage 6.31 package/signing/publication/DMG coordinator regressions와 support, `vitest.config.ts` | runtime-root별 adversarial native injection, missing required addon, owner race/cleanup failure/retry, real ditto xattr, mounted staple success/failure order를 direct suites로 고정했다. changed source/test/support/config 21개는 모두 250 pure LOC 이하이며 최대 248이다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
@@ -270,14 +274,16 @@ npm test -- tests/package-macos-coordinator-cached-accepted.test.mjs
   `node_modules/.bin/vite -> ../vite/bin/vite.js` link text를 app 안에서도 그대로 보존한다.
   signing discovery는 canonical target이 executable text인 contained alias를 sign 대상에서
   제외하고, 기존 duplicate native, escaping native, arbitrary framework alias는 계속 거부한다.
-- OK: actual assembled app의 installed dependency tree를 실제 `/usr/bin/file`로 read-only discovery한
+- HISTORICAL: actual assembled app의 당시 installed dependency tree를 실제 `/usr/bin/file`로 read-only discovery한
   결과는 63 signable targets와 236 file inspections다. packaged
   `@electron-internal/extract-zip/index.linux-arm-gnueabihf.node`는 ELF로 분류되어 그대로 보존되지만
-  signing target에는 포함되지 않았고 discovery는 끝까지 완료됐다.
-- OK: initially foreign ELF/PE/text `.node`와 `.dylib`는 분류 뒤 제외한다. Mach-O `.node`, `.dylib`,
+  signing target에는 포함되지 않았고 discovery는 끝까지 완료됐다. 이 package retention은 Stage 6.30과
+  6.31의 exact runtime closure로 supersede됐다.
+- HISTORICAL: initially foreign ELF/PE/text `.node`와 `.dylib`는 분류 뒤 제외한다. Mach-O `.node`, `.dylib`,
   framework binary, executable host와 non-executable extensionless Mach-O는 계속 발견된다. 첫 pass의
   Mach-O가 signing 뒤 foreign type으로 바뀌거나 사라지는 경우와 새 Mach-O 추가는 두 target set 비교로
-  outer signing 전에 실패한다.
+  outer signing 전에 실패한다. Stage 6.31은 runtime package roots에서는 foreign native payload 자체를
+  staging하지 않고 first codesign 전 required addon singleton을 추가 검증한다.
 - OK: dead framework-alias wrappers를 제거했고 oversized package/coordinator, signing,
   notarization test modules를 split했다. removed large-suite paths는 checked-in Vitest include에서
   빠졌고 title inventory는 보존됐다.
@@ -720,12 +726,41 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   기록했다.
 - MISS(환경 제한): Stage 6.30 changed paths의 LSP diagnostics는 sibling-worktree request-root 제한으로 사용할 수
   없어 PASS로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.30 report-inclusive reviewed head는
+  `1c8ab2d13db90b0edbc4c490ebc53a1e613cbee9`다. QA PASS, Goal FAIL, Code Quality FAIL,
+  Security HIGH FAIL, Context FAIL을 기록했다. runtime package 내부 foreign native/symlink staging,
+  post-link sync failure 뒤 same-owner claim/guard leak, signing 대상 승격, Node `fs.cp` xattr loss,
+  mounted-app staple validation 누락과 stale cumulative accounting이 blocker였다.
+- RED FIRST: Stage 6.31은 세 runtime root의 suffix/extensionless Mach-O/symlink injection, fresh claim과
+  guard post-link sync one-shot failure, replacement-owner race, cleanup failure/retry, real ditto xattr와 mounted
+  staple ordering/failure를 production 교정 전에 재현했다.
+- OK: Stage 6.31 runtime policy는 staging 뒤 package roots를 정확히 `better-sqlite3`, `bindings`,
+  `file-uri-to-path`로 제한하고 build subtree에는 `Release/better_sqlite3.node`만 남긴다. signing은 첫
+  codesign 전에 runtime target singleton을 검사한다.
+- OK: Stage 6.31 publication rollback은 exact owner만 durable tombstone removal하고 replacement owner와
+  stale claim을 보존한다. DMG staging은 `/usr/bin/ditto`를 사용하며 mounted app `stapler validate`는
+  signature, Gatekeeper, checksum보다 먼저 실행된다.
+- REJECT/RESOLVED: pre-commit Oracle session `ses_f4bf49675ffeREHTU70eL5ffZM`은 zero runtime target이
+  assembly와 signing에서 허용되는 exact-one bypass를 확인했다. missing-addon assembly/signing regressions은
+  production fix 전 2 failed/21 passed였고 regular-file postcondition과 unconditional exact-one check 뒤
+  23/23으로 전환됐다.
+- OK: authoritative Stage 6.31 verification은 packaging/signing 6 files/61 tests,
+  notarization publication 4 files/31 tests, coordinator/release 4 files/55 tests, full Vitest 156 files/1051
+  tests, typecheck, lint, changed-source syntax, protected diff, diff check, build, unsigned package와 smoke
+  49/49다. signed missing-input entrypoint는 exit 1, candidate absent, tracked mutation 0건이었다. actual
+  packaged addon은 `/usr/bin/file`에서 Mach-O 64-bit bundle arm64, `/usr/bin/lipo -archs`에서 arm64였다.
+  secret/publication/renderer-IPC surface scan과 generated-output cleanup도 통과했다.
+- OK: Stage 6.31 changed source/test/support/config 21개는 모두 250 pure LOC 이하이며 최대 248이다.
+- MISS(환경 제한): Stage 6.31 LSP diagnostics는 sibling-worktree request-root 제한으로 사용할 수 없어
+  PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact manual
   inspection, tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.30의 exact runtime package closure와 parent-directory-durable evidence publication, Stage 6.29의
+- Stage 6.31의 runtime native singleton, exact-owner publication rollback, ditto metadata continuity와
+  mounted-app staple validation, Stage 6.30의 exact runtime package closure와 parent-directory-durable
+  evidence publication, Stage 6.29의
   unknown attempt retention과 exact storage-remnant cleanup, Stage 6.28의 owner-aware
   claim/guard recovery와 sanitized durable final receipt, Stage 6.27의 typed
   finalization drift cleanup, coherent success cleanup과 Stage 6.26의
@@ -783,9 +818,11 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   REJECT와 Security/QA APPROVE는 Stage 6.29 remediation의 입력으로 보존됐다.
 - Stage 6.29 report-inclusive head `6e1ad240ee342671c366934413c164c78eac09fc`의 fresh review는 Goal/Security/Context
   REJECT와 QA/Quality APPROVE를 기록했고, findings는 Stage 6.30 remediation 입력으로 보존됐다.
-- Stage 6.30 packaging/durability/remnant remediation과 direct, focused, full-suite, build, package, smoke
-  validation은 완료됐다. Stage 6.30은 자신의 아직 알 수 없는 exact SHA를 재귀적으로 주장하지 않는다. 다음
-  fresh exact-head review에서 다섯 lane 모두 exact-head approval을 주고, PR #8 merge와 `origin/master`
+- Stage 6.30 report-inclusive head `1c8ab2d13db90b0edbc4c490ebc53a1e613cbee9`의 review는 QA
+  PASS, Goal/Quality/Security/Context FAIL을 기록했고 findings는 Stage 6.31 remediation 입력으로 보존됐다.
+- Stage 6.31 runtime singleton/publication rollback/DMG metadata/staple remediation과 focused, full-suite,
+  build, package, smoke validation은 완료됐다. Stage 6.31은 자신의 아직 알 수 없는 exact SHA를 재귀적으로
+  주장하지 않는다. 다음 fresh exact-head review에서 다섯 lane 모두 exact-head approval을 주고, PR #8 merge와 `origin/master`
   containment verification을 마칠 때까지 Task #6과 Todo 8은 `진행중`이다.
 
 ## 승인 요청
@@ -836,6 +873,8 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   unknown-attempt loss, generated storage-remnant survival과 stale PR chronology는 Stage 6.29
   source/test/config, 두 report와 PR body에서 교정됐다. Stage 6.29 reviewed head
   `6e1ad240ee342671c366934413c164c78eac09fc`의 copied foreign/tooling native payload, parent-directory durability,
-  stale report claim findings는 Stage 6.30 source/test와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를
-  재귀적으로 주장하지 않는다. Stage 6.30 five-lane fresh exact-head approvals, PR merge, containment는 서로
-  분리된 후속 gate다.
+  stale report claim findings는 Stage 6.30 source/test와 두 report에서 교정됐다.
+- 작업지시자의 최신 명시 지시에 따라 `1c8ab2d` review의 runtime native singleton bypass,
+  post-link claim/guard rollback, DMG xattr/staple continuity와 cumulative accounting findings는 Stage 6.31
+  source/test/config와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않는다.
+  Stage 6.31 five-lane fresh exact-head approvals, PR merge, containment는 서로 분리된 후속 gate다.

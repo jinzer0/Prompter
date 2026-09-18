@@ -1,4 +1,4 @@
-import { access, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
+import { access, cp, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -204,6 +204,8 @@ export async function createCoordinatorFixture({
       await createZipSnapshot(arguments_, options, fakeArtifacts)
     if (command === "/usr/bin/ditto" && arguments_[0] === "-x")
       await restoreSnapshot(arguments_[2], arguments_.at(-1), fakeArtifacts)
+    if (stage === "dmg-stage")
+      await cp(arguments_[0], arguments_[1], { recursive: true, verbatimSymlinks: true })
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "create")
       await createDmgSnapshot(arguments_, fakeArtifacts)
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "attach")

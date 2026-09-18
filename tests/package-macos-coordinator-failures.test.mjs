@@ -9,6 +9,7 @@ import {
   assertNoLaterReleaseStages,
   assertSanitizedReleaseFailure,
   notarizationAttempt,
+  releaseStages,
   syntheticSecret,
   writeRetainedResume,
 } from "./support/macos-coordinator-support.mjs"
@@ -40,6 +41,7 @@ test.each([
   ["dmg-staple", "dmg-gatekeeper"],
   ["dmg-gatekeeper", "attach"],
   ["attach", "checksum"],
+  ["mounted-app-stapler-validate", "app-verify-3"],
   ["app-verify-3", "mounted-app-gatekeeper"],
   ["mounted-app-gatekeeper", "checksum"],
   ["detach", "checksum"],
@@ -106,6 +108,21 @@ test("detaches the mounted app after a mounted-app Gatekeeper failure", async ()
   assert.equal(release.calls.includes("app-verify-3"), true)
   assert.equal(release.calls.includes("detach"), true)
   assert.equal(release.calls.includes("checksum"), false)
+})
+
+test("detaches but suppresses downstream release work when mounted staple validation fails", async () => {
+  const release = await fixture({ failure: "mounted-app-stapler-validate" })
+  await assert.rejects(release.run(), assertSanitizedReleaseFailure)
+  const validationIndex = release.calls.indexOf("mounted-app-stapler-validate")
+  assert.notEqual(validationIndex, -1)
+  assert.deepEqual(
+    release.calls.slice(validationIndex + 1).filter((stage) => releaseStages.includes(stage)),
+    ["detach"],
+  )
+  assert.equal(release.calls.includes("app-verify-3"), false)
+  assert.equal(release.calls.includes("mounted-app-gatekeeper"), false)
+  assert.equal(release.calls.includes("checksum"), false)
+  await assert.rejects(access(release.candidate))
 })
 
 test("preserves a mounted image when detach cleanup fails and reports aggregate failure", async () => {

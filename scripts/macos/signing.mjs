@@ -3,6 +3,10 @@ import { mkdtemp, readFile, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
+import {
+  isAllowedRuntimeNativeTarget,
+  isRuntimeNodeModuleTarget,
+} from "./runtime-native-policy.mjs"
 import { discoverSignableCode, SigningInputError } from "./signing-discovery.mjs"
 
 export { discoverSignableCode } from "./signing-discovery.mjs"
@@ -89,6 +93,16 @@ async function verifyTargets(targets, runFile) {
   }
 }
 
+function validateRuntimeNativeTargets(appPath, targets) {
+  const runtimeTargets = targets.filter((target) => isRuntimeNodeModuleTarget(appPath, target.path))
+  if (
+    runtimeTargets.length !== 1 ||
+    !isAllowedRuntimeNativeTarget(appPath, runtimeTargets[0].path)
+  ) {
+    throw new SigningInputError("Unexpected runtime native signing target")
+  }
+}
+
 function invalidArtifactIdentity(artifactKind) {
   const error = new SigningInputError("Recovered artifact signing identity is invalid")
   error.artifactKind = artifactKind
@@ -148,6 +162,7 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   const canonicalEntitlementsPath = await validateEntitlements(entitlementsPath, executeFile)
   const rootPath = await realpath(resolve(appPath))
   const targets = await discoverSignableCode({ appPath: rootPath, runFile: executeFile })
+  validateRuntimeNativeTargets(rootPath, targets)
 
   for (const target of targets) {
     await executeFile(
@@ -158,6 +173,7 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   }
 
   const postSignTargets = await discoverSignableCode({ appPath: rootPath, runFile: executeFile })
+  validateRuntimeNativeTargets(rootPath, postSignTargets)
   if (
     targets.length !== postSignTargets.length ||
     targets.some((target, index) => target.path !== postSignTargets[index]?.path)

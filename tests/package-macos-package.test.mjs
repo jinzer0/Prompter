@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import {
   access,
+  cp,
   mkdir,
   readdir,
   readFile,
@@ -30,6 +31,7 @@ import {
   electronHelperNames,
   helperSuffix,
 } from "./support/macos-package-fixtures.mjs"
+import "./package-macos-dmg-staging.test.mjs"
 
 const temporaryDirectories = createTemporaryDirectoryTracker()
 afterEach(() => temporaryDirectories.cleanup())
@@ -98,6 +100,39 @@ test("rejects a symlinked package root before app assembly can delete external c
   assert.equal(await readFile(externalSentinelPath, "utf8"), "retain")
 })
 
+test("rejects assembly without the required runtime addon and removes the partial app", async () => {
+  const electron = await electronFixture()
+  const output = await packageFixture()
+  const sourceRoot = join(output.outputDirectory, "source-without-addon")
+  await Promise.all(
+    [
+      "dist",
+      "dist-electron",
+      "drizzle",
+      "node_modules/better-sqlite3",
+      "node_modules/bindings",
+      "node_modules/file-uri-to-path",
+    ].map((directory) => mkdir(join(sourceRoot, directory), { recursive: true })),
+  )
+  await Promise.all([
+    writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.1" })),
+    ...["better-sqlite3", "bindings", "file-uri-to-path"].map((packageName) =>
+      writeFile(join(sourceRoot, "node_modules", packageName, "index.js"), "runtime package"),
+    ),
+  ])
+
+  await assert.rejects(
+    assembleMacOSApp({
+      appPath: output.appPath,
+      electronAppPath: electron.appPath,
+      packageJsonPath: join(sourceRoot, "package.json"),
+      sourceRoot,
+    }),
+    /Required runtime native addon is missing/,
+  )
+  await assert.rejects(access(output.appPath))
+})
+
 test("uses versioned arm64 and x64 DMG names", async () => {
   for (const architecture of ["arm64", "x64"]) {
     const fixture = await packageFixture()
@@ -134,10 +169,16 @@ test("stages only the app and Applications link before invoking hdiutil", async 
   const fixture = await packageFixture()
   await writeFile(join(fixture.appPath, "relative-target"), "target")
   await symlink("relative-target", join(fixture.appPath, "relative-link"))
+  let dittoInvocation
   let hdiutilInvocation
   const dmgPath = await createDmgArchive({
     ...dmgOptions(fixture, "arm64"),
     runFile: async (file, arguments_) => {
+      if (file === "/usr/bin/ditto") {
+        dittoInvocation = { arguments_, file }
+        await cp(arguments_[0], arguments_[1], { recursive: true, verbatimSymlinks: true })
+        return
+      }
       const stagingDirectory = arguments_[arguments_.indexOf("-srcfolder") + 1]
       hdiutilInvocation = { arguments_, file, stagingDirectory }
       assert.deepEqual((await readdir(stagingDirectory)).sort(), ["Applications", "Prompter.app"])
@@ -148,6 +189,10 @@ test("stages only the app and Applications link before invoking hdiutil", async 
       )
       await writeFile(arguments_.at(-1), "DMG")
     },
+  })
+  assert.deepEqual(dittoInvocation, {
+    arguments_: [fixture.appPath, join(hdiutilInvocation.stagingDirectory, "Prompter.app")],
+    file: "/usr/bin/ditto",
   })
   assert.equal(hdiutilInvocation.file, "/usr/bin/hdiutil")
   assert.deepEqual(hdiutilInvocation.arguments_, [
@@ -171,7 +216,11 @@ test("removes stale targets and staging after successful DMG creation", async ()
   let stagingDirectory
   await createDmgArchive({
     ...dmgOptions(fixture, "arm64"),
-    runFile: async (_file, arguments_) => {
+    runFile: async (file, arguments_) => {
+      if (file === "/usr/bin/ditto") {
+        await cp(arguments_[0], arguments_[1], { recursive: true, verbatimSymlinks: true })
+        return
+      }
       stagingDirectory = arguments_[arguments_.indexOf("-srcfolder") + 1]
       await assert.rejects(access(staleDmgPath))
       await writeFile(arguments_.at(-1), "replacement")
@@ -187,7 +236,11 @@ test("removes partial DMGs and staging when hdiutil fails", async () => {
   await assert.rejects(
     createDmgArchive({
       ...dmgOptions(fixture, "x64"),
-      runFile: async (_file, arguments_) => {
+      runFile: async (file, arguments_) => {
+        if (file === "/usr/bin/ditto") {
+          await cp(arguments_[0], arguments_[1], { recursive: true, verbatimSymlinks: true })
+          return
+        }
         stagingDirectory = arguments_[arguments_.indexOf("-srcfolder") + 1]
         await writeFile(arguments_.at(-1), "partial")
         throw new Error("hdiutil failed")

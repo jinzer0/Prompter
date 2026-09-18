@@ -8,6 +8,7 @@ export function createFilesystemProbe(actual, state) {
     if (text.includes(".notarization-submit.reclaim.") && text.endsWith(".tmp")) {
       return "guard temp"
     }
+    if (text.endsWith(".notarization-submit.reclaim")) return "guard final"
     return text.endsWith(".tmp") ? "temp" : undefined
   }
 
@@ -53,10 +54,15 @@ export function createFilesystemProbe(actual, state) {
 
   return {
     link: async (sourcePath, targetPath) => {
-      if (String(targetPath).endsWith(".notarization-submit.claim")) {
+      const publication = labelFor(targetPath)
+      if (publication === "claim final") {
         state.events.push("claim publication")
       }
-      return actual.link(sourcePath, targetPath)
+      const result = await actual.link(sourcePath, targetPath)
+      if (publication === "claim final" || publication === "guard final") {
+        state.latestPublication = publication
+      }
+      return result
     },
     open: async (path, flags, mode) => {
       const handle =

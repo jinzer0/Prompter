@@ -3,7 +3,8 @@ import { link, mkdir, open, readFile, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 import { failNotarization } from "./notarization-contract.mjs"
-import { syncDirectory, writeSyncedExclusive } from "./notarization-durable-storage.mjs"
+import { syncDirectory } from "./notarization-durable-storage.mjs"
+import { createRecordPublisher } from "./notarization-publication.mjs"
 
 export { writeAtomicJson } from "./notarization-durable-storage.mjs"
 
@@ -129,6 +130,7 @@ export function createSubmissionClaim(
       return false
     }
     await removeClaimFile(removalPath, { force: true })
+    await syncDirectory(directory, openClaimFile)
     return true
   }
 
@@ -139,26 +141,32 @@ export function createSubmissionClaim(
     failNotarization("Notarization submission requires manual recovery")
   }
 
+  const publishRecord = createRecordPublisher({
+    directory,
+    linkRecordFile: linkClaimFile,
+    openRecordFile: openClaimFile,
+    removeRecordFile: removeClaimFile,
+    removeOwned,
+  })
+
   async function writeClaim() {
-    const temporaryPath = join(directory, `.${claimFileName}.${ownerId}.tmp`)
-    try {
-      await writeSyncedExclusive(temporaryPath, claim, openClaimFile)
-      await linkClaimFile(temporaryPath, claimPath)
-      await syncDirectory(directory, openClaimFile)
-    } finally {
-      await removeClaimFile(temporaryPath, { force: true })
-    }
+    await publishRecord({
+      finalPath: claimPath,
+      temporaryPath: join(directory, `.${claimFileName}.${ownerId}.tmp`),
+      record: claim,
+      parser: parseClaim,
+      fields: claimFields,
+    })
   }
 
   async function publishGuard(guard) {
-    const temporaryPath = join(directory, `.${reclaimFileName}.${ownerId}.tmp`)
-    try {
-      await writeSyncedExclusive(temporaryPath, guard, openClaimFile)
-      await linkClaimFile(temporaryPath, guardPath)
-      await syncDirectory(directory, openClaimFile)
-    } finally {
-      await removeClaimFile(temporaryPath, { force: true })
-    }
+    await publishRecord({
+      finalPath: guardPath,
+      temporaryPath: join(directory, `.${reclaimFileName}.${ownerId}.tmp`),
+      record: guard,
+      parser: parseGuard,
+      fields: guardFields,
+    })
   }
 
   async function acquireGuard(claimOwnerId) {

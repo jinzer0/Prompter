@@ -20,6 +20,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.3 | 8 | latest fresh-review failure 교정 addendum | Stage 6.3 governance, alias provenance, candidate ownership, state-machine/schema regressions | code-quality blocker 2건과 regression gap 전건 교정, fresh five-lane PASS 전 closure 차단 |
 | 6.4 | 8 | latest failed fresh-review 교정 addendum | Stage 6.4 governance, Electron 43 alias/version binding, preflight-before-candidate ordering, pending-state/schema regressions | five-lane FAIL blocker 전건 교정, direct security review 포함 fresh five-lane PASS 전 closure 차단 |
 | 6.5 | 8 | latest fresh review blocker 교정 addendum | Stage 6.5 governance, arbitrary framework alias rejection, Notarization severity fail-closed regressions | blocker 2건 교정, fresh five-lane direct reproduction PASS 전 closure 차단 |
+| 6.30 | 8 | exact-head fresh review blocker 교정 addendum | Stage 6.30 governance, signed staging native-addon policy, durable directory publication, stale report correction gate | exact head `6e1ad240ee342671c366934413c164c78eac09fc` blocker 3건 교정, real-tool checked-in regressions, five fresh exact-head approvals 전 merge 차단 |
 
 ## 구현 전 공통 기준
 
@@ -1126,6 +1127,104 @@ Task #6 [Stage 6.5]: alias와 Notarization severity fail-closed 교정
 Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `publish/task6` push,
 `master` PR, Todo 8 completion, Issue #7 entry는 이 governance commit 뒤에도 순차적으로 blocked다.
 
+## Stage 6.30 - exact-head fresh review blocker 교정 addendum
+
+Reviewed head는 정확히 `6e1ad240ee342671c366934413c164c78eac09fc`로 기록한다. 최신 exact-head
+fresh review 결과는 Goal signed staging blocker, Security directory durability blocker, Context stale
+report claim이다. Stage 6.30은 product code, tests, official docs, evidence, Stage 6 report draft,
+final report draft를 수정하기 전 governance와 orders note만 먼저 고정한다. 아래 blocker를 모두
+교정하고 같은 exact head 계열에서 fresh Goal, QA, Code quality, Context, Security 승인 5건을 새로
+받기 전까지 merge, closure reports, orders 완료 처리, `publish/task6` push, `master` PR 진행,
+Todo 8 completion, Issue #7 진입은 blocked 상태다. 기존 Stage 1-6.5 chronology는 보존한다.
+
+### Stage 6.30 review outcome 매핑
+
+| Outcome | 재현된 동작 또는 claim | Stage 6.30 의미 |
+|---|---|---|
+| Goal signed staging blocker | signed release staging이 production-shaped `.app`에서 native addon을 발견하거나 허용하는지 충분히 증명하지 못했다. | native addon allowlist와 real-tool assembly regression을 교정 전 승인 범위로 고정한다. |
+| Security directory durability blocker | directory ordering이 file fsync와 directory fsync 사이에 publish entry를 두거나 parent directory durability를 보장하지 않을 수 있다. | file sync, publish entry, parent directory sync, continuation 순서를 fail closed로 고정한다. |
+| Context stale report claim | report draft가 validated implementation보다 앞서 성공 claim을 적을 수 있다. | reports는 validation 뒤에만 정정하며 stale claim을 closure 근거로 쓰지 않는다. |
+
+### Stage 6.30 blocker 매핑
+
+| Blocking finding | 필수 교정 | 소유 파일 | 필수 테스트와 증거 |
+|---|---|---|---|
+| signed staging native addon policy | staging dependency allowlist는 `better-sqlite3`, `bindings`, `file-uri-to-path`뿐이다. 허용 native addon은 정확히 `better-sqlite3/build/Release/better_sqlite3.node` 하나뿐이다. 그 외 `.node`, dylib, binary addon, copied dependency는 stage하지 않는다. `discoverSignableCode`의 native-suffix non-Mach-O rejection, app-root containment, symlink escape rejection, duplicate canonical rejection, framework alias fail-closed 계약은 약화하지 않는다. | `scripts/package-macos.mjs`, `tests/package-macos-package.test.mjs`, `tests/package-macos-production-staging.test.mjs`, `vitest.config.ts` only if registration is required | real production-shaped assembly regression이 실제 `/usr/bin/file`과 `/usr/bin/lipo`를 사용해 required addon을 검사하고, optional/tooling/foreign native payload가 stage되지 않으며 injected non-Mach-O `.node`는 discovery에서 계속 거부됨을 증명한다. |
+| directory durability ordering | claim과 acknowledged UUID publication은 directory ordering을 `file sync -> publish entry -> parent directory sync -> continuation`으로 강제한다. directory sync 실패는 fail closed이며 submit 또는 claim release로 진행하지 않는다. UUID publication sync 실패 뒤 `submitting` claim은 manual recovery를 위해 보존한다. | `scripts/macos/notarization-storage.mjs`, `scripts/macos/notarization-durable-storage.mjs`, `tests/package-macos-notarization-storage.test.mjs`, `tests/package-macos-notarization-durability.test.mjs`, `vitest.config.ts` only if registration is required | fault-injected directory sync regression이 claim sync 실패 시 submit 0건, UUID sync 실패 시 claim release와 resubmit 0건, `submitting` claim 보존, sanitized fail-closed error를 증명한다. |
+| stale report claim | Stage 6 report와 final report는 Stage 6.30 validation matrix가 끝난 뒤에만 정정한다. claim-before-submit과 UUID-before-release ordering을 checked-in tests로 먼저 고정한다. | `mydocs/working/task_m011_6_stage6.md` only after validation, `mydocs/report/task_m011_6_report.md` only after validation and closure approval | claim-before-submit, UUID-before-release ordering regressions이 submit 전 success claim 0건, UUID persistence 전 release continuation 0건, stale report text가 closure evidence가 아님을 증명한다. |
+
+### Stage 6.30 source policy
+
+- Stage 6.30 implementation 전에는 이 addendum과 `mydocs/orders/20260908.md`만 수정한다.
+- No live Apple operations: 실제 signing, Keychain, Notarization, stapler, Gatekeeper, tag, release,
+  upload, push, merge는 Stage 6.30에서 실행하지 않는다.
+- `discoverSignableCode`의 fail-closed 보안 경계는 약화하지 않는다. 허용 native addon 정책은 staging
+  assembly와 release continuation을 좁히기 위한 것이며 signing discovery skip 정책이 아니다.
+- Reports corrected only after validation: `mydocs/working/task_m011_6_stage6.md`와
+  `mydocs/report/task_m011_6_report.md`는 Stage 6.30 implementation, validation, exact-head fresh review
+  승인 전에는 정정하지 않는다.
+- Issue #7 remains blocked until Task #6 PR is merged into `master` and `origin/master` confirms that merge.
+
+### Stage 6.30 expected files
+
+Source candidates:
+
+- `scripts/package-macos.mjs`
+- `scripts/macos/notarization-storage.mjs`
+- `scripts/macos/notarization-durable-storage.mjs` (분리 필요 시 신규)
+
+Test candidates:
+
+- `tests/package-macos-package.test.mjs`
+- `tests/package-macos-production-staging.test.mjs` (신규)
+- `tests/package-macos-notarization-storage.test.mjs`
+- `tests/package-macos-notarization-durability.test.mjs` (신규)
+- `tests/package-macos-notarization-claim.test.mjs`
+- `vitest.config.ts` (신규 test 등록이 필요할 때만)
+
+Report candidates, validation 뒤에만:
+
+- `mydocs/working/task_m011_6_stage6.md`
+- `mydocs/report/task_m011_6_report.md`
+- `mydocs/orders/20260908.md`
+
+Evidence:
+
+- `.omo/evidence/task-8-stage6-30-exact-head-remediation.md` (ignored, sanitized)
+
+### Stage 6.30 validation matrix
+
+| Check class | Required commands or proof | PASS condition |
+|---|---|---|
+| targeted staging | checked-in real production-shaped assembly test using real `/usr/bin/file` and `/usr/bin/lipo` | allowlist is exactly `better-sqlite3`, `bindings`, `file-uri-to-path`; `better-sqlite3/build/Release/better_sqlite3.node` is retained and inspected; optional/tooling/foreign native payloads are absent |
+| discovery boundary | existing and new discovery regressions | `discoverSignableCode` still rejects app-root escape, symlink escape, duplicate canonical paths, arbitrary framework aliases, and unexpected Mach-O/native payloads |
+| directory durability | fault-injected directory sync tests | ordering is `file sync -> publish entry -> parent directory sync -> continuation`; claim sync failure blocks submit; UUID sync failure preserves the `submitting` claim and blocks release/resubmit |
+| ordering claims | claim-before-submit and UUID-before-release tests | durable claim publication precedes submit; durable UUID publication precedes claim release |
+| focused | packaging, production-staging, notarization-storage, notarization-durability, notarization-claim tests | focused suite passes with checked-in Stage 6.30 regressions |
+| full | `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` | all exit 0 or pre-existing environment limits are classified |
+| package and smoke | unsigned package, signed missing-input mutation-zero, Electron smoke | unsigned succeeds; signed path fails before mutation when inputs are absent; smoke passes |
+| protected and secret | protected-path diff, whitespace, artifact scan, secret scan, publication scan | no protected diff, no whitespace issue, no tracked generated artifact, no secret leakage, no publication command |
+| no live Apple operations | command trace and evidence review | no real Apple signing, Keychain, Notarization, stapler, Gatekeeper, tag, release, upload, push, or merge operation ran |
+| fresh exact-head approvals | Goal, QA, Code quality, Context, Security lanes on exact reviewed head lineage | five fresh exact-head approvals are recorded before merge, closure report, orders completion, Todo 8 completion, or Issue #7 entry |
+
+### Stage 6.30 커밋 경계
+
+이 addendum과 orders Stage 6.30 blocker note만 먼저 고정한다.
+
+```text
+Task #6: Stage 6.30 재검토 교정 계획
+```
+
+제품과 테스트 교정은 다음 implementation commit으로만 고정한다.
+
+```text
+Task #6 [Stage 6.30]: signed staging과 durability 교정
+```
+
+Stage 6.30 implementation, validation, report correction, fresh exact-head approvals 5건, closure reports,
+orders completion, `publish/task6` push, `master` PR, Todo 8 completion, merge, Issue #7 entry는 이 governance
+commit 뒤에도 순차적으로 blocked다.
+
 ## UltraQA trigger 매핑
 
 | 실패 클래스 | 주입/관찰 방법 | 필수 fail-closed 결과 | Stage/Evidence |
@@ -1144,6 +1243,7 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
 | failed fresh review blockers | pre-build version entrypoint, traversal-order alias, accepted-log retry, absolute Apple tools, helper ownership, checked-in regression gaps, docs/evidence wording을 재현 | blocker 전건 교정, Stage 6.2 report 작성, five-lane PASS 전 closure 0건 | Stage 6.2, task-8-stage6-2 evidence |
 | latest failed fresh review blockers | Electron 43 Helpers/Libraries alias, same-Current mixed-version binding, accepted alias descendant traversal, preflight-before-candidate ordering, accepted-pending coordinator boundary, executable evidence schema, docs temporal wording을 재현 | blocker 전건 교정, Stage 6.4 report 작성, direct security review 포함 five-lane PASS 전 closure 0건 | Stage 6.4, task-8-stage6-4 evidence |
 | latest fresh review blockers | arbitrary `Versions/<non-current>/<FrameworkBinary>` symlink alias와 unknown/malformed Notarization issue severity acceptance를 재현 | blocker 2건 교정, Stage 6.5 report 작성, direct reproduction 포함 five-lane PASS 전 closure 0건 | Stage 6.5, task-8-stage6-5 evidence |
+| exact-head fresh review blockers | signed staging native addon allowlist, directory durability ordering, stale report claim을 재현 | blocker 3건 교정, Stage 6.30 report 작성, five fresh exact-head approvals 전 merge와 closure 0건 | Stage 6.30, task-8-stage6-30 evidence |
 
 ## 검증
 
@@ -1169,6 +1269,9 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
 - latest fresh review blocker가 확인된 뒤에는 Stage 6.5 검증과 fresh five-lane PASS 전까지 Stage 6
   closure report commit, final report commit, orders 완료 처리, PR publication, Todo 8 완료, Issue #7
   진입을 완료로 취급하지 않는다.
+- exact-head fresh review blocker가 확인된 뒤에는 Stage 6.30 검증, report correction, five fresh
+  exact-head approvals 전까지 Stage 6 closure report commit, final report commit, orders 완료 처리,
+  PR publication, merge, Todo 8 완료, Issue #7 진입을 완료로 취급하지 않는다.
 
 ## 커밋
 
@@ -1183,6 +1286,8 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
   - `Task #6: Stage 6.4 재검토 교정 계획`
 - latest fresh review 뒤 Stage 6.5 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
   - `Task #6: Stage 6.5 재검토 교정 계획`
+- exact-head fresh review 뒤 Stage 6.30 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
+  - `Task #6: Stage 6.30 재검토 교정 계획`
 - Stage 산출물과 `mydocs/working/task_m011_6_stage{N}.md`는 같은 Stage 커밋에 둔다.
 - Stage 1: `Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가`
 - Stage 2: `Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가`
@@ -1194,6 +1299,7 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
 - Stage 6.2 제품 교정: `Task #6 [Stage 6.2]: fresh review blocker 교정`
 - Stage 6.4 제품 교정: `Task #6 [Stage 6.4]: Electron alias와 preflight 계약 교정`
 - Stage 6.5 제품 교정: `Task #6 [Stage 6.5]: alias와 Notarization severity fail-closed 교정`
+- Stage 6.30 제품 교정: `Task #6 [Stage 6.30]: signed staging과 durability 교정`
 - Stage 6 검증 및 보고서: `Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료`
 - 구현계획서, Stage, 최종 보고서의 각각의 승인 전에는 해당 커밋/push/PR을 실행하지 않는다.
 - Stage 6.2 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push와
@@ -1202,6 +1308,8 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
   `master` 대상 PR 생성, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
 - Stage 6.5 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push,
   `master` 대상 PR 생성, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
+- Stage 6.30 correction commit 뒤 validation, report correction, five fresh exact-head approvals와 closure
+  commit 전에는 `publish/task6` push, `master` 대상 PR 생성, merge, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
 
 ## 단계 의존성
 
@@ -1224,6 +1332,9 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
 - Stage 6.5는 latest fresh review의 blocker 2건을 고친 뒤 arbitrary framework binary alias rejection,
   shared lowercase-info severity validation, coordinator downstream suppression proof, Stage 6 report 갱신,
   final report 갱신, fresh five-lane PASS를 요구한다.
+- Stage 6.30은 exact reviewed head `6e1ad240ee342671c366934413c164c78eac09fc`의 blocker 3건을 고친 뒤
+  signed staging native-addon allowlist, directory durability ordering, claim-before-submit, UUID-before-release,
+  report correction, five fresh exact-head approvals를 요구한다.
 - 이슈 #7은 Stage 6 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
 
 ## 위험과 대응
@@ -1255,6 +1366,9 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
 - **latest fresh review blocker 재발**: Stage 6.5에서 arbitrary `Versions/<non-current>/<FrameworkBinary>`
   symlink alias와 unknown/malformed Notarization issue severity를 소유 파일과 검증 lane에 연결하고,
   direct reproduction 포함 five-lane PASS 전에는 closure, PR publication, Todo 8 완료, Issue #7 진입을 차단한다.
+- **exact-head fresh review blocker 재발**: Stage 6.30에서 signed staging native-addon allowlist,
+  directory durability ordering, stale report claim을 소유 파일과 검증 lane에 연결하고, five fresh
+  exact-head approvals 전에는 merge, closure, PR publication, Todo 8 완료, Issue #7 진입을 차단한다.
 
 ## 승인 요청 사항
 
@@ -1283,6 +1397,10 @@ Stage 6.5 implementation, fresh reviews, closure reports, orders completion, `pu
 - latest fresh review 이후 Stage 6.5 교정 계획, arbitrary framework binary alias fail-closed,
   Notarization severity lowercase-info taxonomy, shared severity parser, coordinator downstream suppression,
   governance commit, implementation commit, direct reproduction 포함 fresh five-lane PASS 전 closure 차단 조건
+- exact-head fresh review 이후 Stage 6.30 교정 계획, reviewed head
+  `6e1ad240ee342671c366934413c164c78eac09fc`, signed staging native-addon allowlist, directory durability
+  ordering, stale report claim correction gate, governance commit, implementation commit, validation 뒤 report
+  correction, five fresh exact-head approvals 전 merge와 closure 차단 조건
 
 이 구현계획서가 명시적으로 승인되기 전에는 governance 문서를 포함한 어떤 커밋도 만들지
 않고, 제품/소스/테스트/공식 문서를 수정하거나 live Apple/GitHub release 명령을 실행하지

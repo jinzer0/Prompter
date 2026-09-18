@@ -7,12 +7,9 @@ import {
   validateFinalNotarizationEvidence,
 } from "./notarization-evidence.mjs"
 import { finalNotarizationReceiptFileName } from "./notarization-final-receipt.mjs"
+import { isGeneratedNotarizationStorageRemnant } from "./notarization-storage-remnants.mjs"
 import { validateOwnedDirectory } from "./owned-directory.mjs"
 
-const resumableErrors = new Set([
-  "Notarization command failed",
-  "Notarization submission is unresolved",
-])
 const terminalAttemptErrors = new Set(["Notarization submission was not accepted"])
 const transientEvidenceFileNames = new Set([
   "notarization-resume.json",
@@ -210,7 +207,9 @@ async function removeTransientAttemptEvidence(attempt) {
     entries
       .filter(
         (entry) =>
-          (transientEvidenceFileNames.has(entry.name) || activeLogFileName.test(entry.name)) &&
+          (transientEvidenceFileNames.has(entry.name) ||
+            activeLogFileName.test(entry.name) ||
+            isGeneratedNotarizationStorageRemnant(entry.name)) &&
           (entry.isFile() || entry.isSymbolicLink()),
       )
       .map((entry) => unlink(join(evidenceCanonical, entry.name))),
@@ -237,9 +236,7 @@ export async function cleanupReleaseAttempts(attempts, error, attemptHandlingSta
         (!invalidatedAttempt ||
           (!terminalError &&
             error?.discardEvidence !== true &&
-            (retained.saved.status === "Accepted" ||
-              retained.saved.status === "accepted" ||
-              resumableErrors.has(error.message))))
+            ["unknown", "accepted", "Accepted"].includes(retained.saved.status)))
     } catch {
       retain = false
     }

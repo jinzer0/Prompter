@@ -11,6 +11,7 @@ export default defineConfig({
       "tests/package-macos-coordinator-app-recovery.test.mjs",
       "tests/package-macos-coordinator-artifact-drift.test.mjs",
       "tests/package-macos-coordinator-dmg-recovery.test.mjs",
+      "tests/package-macos-coordinator-info-recovery.test.mjs",
       "tests/package-macos-coordinator-dmg-app-refresh.test.mjs",
       "tests/package-macos-coordinator-signing-identity-recovery.test.mjs",
       "tests/package-macos-coordinator-signing-fingerprint-recovery.test.mjs",

@@ -9,6 +9,7 @@ import {
   createZipSnapshot,
   restoreSnapshot,
 } from "./macos-coordinator-artifacts.mjs"
+import { xcrunResult } from "./macos-coordinator-notary-responses.mjs"
 import {
   appSubmissionId,
   commandStage,
@@ -37,6 +38,7 @@ export async function createCoordinatorFixture({
   shared,
   warningLog = false,
   notaryLog,
+  notaryInfo,
   notaryMutation,
 } = {}) {
   const root = shared?.root ?? (await mkdtemp(join(tmpdir(), "prompter-release-test-")))
@@ -173,7 +175,14 @@ export async function createCoordinatorFixture({
         stderr: "",
       }
     if (command === "/usr/bin/xcrun")
-      return xcrunResult(arguments_, pendingAppStatus, pendingDmgStatus, warningLog, notaryLog)
+      return xcrunResult({
+        arguments_,
+        pendingAppStatus,
+        pendingDmgStatus,
+        warningLog,
+        notaryLog,
+        notaryInfo,
+      })
     if (command === "/usr/bin/ditto" && arguments_[0] === "-c")
       await createZipSnapshot(arguments_, options, fakeArtifacts)
     if (command === "/usr/bin/ditto" && arguments_[0] === "-x")
@@ -219,34 +228,4 @@ export async function createCoordinatorFixture({
         },
       }),
   }
-}
-
-function xcrunResult(arguments_, pendingAppStatus, pendingDmgStatus, warningLog, notaryLog) {
-  if (arguments_[1] === "history") return { stdout: "{}", stderr: "" }
-  if (arguments_[1] === "submit")
-    return {
-      stdout: JSON.stringify({
-        id: arguments_[2].endsWith(".dmg") ? dmgSubmissionId : appSubmissionId,
-        status: "Accepted",
-      }),
-      stderr: "",
-    }
-  if (arguments_[1] === "info") {
-    const isDmg = arguments_[2] === dmgSubmissionId
-    return {
-      stdout: JSON.stringify({
-        id: isDmg ? dmgSubmissionId : appSubmissionId,
-        status: isDmg ? (pendingDmgStatus ?? "Accepted") : (pendingAppStatus ?? "Accepted"),
-      }),
-      stderr: "",
-    }
-  }
-  if (arguments_[1] === "log")
-    return {
-      stdout: JSON.stringify(
-        notaryLog ?? (warningLog ? { issues: [{ severity: "warning" }] } : { issues: [] }),
-      ),
-      stderr: "",
-    }
-  return { stdout: "", stderr: "" }
 }

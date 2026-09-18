@@ -665,12 +665,39 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   `PROMPTER_SIGNING_IDENTITY` 누락으로 expected nonzero 실패했고 live Apple operation은 실행하지 않았다.
 - MISS(환경 제한): Stage 6.28 source/test/config paths 13건의 LSP diagnostics는 sibling-worktree request-root
   제한으로 모두 거부됐으며 PASS로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.28 report-inclusive head
+  `6380d7758f0cf02176eb3bbd957ad8c5e7154fe8` review는 Goal REJECT
+  `ses_f4c9a7031ffdf5osrW1ycHnwdW`, Quality REJECT `ses_f4c9a720cffdobFZ0FyypKZ1ET`, Security APPROVE
+  `ses_f4c9a768cffep9n3jtyPWeoIIH`, QA APPROVE `ses_f4c9a6de8ffeabrvOhg1Pm9pX5`, Context REJECT
+  `ses_f4c9a73e3ffeUFpi3rY52GF3TM`를 기록했다. QA는 targeted 12 files/122 tests와 full Vitest 151
+  files/1021 tests를 독립 확인했다.
+- Goal과 Context discussion
+  [4044666887](https://github.com/jinzer0/Prompter/pull/8#discussion_r4044666887)은 malformed/service-error
+  `info`가 valid bound unknown attempt artifact만 제거해 resume evidence를 고립시키는 blocker를 확인했다.
+  Quality는 atomic JSON/guard `.tmp`와 claim/guard `.remove` crash remnant가 성공 뒤에도 final receipt 옆에
+  남는 blocker를 확인했다. Context는 Stage 6.27 target 오류, Stage 6.28 row 누락과 stale blob-head claim도
+  함께 확인했다.
+- OK: Stage 6.29는 affected error가 nonterminal이고 `discardEvidence`가 아닌 경우 valid bound
+  `unknown`/`accepted`/`Accepted` attempt를 error message allowlist 없이 보존한다. app/DMG malformed 및
+  service-error `info` 뒤 artifact와 resume evidence를 유지하고 다음 invocation은 submit 없이 `info`/`log`로
+  완료한다.
+- OK: exact storage-remnant matcher는 atomic resume/final/log JSON temp, reclaim-guard temp와 claim/guard
+  tombstone만 인식한다. 성공 cleanup은 owned evidence directory의 direct file 또는 symlink만 unlink하고
+  near-match, sibling, external target와 caller sentinel을 보존한다.
+- OK: authoritative Stage 6.29 verification은 targeted 10 files/79 tests, full Vitest 152 files/1026 tests,
+  typecheck, lint, changed-file syntax, `git diff --check`다. lint는 기존 Biome deprecated-config info만
+  출력했다. 이 delta는 release recovery와 synthetic fixture/config에만 영향을 주므로 immediate-parent Stage
+  6.28 build, unsigned package, smoke 49/49와 missing-input fail-closed evidence를 보존하며 재실행했다고
+  주장하지 않는다.
+- MISS(환경 제한): Stage 6.29 source/test/config paths 7건의 LSP diagnostics는 sibling-worktree request-root
+  제한으로 모두 거부됐으며 PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact manual
   inspection, tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.28의 owner-aware claim/guard recovery와 sanitized durable final receipt, Stage 6.27의 typed
+- Stage 6.29의 unknown attempt retention과 exact storage-remnant cleanup, Stage 6.28의 owner-aware
+  claim/guard recovery와 sanitized durable final receipt, Stage 6.27의 typed
   finalization drift cleanup, coherent success cleanup과 Stage 6.26의
   final-artifact certificate fingerprint
   continuity는 확인된 submission/evidence/signing continuity 결함을 fail closed하지만, 같은 사용자 권한의
@@ -721,8 +748,11 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - Stage 6.27 remediation은 `269bd484ccf0b3641596fa37ad6ff617f60683ac`로 게시됐고 PR #8 immutable
   links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 review의 Goal/Quality/Security/Context
   REJECT와 QA APPROVE는 Stage 6.28 remediation의 입력으로 보존됐다.
-- Stage 6.28 claim durability/final receipt remediation과 direct regressions은 통합 검증 완료 상태다.
-- Stage 6.28 report-inclusive publication receipt가 exact head의 source of truth다. 다음 fresh exact-head review,
+- Stage 6.28 remediation은 `6380d7758f0cf02176eb3bbd957ad8c5e7154fe8`로 게시됐고 PR #8 immutable
+  links와 temp detached review worktree도 같은 exact head로 갱신됐다. 그 review의 Goal/Quality/Context
+  REJECT와 Security/QA APPROVE는 Stage 6.29 remediation의 입력으로 보존됐다.
+- Stage 6.29 unknown-retention/storage-remnant remediation과 direct regressions은 통합 검증 완료 상태다.
+- Stage 6.29 report-inclusive publication receipt가 exact head의 source of truth다. 다음 fresh exact-head review,
   PR #8 merge와 `origin/master` containment verification 전까지 Todo 8은 `진행중`이다.
 
 ## 승인 요청
@@ -767,5 +797,10 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - 작업지시자의 최신 명시 지시에 따라 `269bd48` review와 discussions `4044349962`, `4044349966`의
   acknowledged UUID duplicate-submit window, reclaim-guard crash wedge, success receipt deletion은 Stage 6.28
   source/test/docs/config와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지
+  않는다. publication receipt가 exact head의 source of truth이며 fresh exact-head review, PR merge,
+  containment는 서로 분리된 후속 gate다.
+- 작업지시자의 최신 명시 지시에 따라 `6380d77` review와 discussion `4044666887`의 malformed/service-error
+  unknown-attempt loss, generated storage-remnant survival과 stale PR chronology는 Stage 6.29
+  source/test/config, 두 report와 PR body에서 교정된다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지
   않는다. publication receipt가 exact head의 source of truth이며 fresh exact-head review, PR merge,
   containment는 서로 분리된 후속 gate다.

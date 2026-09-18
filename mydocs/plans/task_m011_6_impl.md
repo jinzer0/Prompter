@@ -21,6 +21,7 @@ GitHub Issue: [#6](https://github.com/jinzer0/Prompter/issues/6)
 | 6.4 | 8 | latest failed fresh-review 교정 addendum | Stage 6.4 governance, Electron 43 alias/version binding, preflight-before-candidate ordering, pending-state/schema regressions | five-lane FAIL blocker 전건 교정, direct security review 포함 fresh five-lane PASS 전 closure 차단 |
 | 6.5 | 8 | latest fresh review blocker 교정 addendum | Stage 6.5 governance, arbitrary framework alias rejection, Notarization severity fail-closed regressions | blocker 2건 교정, fresh five-lane direct reproduction PASS 전 closure 차단 |
 | 6.30 | 8 | exact-head fresh review blocker 교정 addendum | Stage 6.30 governance, signed staging native-addon policy, durable directory publication, stale report correction gate | exact head `6e1ad240ee342671c366934413c164c78eac09fc` blocker 3건 교정, real-tool checked-in regressions, five fresh exact-head approvals 전 merge 차단 |
+| 6.31 | 8 | Stage 6.30 exact-head 재검토 blocker 교정 addendum | runtime native singleton policy, claim/guard rollback, DMG xattr/staple 검증, 누적 보고 정정 | exact head `1c8ab2d13db90b0edbc4c490ebc53a1e613cbee9` blocker 전건 교정, five fresh exact-head approvals 전 merge 차단 |
 
 ## 구현 전 공통 기준
 
@@ -1225,6 +1226,110 @@ Stage 6.30 implementation, validation, report correction, fresh exact-head appro
 orders completion, `publish/task6` push, `master` PR, Todo 8 completion, merge, Issue #7 entry는 이 governance
 commit 뒤에도 순차적으로 blocked다.
 
+## Stage 6.31 - Stage 6.30 exact-head 재검토 blocker 교정 addendum
+
+Reviewed head는 정확히 `1c8ab2d13db90b0edbc4c490ebc53a1e613cbee9`로 기록한다. 해당 head의
+fresh review는 QA PASS, Goal FAIL, Code Quality FAIL, Security HIGH FAIL, Context FAIL이었다.
+Stage 6.31은 아래 blocker 전건을 red-first regression으로 고정하고 통합 검증한 뒤에만 두 누적
+보고서를 정정한다. 같은 report-inclusive exact head의 fresh Goal, QA, Code Quality, Security, Context
+승인 5건 전까지 PR #8 merge, orders/Todo 8 완료, Issue #7 진입은 blocked다.
+
+### Stage 6.31 review outcome 매핑
+
+| Lane | Outcome | 확인된 blocker | Stage 6.31 필수 결과 |
+|---|---|---|---|
+| QA | PASS | focused 47/47, 50/50, 31/31, full 154 files/1035 tests와 build/package/smoke 통과 | 기존 validation surface를 보존하고 신규 regressions을 추가한다. |
+| Goal | FAIL | 세 runtime package root 내부의 build 외 native payload와 symlink가 staging될 수 있다. | packaged app의 runtime node_modules signable target을 required addon 하나로 제한한다. |
+| Code Quality | FAIL | hard-link publication 뒤 directory sync 실패 시 current-PID claim/guard가 남아 same-process retry를 막는다. | exact owner record만 durable rollback하고 replacement owner와 stale claim을 보존한다. |
+| Security | HIGH FAIL | allowlisted package에 주입된 valid ARM64 Mach-O가 Developer ID signing 대상으로 승격될 수 있다. | 첫 mutating codesign 전에 unexpected runtime-node_modules target을 fail closed한다. |
+| Context | FAIL | Node `fs.cp` DMG staging이 xattr를 보존하지 않고 mounted app staple validation이 없으며 누적 보고/order/file accounting이 stale하다. | `/usr/bin/ditto` staging, mounted `stapler validate`, superseded history 표시와 완전한 file accounting을 고정한다. |
+
+### Stage 6.31 blocker와 파일 소유권
+
+| Blocking finding | 필수 교정 | 소유 파일 | red-first 증거 |
+|---|---|---|---|
+| runtime native singleton policy | staging은 `better-sqlite3`, `bindings`, `file-uri-to-path`만 복사하고 package 내부 foreign `.node`, `.dylib`, `.o`, `.a`, extensionless Mach-O와 native symlink를 제외한다. signing discovery 계약은 유지하되 첫 codesign 전에 runtime node_modules target이 정확히 `better-sqlite3/build/Release/better_sqlite3.node` 하나인지 검사한다. | `scripts/package-macos.mjs`, `scripts/macos/signing.mjs`, 필요 시 `scripts/macos/runtime-native-policy.mjs`; production-staging/signing-flow와 신규 adversarial test/support | 세 package root 각각에 suffix, extensionless Mach-O, symlink를 주입하면 교정 전 stage/signing boundary가 실패한다. |
+| claim/guard publication rollback | temporary file sync/close와 hard-link 뒤 directory sync가 실패하면 publish 여부를 추적한다. final record의 ownership field가 exact match일 때만 owner tombstone을 사용해 제거하고 containing directory를 sync한다. guard rollback은 stale claim을 변경하지 않으며 ownership이 바뀌면 replacement를 보존하고 fail closed한다. | `scripts/macos/notarization-storage.mjs`, 필요 시 `scripts/macos/notarization-publication.mjs`; durability probe와 신규 rollback test | fresh claim/guard post-link sync one-shot failure 뒤 leaked lock이 없어야 하고 retry는 submit/reclaim을 정확히 한 번만 수행한다. |
+| DMG metadata/staple continuity | DMG staging app copy만 injected `/usr/bin/ditto`로 바꿔 xattr를 보존한다. final DMG mount 뒤 contained app에 `/usr/bin/xcrun stapler validate`를 실행하고 그 성공 뒤에만 signature/Gatekeeper/checksum으로 진행한다. | `scripts/package-macos.mjs`, `scripts/release-macos.mjs`; package/coordinator tests와 신규 DMG staging test/support | real ditto synthetic xattr 보존, command order, mounted staple failure downstream suppression과 detach cleanup을 교정 전 실패로 재현한다. |
+| stale governance/report accounting | Stage 6 누적 보고의 line 109와 273-280을 삭제하지 않고 original head의 historical behavior로 표시한 뒤 Stage 6.31에서 superseded됐음을 기록한다. orders note와 expected-file list를 실제 diff와 맞춘다. | 이 구현계획서, `mydocs/orders/20260908.md`, validation 뒤 두 누적 보고서 | stale current-state claim, Stage 6.30 pending note, 누락 file accounting이 남지 않는다. |
+
+### Stage 6.31 source policy
+
+- governance commit 전에는 제품/테스트/공식 문서를 수정하지 않는다.
+- tests-first로 세 lane의 red evidence를 확보하고 기존 green assertions을 약화하지 않는다.
+- `discoverSignableCode`의 containment, symlink escape, canonical duplicate, framework alias, native-suffix
+  non-Mach-O와 exact ARM64 fail-closed 계약을 유지한다.
+- actual Node `fs.cp` xattr probe는 metadata loss를, `/usr/bin/ditto` probe는 metadata retention을 확인했으나
+  live signing, Keychain, Notarization, staple mutation, Gatekeeper, tag, release, upload는 실행하지 않는다.
+- changed source/test/support module은 250 pure LOC 이하를 유지하고 LSP 제한은 PASS로 기록하지 않는다.
+- Issue #7은 Task #6 PR merge와 `origin/master` containment 확인 전까지 blocked다.
+
+### Stage 6.31 expected files
+
+Governance:
+
+- `mydocs/plans/task_m011_6_impl.md`
+- `mydocs/orders/20260908.md`
+
+Source candidates:
+
+- `scripts/package-macos.mjs`
+- `scripts/release-macos.mjs`
+- `scripts/macos/signing.mjs`
+- `scripts/macos/notarization-storage.mjs`
+- `scripts/macos/runtime-native-policy.mjs` (분리 필요 시 신규)
+- `scripts/macos/notarization-publication.mjs` (분리 필요 시 신규)
+
+Test/support/config candidates:
+
+- `tests/package-macos-package.test.mjs`
+- `tests/package-macos-production-staging.test.mjs`
+- `tests/package-macos-signing-flow.test.mjs`
+- `tests/package-macos-notarization-durability.test.mjs`
+- `tests/package-macos-coordinator-success.test.mjs`
+- `tests/package-macos-coordinator-failures.test.mjs`
+- `tests/package-macos-native-staging-adversarial.test.mjs` (필요 시 신규)
+- `tests/package-macos-notarization-publication-rollback.test.mjs` (필요 시 신규)
+- `tests/package-macos-dmg-staging.test.mjs` (필요 시 신규)
+- `tests/support/macos-package-tree.mjs`
+- `tests/support/macos-notarization-durability-probe.mjs`
+- `tests/support/macos-coordinator-artifacts.mjs`
+- `tests/support/macos-coordinator-fixtures.mjs`
+- `tests/support/macos-coordinator-support.mjs`
+- `vitest.config.ts` (신규 suite 등록이 필요할 때만)
+
+Validation 뒤 report candidates:
+
+- `mydocs/working/task_m011_6_stage6.md`
+- `mydocs/report/task_m011_6_report.md`
+- `mydocs/orders/20260908.md`
+
+### Stage 6.31 validation matrix
+
+| Check class | Required proof | PASS condition |
+|---|---|---|
+| runtime staging red/green | 세 runtime root의 suffix, extensionless Mach-O, symlink injection과 real-tool discovery | required addon만 staging/signable target으로 남고 unexpected target은 first codesign 전에 실패한다. |
+| publication rollback red/green | fresh claim과 guard post-link directory-sync one-shot failure, ownership race, cleanup failure | exact owner lock만 durable removal되고 guard failure는 stale claim을 보존하며 retry는 정확히 한 번 진행한다. |
+| DMG metadata red/green | real ditto synthetic xattr probe와 injected command order | xattr가 보존되고 ditto 뒤 hdiutil이 실행된다. |
+| mounted app staple | success/failure fake runner trace | mounted app `stapler validate`가 signature/Gatekeeper/checksum보다 먼저 실행되고 failure는 detach 외 downstream을 차단한다. |
+| focused/full/static | changed-domain Vitest, full `npm test`, typecheck, lint, syntax, diff check | 모두 exit 0이고 신규 suite가 checked-in config에 등록된다. |
+| package/smoke/fail-closed | build, unsigned package, smoke, missing-input signed entrypoint | build/package/smoke 성공; signed path는 mutation 전 expected nonzero이며 live Apple operation은 없다. |
+| scope/security | protected diff, secret/publication scan, changed-file accounting, pure LOC | protected/secret/generated/publication diff 0건, expected files와 실제 diff 일치, pure LOC <=250이다. |
+| reports/review | 누적 보고 정정 뒤 exact-head five-lane review | stale current claim이 없고 다섯 lane이 같은 exact head를 승인하기 전 merge하지 않는다. |
+
+### Stage 6.31 커밋과 gate
+
+Governance는 제품 변경 전에 다음 commit으로 고정한다.
+
+```text
+Task #6: Stage 6.31 교정 계획과 오늘할일 갱신
+```
+
+Red-first tests와 production remediation, validation 뒤 누적 보고서는 Stage 6.31 report-inclusive commit
+계보로 고정한다. validation과 report diff 승인 전 push하지 않고, fresh five-lane unanimous exact-head
+approval 전 merge하지 않는다. merge 뒤 `origin/master` containment 확인 전 orders/Todo 8 완료나 Issue #7
+진입을 주장하지 않는다.
+
 ## UltraQA trigger 매핑
 
 | 실패 클래스 | 주입/관찰 방법 | 필수 fail-closed 결과 | Stage/Evidence |
@@ -1244,6 +1349,7 @@ commit 뒤에도 순차적으로 blocked다.
 | latest failed fresh review blockers | Electron 43 Helpers/Libraries alias, same-Current mixed-version binding, accepted alias descendant traversal, preflight-before-candidate ordering, accepted-pending coordinator boundary, executable evidence schema, docs temporal wording을 재현 | blocker 전건 교정, Stage 6.4 report 작성, direct security review 포함 five-lane PASS 전 closure 0건 | Stage 6.4, task-8-stage6-4 evidence |
 | latest fresh review blockers | arbitrary `Versions/<non-current>/<FrameworkBinary>` symlink alias와 unknown/malformed Notarization issue severity acceptance를 재현 | blocker 2건 교정, Stage 6.5 report 작성, direct reproduction 포함 five-lane PASS 전 closure 0건 | Stage 6.5, task-8-stage6-5 evidence |
 | exact-head fresh review blockers | signed staging native addon allowlist, directory durability ordering, stale report claim을 재현 | blocker 3건 교정, Stage 6.30 report 작성, five fresh exact-head approvals 전 merge와 closure 0건 | Stage 6.30, task-8-stage6-30 evidence |
+| Stage 6.30 exact-head 재검토 blockers | runtime native singleton bypass, post-link claim/guard sync rollback, DMG xattr/staple continuity, stale cumulative accounting을 재현 | blocker 전건 교정, Stage 6.31 report 작성, five fresh exact-head approvals 전 merge와 closure 0건 | Stage 6.31, task-8-stage6-31 evidence |
 
 ## 검증
 
@@ -1272,6 +1378,9 @@ commit 뒤에도 순차적으로 blocked다.
 - exact-head fresh review blocker가 확인된 뒤에는 Stage 6.30 검증, report correction, five fresh
   exact-head approvals 전까지 Stage 6 closure report commit, final report commit, orders 완료 처리,
   PR publication, merge, Todo 8 완료, Issue #7 진입을 완료로 취급하지 않는다.
+- Stage 6.30 exact-head 재검토 blocker가 확인된 뒤에는 Stage 6.31 red-first 교정, full validation,
+  cumulative report correction과 five fresh exact-head approvals 전까지 merge, orders/Todo 8 완료,
+  `origin/master` containment와 Issue #7 진입을 완료로 취급하지 않는다.
 
 ## 커밋
 
@@ -1288,6 +1397,8 @@ commit 뒤에도 순차적으로 blocked다.
   - `Task #6: Stage 6.5 재검토 교정 계획`
 - exact-head fresh review 뒤 Stage 6.30 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
   - `Task #6: Stage 6.30 재검토 교정 계획`
+- Stage 6.30 exact-head 재검토 실패 뒤 Stage 6.31 governance amendment와 orders note는 제품 교정 전에 별도 커밋으로 고정한다.
+  - `Task #6: Stage 6.31 교정 계획과 오늘할일 갱신`
 - Stage 산출물과 `mydocs/working/task_m011_6_stage{N}.md`는 같은 Stage 커밋에 둔다.
 - Stage 1: `Task #6 Stage 1: v0.1.1 패키징 정체성과 로컬 패키지 경계 추가`
 - Stage 2: `Task #6 Stage 2: Developer ID 서명과 Keychain Notarization 기반 추가`
@@ -1300,6 +1411,7 @@ commit 뒤에도 순차적으로 blocked다.
 - Stage 6.4 제품 교정: `Task #6 [Stage 6.4]: Electron alias와 preflight 계약 교정`
 - Stage 6.5 제품 교정: `Task #6 [Stage 6.5]: alias와 Notarization severity fail-closed 교정`
 - Stage 6.30 제품 교정: `Task #6 [Stage 6.30]: signed staging과 durability 교정`
+- Stage 6.31 제품 교정: `Task #6 [Stage 6.31]: runtime staging과 release durability 교정`
 - Stage 6 검증 및 보고서: `Task #6 Stage 6 + 최종 보고서: pre-PR blocker 교정 검증 완료`
 - 구현계획서, Stage, 최종 보고서의 각각의 승인 전에는 해당 커밋/push/PR을 실행하지 않는다.
 - Stage 6.2 correction commit 뒤 fresh five-lane PASS와 closure commit 전에는 `publish/task6` push와
@@ -1310,6 +1422,8 @@ commit 뒤에도 순차적으로 blocked다.
   `master` 대상 PR 생성, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
 - Stage 6.30 correction commit 뒤 validation, report correction, five fresh exact-head approvals와 closure
   commit 전에는 `publish/task6` push, `master` 대상 PR 생성, merge, Todo 8 완료, Issue #7 진입을 실행하지 않는다.
+- Stage 6.31 correction commit 뒤 validation, report correction과 five fresh exact-head approvals 전에는
+  PR #8 merge, orders/Todo 8 완료, branch cleanup과 Issue #7 진입을 실행하지 않는다.
 
 ## 단계 의존성
 
@@ -1335,6 +1449,9 @@ commit 뒤에도 순차적으로 blocked다.
 - Stage 6.30은 exact reviewed head `6e1ad240ee342671c366934413c164c78eac09fc`의 blocker 3건을 고친 뒤
   signed staging native-addon allowlist, directory durability ordering, claim-before-submit, UUID-before-release,
   report correction, five fresh exact-head approvals를 요구한다.
+- Stage 6.31은 exact reviewed head `1c8ab2d13db90b0edbc4c490ebc53a1e613cbee9`의 Goal/Quality/Security/Context
+  blocker를 고친 뒤 runtime native singleton, durable publication rollback, ditto xattr retention, mounted staple
+  validation, cumulative accounting correction과 five fresh exact-head approvals를 요구한다.
 - 이슈 #7은 Stage 6 구현 PR이 `master`에 병합되고 `origin/master`에 확인될 때까지 blocked다.
 
 ## 위험과 대응
@@ -1369,6 +1486,9 @@ commit 뒤에도 순차적으로 blocked다.
 - **exact-head fresh review blocker 재발**: Stage 6.30에서 signed staging native-addon allowlist,
   directory durability ordering, stale report claim을 소유 파일과 검증 lane에 연결하고, five fresh
   exact-head approvals 전에는 merge, closure, PR publication, Todo 8 완료, Issue #7 진입을 차단한다.
+- **Stage 6.30 exact-head 재검토 blocker 재발**: Stage 6.31에서 runtime native target singleton,
+  post-link owner-safe rollback, DMG xattr/staple continuity와 complete file accounting을 red-first tests와
+  연결하고 five fresh exact-head approvals 전에는 merge, completion, cleanup과 Issue #7 진입을 차단한다.
 
 ## 승인 요청 사항
 
@@ -1401,6 +1521,10 @@ commit 뒤에도 순차적으로 blocked다.
   `6e1ad240ee342671c366934413c164c78eac09fc`, signed staging native-addon allowlist, directory durability
   ordering, stale report claim correction gate, governance commit, implementation commit, validation 뒤 report
   correction, five fresh exact-head approvals 전 merge와 closure 차단 조건
+- Stage 6.30 exact-head 재검토 이후 Stage 6.31 교정 계획, reviewed head
+  `1c8ab2d13db90b0edbc4c490ebc53a1e613cbee9`, runtime native singleton, claim/guard rollback,
+  DMG xattr와 mounted staple continuity, cumulative accounting, red-first tests, validation/report correction,
+  five fresh exact-head approvals 전 merge와 closure 차단 조건
 
 이 구현계획서가 명시적으로 승인되기 전에는 governance 문서를 포함한 어떤 커밋도 만들지
 않고, 제품/소스/테스트/공식 문서를 수정하거나 live Apple/GitHub release 명령을 실행하지

@@ -6,7 +6,7 @@ Milestone: M011
 
 ## 요약
 
-`npm run package:release:macos`의 successful rerun에서 final DMG와 `SHA256SUMS`까지 생성됐다. DMG Notarization은 Accepted이며, DMG staple/signature/Gatekeeper, read-only mount, mounted app staple/signature/Gatekeeper, checksum 검증을 별도로 재확인했다.
+PR #11 merge 후 `origin/master` merge commit `bb4452e382ebf2e462070da9d23c0fc7acab1d84`에서 release evidence/assets를 삭제하고 `npm run package:release:macos`를 다시 실행했다. Final DMG와 `SHA256SUMS`가 재생성됐고, DMG Notarization은 Accepted이며, DMG staple/signature/Gatekeeper, read-only mount, mounted app staple/signature/Gatekeeper, checksum 검증을 별도로 재확인했다.
 
 ## 산출물
 
@@ -29,8 +29,8 @@ Tracked report:
 `SHA256SUMS`:
 
 ```text
-7ef96de4c3285661594e7676706e22517cf1d18cb5ed5ce1dfdc6baf67861d5c  Prompter-0.1.1-mac-arm64.zip
-3317489c33f87be8cf27fab987c61af78405d6e22d7d1958ad7321e2565eb035  Prompter-0.1.1-mac-arm64.dmg
+f8830f2eb136be06351229f850348e0578301648444d23b4d90fe24734fb932f  Prompter-0.1.1-mac-arm64.zip
+b9c63063084c547242dbbb1e23d4c273eb0ca16bcbf5ed964d9c548f025b8786  Prompter-0.1.1-mac-arm64.dmg
 ```
 
 Local sizes at verification time:

@@ -114,7 +114,7 @@ async function verifyArtifactIdentity(path, identity, artifactKind, runFile) {
   try {
     const { stdout, stderr } = await runFile(
       codesignCommand,
-      ["--display", "--verbose=4", "--extract-certificates", certificatePrefix, path],
+      ["--display", "--verbose=4", `--extract-certificates=${certificatePrefix}`, path],
       {},
     )
     let certificate

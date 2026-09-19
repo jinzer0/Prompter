@@ -8,14 +8,22 @@ import { discoverSignableCode, signAppBundle } from "../scripts/macos/signing.mj
 import {
   createSigningFixture,
   createSigningRunner,
+  identityListing,
   signingIdentity,
 } from "./support/macos-signing-fixtures.mjs"
+import { createElectronSigningFixture } from "./support/macos-signing-target-fixtures.mjs"
 
 const fixtures = []
 afterEach(() => Promise.all(fixtures.splice(0).map(({ remove }) => remove())))
 
 async function fixture(options) {
   const created = await createSigningFixture(options)
+  fixtures.push(created)
+  return created.paths
+}
+
+async function electronFixture(options) {
+  const created = await createElectronSigningFixture(options)
   fixtures.push(created)
   return created.paths
 }
@@ -166,9 +174,13 @@ test.each([
 })
 
 test("rejects a post-sign x86_64 mutation before outer app signing", async () => {
-  const paths = await fixture()
+  const paths = await electronFixture()
   const calls = []
-  const nativePath = await realpath(paths.native)
+  const nativePath = await realpath(
+    paths.targetPaths[
+      "Contents/Resources/app/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    ],
+  )
 
   await assert.rejects(
     signAppBundle({
@@ -198,4 +210,28 @@ test("rejects a post-sign x86_64 mutation before outer app signing", async () =>
     ),
     false,
   )
+})
+
+test("requires exactly one well-formed signing identity before any signing mutation", async () => {
+  const paths = await fixture()
+  for (const listing of [
+    identityListing([]),
+    identityListing([signingIdentity, signingIdentity]),
+    identityListing([`${signingIdentity} SYNTHETIC_SUFFIX`]),
+    "  1) malformed\n  1 valid identities found\n",
+    identityListing([signingIdentity], 2),
+  ]) {
+    const calls = []
+    await assert.rejects(
+      signAppBundle({
+        appPath: paths.appPath,
+        identity: signingIdentity,
+        entitlementsPath: paths.entitlements,
+        runFile: createSigningRunner({ listing, calls }),
+      }),
+      /Exactly one signing identity is required|Unable to validate signing identity/,
+    )
+    assert.equal(calls.filter(({ command }) => command === "/usr/bin/codesign").length, 0)
+    assert.equal(JSON.stringify(calls).includes(signingIdentity), false)
+  }
 })

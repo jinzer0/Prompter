@@ -68,6 +68,13 @@ export async function createSigningFixture(options = {}) {
       .map(executable),
   )
   await writeFile(paths.entitlements, expectedEntitlements)
+  await Promise.all(
+    ["bindings", "file-uri-to-path"].map((name) =>
+      mkdir(join(appPath, "Contents", "Resources", "app", "node_modules", name), {
+        recursive: true,
+      }),
+    ),
+  )
   if (options.frameworkAliases) await createFrameworkAliases(appPath, paths, options)
   if (options.duplicate)
     await symlink(paths.native, join(appPath, "Contents", "Resources", "app", "fixture-alias.node"))

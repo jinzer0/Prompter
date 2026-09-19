@@ -2,7 +2,6 @@ import assert from "node:assert/strict"
 import { access, realpath } from "node:fs/promises"
 import { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-
 import { afterEach, test } from "vitest"
 
 import {
@@ -16,6 +15,7 @@ import {
   frameworkDirectories,
   signingIdentity,
 } from "./support/macos-signing-fixtures.mjs"
+import { createElectronSigningFixture } from "./support/macos-signing-target-fixtures.mjs"
 
 const fixtures = []
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
@@ -26,7 +26,11 @@ async function fixture(options) {
   fixtures.push(created)
   return created.paths
 }
-
+async function electronFixture(options) {
+  const created = await createElectronSigningFixture(options)
+  fixtures.push(created)
+  return created.paths
+}
 test("accepts the complete Current-bound framework layout and inspects canonical descendants once", async () => {
   const paths = await fixture({ frameworkAliases: true })
   const calls = []
@@ -57,7 +61,6 @@ test("accepts the complete Current-bound framework layout and inspects canonical
   assert.equal(new Set(inspected).size, inspected.length)
   assert.equal(inspected.filter((path) => path.includes("Kit.framework/Versions/A/")).length, 8)
 })
-
 test("rejects root framework binary aliases bound to a version other than Current", async () => {
   const paths = await fixture({ frameworkAliases: true, mixedFrameworkBinaryAlias: true })
   await assert.rejects(
@@ -65,7 +68,6 @@ test("rejects root framework binary aliases bound to a version other than Curren
     /Signable .* alias is not allowed/,
   )
 })
-
 test.each([
   ["Versions/B/Kit", { versionedFrameworkBinaryAlias: true }],
   ["Versions/A/Kit-alias", { currentVersionBinaryAlias: true }],
@@ -172,9 +174,13 @@ test.each([
 })
 
 test("rejects a post-sign non-Mach-O native object and suppresses the outer signature", async () => {
-  const paths = await fixture()
+  const paths = await electronFixture()
   const calls = []
-  const nativePath = await realpath(paths.native)
+  const nativePath = await realpath(
+    paths.targetPaths[
+      "Contents/Resources/app/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+    ],
+  )
   await assert.rejects(
     signAppBundle({
       appPath: paths.appPath,
@@ -194,9 +200,11 @@ test("rejects a post-sign non-Mach-O native object and suppresses the outer sign
 })
 
 test("rejects a post-sign Mach-O addition and suppresses the outer signature", async () => {
-  const paths = await fixture()
+  const paths = await electronFixture({
+    extraExecutablePaths: ["Contents/Resources/post-sign-tool"],
+  })
   const calls = []
-  const toolPath = await realpath(paths.tool)
+  const toolPath = await realpath(join(paths.appPath, "Contents", "Resources", "post-sign-tool"))
   await assert.rejects(
     signAppBundle({
       appPath: paths.appPath,
@@ -208,7 +216,7 @@ test("rejects a post-sign Mach-O addition and suppresses the outer signature", a
         machOAfterSigningPaths: [toolPath],
       }),
     }),
-    /Signable code changed during signing/,
+    /App signing target manifest mismatch/,
   )
   assert.equal(
     calls.some(
@@ -220,7 +228,7 @@ test("rejects a post-sign Mach-O addition and suppresses the outer signature", a
 })
 
 test("uses strict deep verification only after discovery without mutating the bundle", async () => {
-  const paths = await fixture()
+  const paths = await electronFixture()
   const calls = []
   await verifyAppSignature({ appPath: paths.appPath, runFile: createSigningRunner({ calls }) })
   const codesignCalls = calls.filter(({ command }) => command === "/usr/bin/codesign")
@@ -237,6 +245,6 @@ test("uses strict deep verification only after discovery without mutating the bu
   ])
   assert.equal(
     (await discoverSignableCode({ appPath: paths.appPath, runFile: createSigningRunner() })).length,
-    11,
+    24,
   )
 })

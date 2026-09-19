@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
+import { appleCommandTimeoutMs } from "./macos/apple-command-policy.mjs"
 import { assessGatekeeper, preflightNotaryProfile } from "./macos/notarization.mjs"
 import {
   inspectReleaseAttempts,
@@ -144,7 +145,10 @@ export async function runMacOSRelease(options) {
       state.mountDirectory,
       join(state.mountDirectory, appBundleName),
     )
-    await run("/usr/bin/xcrun", ["stapler", "validate", mountedApp], {})
+    await run("/usr/bin/xcrun", ["stapler", "validate", mountedApp], {
+      timeoutMs: appleCommandTimeoutMs,
+      ...(release.signal === undefined ? {} : { signal: release.signal }),
+    })
     await verifyAppSignature({
       appPath: mountedApp,
       identity: release.signingIdentity,

@@ -31,7 +31,6 @@ import {
   electronHelperNames,
   helperSuffix,
 } from "./support/macos-package-fixtures.mjs"
-import "./package-macos-dmg-staging.test.mjs"
 
 const temporaryDirectories = createTemporaryDirectoryTracker()
 afterEach(() => temporaryDirectories.cleanup())

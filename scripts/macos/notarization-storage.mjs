@@ -3,7 +3,11 @@ import { link, mkdir, open, readFile, rename, rm } from "node:fs/promises"
 import { join } from "node:path"
 
 import { failNotarization } from "./notarization-contract.mjs"
-import { syncDirectory } from "./notarization-durable-storage.mjs"
+import {
+  createOwnedRecordRemover,
+  parseRecordContents,
+  readRecord,
+} from "./notarization-owned-record.mjs"
 import { createRecordPublisher } from "./notarization-publication.mjs"
 
 export { writeAtomicJson } from "./notarization-durable-storage.mjs"
@@ -66,27 +70,6 @@ function parseGuard(value) {
   return value
 }
 
-function parseRecordContents(contents, parser) {
-  try {
-    return parser(JSON.parse(contents))
-  } catch (error) {
-    if (!(error instanceof SyntaxError)) throw error
-    return null
-  }
-}
-
-async function readRecord(path, parser, readRecordFile) {
-  try {
-    return parseRecordContents(await readRecordFile(path, "utf8"), parser)
-  } catch (_error) {
-    return null
-  }
-}
-
-function sameRecord(left, right, fields) {
-  return left !== null && fields.every((field) => left[field] === right[field])
-}
-
 export function createSubmissionClaim(
   directory,
   {
@@ -109,30 +92,15 @@ export function createSubmissionClaim(
   const readClaim = () => readRecord(claimPath, parseClaim, readClaimFile)
   const readGuard = () => readRecord(guardPath, parseGuard, readClaimFile)
 
-  async function removeOwned(path, expected, parser, fields) {
-    const current = await readRecord(path, parser, readClaimFile)
-    if (!sameRecord(current, expected, fields)) return false
-    const removalPath = `${path}.${ownerId}.remove`
-    try {
-      await renameClaimFile(path, removalPath)
-    } catch (error) {
-      if (error?.code === "ENOENT") return false
-      throw error
-    }
-    const moved = await readRecord(removalPath, parser, readClaimFile)
-    if (!sameRecord(moved, expected, fields)) {
-      try {
-        await linkClaimFile(removalPath, path)
-        await removeClaimFile(removalPath, { force: true })
-      } catch (error) {
-        if (error?.code !== "EEXIST") throw error
-      }
-      return false
-    }
-    await removeClaimFile(removalPath, { force: true })
-    await syncDirectory(directory, openClaimFile)
-    return true
-  }
+  const removeOwned = createOwnedRecordRemover({
+    directory,
+    ownerId,
+    linkRecordFile: linkClaimFile,
+    openRecordFile: openClaimFile,
+    readRecordFile: readClaimFile,
+    renameRecordFile: renameClaimFile,
+    removeRecordFile: removeClaimFile,
+  })
 
   function rejectClaim(current) {
     if (current !== null && isOwnerAlive(current.pid)) {
@@ -193,7 +161,12 @@ export function createSubmissionClaim(
       if (attempt === guardPublishAttempts - 1) {
         failNotarization("Notarization submission requires manual recovery")
       }
-      await removeOwned(guardPath, existingGuard, parseGuard, guardFields)
+      await removeOwned({
+        path: guardPath,
+        expected: existingGuard,
+        parser: parseGuard,
+        fields: guardFields,
+      })
     }
     failNotarization("Notarization submission requires manual recovery")
   }
@@ -230,7 +203,14 @@ export function createSubmissionClaim(
         ) {
           return rejectClaim(currentClaim)
         }
-        if (!(await removeOwned(claimPath, currentClaim, parseClaim, claimFields))) {
+        if (
+          !(await removeOwned({
+            path: claimPath,
+            expected: currentClaim,
+            parser: parseClaim,
+            fields: claimFields,
+          }))
+        ) {
           return rejectClaim(await readClaim())
         }
         try {
@@ -241,13 +221,23 @@ export function createSubmissionClaim(
           failNotarization("Notarization evidence is unavailable")
         }
       } finally {
-        await removeOwned(guardPath, guard, parseGuard, guardFields)
+        await removeOwned({
+          path: guardPath,
+          expected: guard,
+          parser: parseGuard,
+          fields: guardFields,
+        })
       }
     },
     async release() {
       const currentClaim = await readClaim()
       if (currentClaim?.ownerId !== ownerId) return
-      await removeOwned(claimPath, currentClaim, parseClaim, claimFields)
+      await removeOwned({
+        path: claimPath,
+        expected: currentClaim,
+        parser: parseClaim,
+        fields: claimFields,
+      })
     },
     async markSubmitting() {
       let handle

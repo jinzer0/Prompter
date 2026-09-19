@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
-import { readFile, rename, rm, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { link, readFile, rename, rm, writeFile } from "node:fs/promises"
+import { basename, join } from "node:path"
 
 import { afterEach, test, vi } from "vitest"
 
@@ -21,6 +21,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
 })
 
 import { createSubmissionClaim } from "../scripts/macos/notarization-storage.mjs"
+import { isGeneratedNotarizationStorageRemnant } from "../scripts/macos/notarization-storage-remnants.mjs"
 import { createNotarizationDirectoryTracker } from "./support/macos-notarization-fixtures.mjs"
 
 const temporaryDirectories = createNotarizationDirectoryTracker()
@@ -94,29 +95,41 @@ test("removes its published guard durably, preserves the stale claim, and reclai
   await retry.release()
 })
 
-test("preserves a replacement guard when post-link rollback races its owner", async () => {
+test("restores and syncs a replacement guard moved by post-link rollback", async () => {
   const root = await temporaryDirectories.create()
   const { claim: claimPath, guard: guardPath } = paths(root)
   const stale = `${JSON.stringify({ ownerId: ownerId(8), pid: deadPid, phase: "pre-submit" })}\n`
   const replacement = { ownerId: ownerId(2), pid: process.pid, claimOwnerId: ownerId(8) }
-  let replaceOnRollback = false
+  const replacementPath = join(root, "replacement-guard")
+  const removalPath = `${guardPath}.${ownerId(1)}.remove`
+  const temporaryGuard = join(root, `..notarization-submit.reclaim.${ownerId(1)}.tmp`)
   await writeFile(claimPath, stale)
+  await writeFile(replacementPath, `${JSON.stringify(replacement)}\n`)
   fsProbe.directories.add(root)
-  fsProbe.directorySyncFailure = (publication) => {
-    if (publication !== "guard final") return undefined
-    replaceOnRollback = true
-    return Object.assign(new Error("synthetic final guard sync failure"), { code: "EIO" })
-  }
+  fsProbe.directorySyncFailure = failOnce(
+    "guard final",
+    Object.assign(new Error("synthetic final guard sync failure"), { code: "EIO" }),
+  )
 
   await assert.rejects(
     createClaim(root, ownerId(1), {
       isOwnerAlive: () => false,
-      readClaimFile: async (path, ...arguments_) => {
-        if (path === guardPath && replaceOnRollback) {
-          replaceOnRollback = false
-          await writeFile(guardPath, `${JSON.stringify(replacement)}\n`)
+      linkClaimFile: async (sourcePath, targetPath) => {
+        if (sourcePath === removalPath) fsProbe.events.push("replacement restore")
+        await link(sourcePath, targetPath)
+      },
+      removeClaimFile: async (path, options) => {
+        if (path === removalPath) fsProbe.events.push("replacement tombstone unlink")
+        if (path === temporaryGuard) fsProbe.events.push("guard temp cleanup")
+        await rm(path, options)
+      },
+      renameClaimFile: async (sourcePath, targetPath) => {
+        if (sourcePath === guardPath) {
+          fsProbe.events.push("replacement swap")
+          await rename(replacementPath, guardPath)
         }
-        return readFile(path, ...arguments_)
+        await rename(sourcePath, targetPath)
+        if (sourcePath === guardPath) fsProbe.events.push("replacement tombstone")
       },
     }).acquire(),
     /unavailable/,
@@ -124,6 +137,107 @@ test("preserves a replacement guard when post-link rollback races its owner", as
 
   assert.equal(await readFile(claimPath, "utf8"), stale)
   assert.deepEqual(JSON.parse(await readFile(guardPath, "utf8")), replacement)
+  assert.deepEqual(fsProbe.events.slice(fsProbe.events.indexOf("replacement swap")), [
+    "replacement swap",
+    "replacement tombstone",
+    "replacement restore",
+    "replacement tombstone unlink",
+    'directory open("r")',
+    "directory sync",
+    "directory close",
+    "guard temp cleanup",
+  ])
+})
+
+test("fails closed without retry when replacement restoration directory sync fails", async () => {
+  const root = await temporaryDirectories.create()
+  const { claim: claimPath, guard: guardPath } = paths(root)
+  const replacement = { ownerId: ownerId(2), pid: process.pid, claimOwnerId: ownerId(8) }
+  const replacementPath = join(root, "replacement-guard")
+  const removalPath = `${guardPath}.${ownerId(1)}.remove`
+  let syncFailures = 0
+  let renameAttempts = 0
+  await writeFile(
+    claimPath,
+    `${JSON.stringify({ ownerId: ownerId(8), pid: deadPid, phase: "pre-submit" })}\n`,
+  )
+  await writeFile(replacementPath, `${JSON.stringify(replacement)}\n`)
+  fsProbe.directories.add(root)
+  fsProbe.directorySyncFailure = (publication) => {
+    if (publication !== "guard final") return undefined
+    syncFailures += 1
+    return Object.assign(new Error(`synthetic directory sync failure ${syncFailures}`), {
+      code: "EIO",
+    })
+  }
+
+  await assert.rejects(
+    createClaim(root, ownerId(1), {
+      isOwnerAlive: () => false,
+      renameClaimFile: async (sourcePath, targetPath) => {
+        if (sourcePath === guardPath) {
+          renameAttempts += 1
+          await rename(replacementPath, guardPath)
+        }
+        await rename(sourcePath, targetPath)
+      },
+    }).acquire(),
+    /unavailable/,
+  )
+
+  assert.equal(syncFailures, 2)
+  assert.equal(renameAttempts, 1)
+  assert.deepEqual(JSON.parse(await readFile(guardPath, "utf8")), replacement)
+  await assert.rejects(readFile(removalPath), { code: "ENOENT" })
+})
+
+test("keeps a durable claim authoritative when its temporary cleanup fails", async () => {
+  const root = await temporaryDirectories.create()
+  const id = ownerId(1)
+  const { claim: claimPath } = paths(root)
+  const temporaryClaim = join(root, `..notarization-submit.claim.${id}.tmp`)
+  fsProbe.directories.add(root)
+  const claim = createClaim(root, id, {
+    removeClaimFile: async (path, options) => {
+      if (path === temporaryClaim)
+        throw Object.assign(new Error("synthetic cleanup failure"), { code: "EIO" })
+      await rm(path, options)
+    },
+  })
+
+  await claim.acquire()
+
+  assert.equal(JSON.parse(await readFile(claimPath, "utf8")).ownerId, id)
+  assert.equal(isGeneratedNotarizationStorageRemnant(basename(temporaryClaim)), true)
+  assert.equal(JSON.parse(await readFile(temporaryClaim, "utf8")).ownerId, id)
+  await claim.release()
+})
+
+test("continues reclaim after durable guard temporary cleanup fails", async () => {
+  const root = await temporaryDirectories.create()
+  const id = ownerId(1)
+  const { claim: claimPath, guard: guardPath } = paths(root)
+  const temporaryGuard = join(root, `..notarization-submit.reclaim.${id}.tmp`)
+  await writeFile(
+    claimPath,
+    `${JSON.stringify({ ownerId: ownerId(8), pid: deadPid, phase: "pre-submit" })}\n`,
+  )
+  fsProbe.directories.add(root)
+  const claim = createClaim(root, id, {
+    isOwnerAlive: () => false,
+    removeClaimFile: async (path, options) => {
+      if (path === temporaryGuard)
+        throw Object.assign(new Error("synthetic cleanup failure"), { code: "EIO" })
+      await rm(path, options)
+    },
+  })
+
+  await claim.acquire()
+
+  assert.equal(JSON.parse(await readFile(claimPath, "utf8")).ownerId, id)
+  await assert.rejects(readFile(guardPath), { code: "ENOENT" })
+  assert.equal(isGeneratedNotarizationStorageRemnant(basename(temporaryGuard)), true)
+  await claim.release()
 })
 
 test("fails closed when published-guard rollback cleanup fails", async () => {

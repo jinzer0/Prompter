@@ -7,7 +7,8 @@ import {
   createDmgSnapshot,
   createFakeArtifacts,
   createZipSnapshot,
-  restoreSnapshot,
+  restoreDmgSnapshot,
+  restoreZipSnapshot,
 } from "./macos-coordinator-artifacts.mjs"
 import { xcrunResult } from "./macos-coordinator-notary-responses.mjs"
 import {
@@ -35,11 +36,15 @@ export async function createCoordinatorFixture({
   certificateContents = syntheticCertificate,
   certificateExtraction = "valid",
   identityFingerprint = syntheticIdentityFingerprint,
+  signal,
   shared,
   warningLog = false,
   notaryLog,
   notaryInfo,
   notaryMutation,
+  restoredZipAppMutation,
+  finalZipAppMutation,
+  mountedDmgAppMutation,
 } = {}) {
   const root = shared?.root ?? (await mkdtemp(join(tmpdir(), "prompter-release-test-")))
   const sourceRoot = shared?.sourceRoot ?? join(root, "source")
@@ -55,13 +60,8 @@ export async function createCoordinatorFixture({
   const evidenceRoot = shared?.evidenceRoot ?? join(root, "evidence-parent", "evidence")
   const electron = shared?.electron ?? (await createElectronAppFixture())
   const fakeArtifacts = shared?.fakeArtifacts ?? createFakeArtifacts(root)
-  const appAttemptPath = join(
-    evidenceRoot,
-    "v0.1.1",
-    "app",
-    "notarization-attempt",
-    "Prompter-0.1.1-mac-arm64.zip",
-  )
+  const appAttemptFile = "Prompter-0.1.1-mac-arm64.zip"
+  const appAttemptPath = join(evidenceRoot, "v0.1.1", "app", "notarization-attempt", appAttemptFile)
   if (shared === undefined) {
     await mkdir(sourceRoot, { recursive: true })
     await mkdir(dirname(nativeSourcePath), { recursive: true })
@@ -89,19 +89,16 @@ export async function createCoordinatorFixture({
       writeFile(join(evidenceRoot, "caller-sentinel"), "retain"),
     ])
   }
-  if (failure === "stale-candidate") {
-    await mkdir(join(releaseRoot, "v0.1.1"))
-    await writeFile(join(releaseRoot, "v0.1.1", "stale"), "stale")
-  }
+  if (failure === "stale-candidate") await mkdir(join(releaseRoot, "v0.1.1"))
+  if (failure === "stale-candidate") await writeFile(join(releaseRoot, "v0.1.1", "stale"), "stale")
   const [calls, rawCalls, observedTempRoots] = [[], [], new Set()]
   let candidateExistsDuringProfile = false
   const runFile = async (command, arguments_, options = {}) => {
     const stage = commandStage(command, arguments_)
     calls.push(stage)
     rawCalls.push({ command, arguments_, options })
-    if (stage === "app-info" || stage === "app-log") {
+    if (stage === "app-info" || stage === "app-log")
       await notaryMutation?.({ artifactPath: appAttemptPath, stage })
-    }
     for (const value of [...arguments_, options.cwd].filter((entry) => typeof entry === "string")) {
       const match = value.match(
         /^(.*\/prompter-(?:release-app|notary-app|release-extract|release-mount|dmg|signing-certificate)-[^/]+)/u,
@@ -137,7 +134,7 @@ export async function createCoordinatorFixture({
       await writeFile(artifactPath, `${await readFile(artifactPath, "utf8")}-stapled`)
       return { stdout: "", stderr: "" }
     }
-    if (stage === failure) throw new Error(syntheticSecret)
+    if (stage === (failure?.stage ?? failure)) throw failure?.error ?? new Error(syntheticSecret)
     if (stage === "identity") {
       const matches = identityListing === "multiple" ? 2 : identityListing === "none" ? 0 : 1
       return {
@@ -202,14 +199,17 @@ export async function createCoordinatorFixture({
       })
     if (command === "/usr/bin/ditto" && arguments_[0] === "-c")
       await createZipSnapshot(arguments_, options, fakeArtifacts)
-    if (command === "/usr/bin/ditto" && arguments_[0] === "-x")
-      await restoreSnapshot(arguments_[2], arguments_.at(-1), fakeArtifacts)
+    if (command === "/usr/bin/ditto" && arguments_[0] === "-x") {
+      const mutation =
+        arguments_[2] === appAttemptPath ? restoredZipAppMutation : finalZipAppMutation
+      await restoreZipSnapshot(arguments_, fakeArtifacts, mutation)
+    }
     if (stage === "dmg-stage")
       await cp(arguments_[0], arguments_[1], { recursive: true, verbatimSymlinks: true })
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "create")
       await createDmgSnapshot(arguments_, fakeArtifacts)
     if (command === "/usr/bin/hdiutil" && arguments_[0] === "attach")
-      await restoreSnapshot(arguments_.at(-1), arguments_[4], fakeArtifacts)
+      await restoreDmgSnapshot(arguments_, fakeArtifacts, mountedDmgAppMutation)
     if (command === "/usr/bin/shasum")
       return {
         stdout: `${"a".repeat(64)}  ${arguments_[2]}\n${"b".repeat(64)}  ${arguments_[3]}\n`,
@@ -236,6 +236,7 @@ export async function createCoordinatorFixture({
         arch: "arm64",
         signingIdentity,
         notaryProfile: "SYNTHETIC_PROFILE",
+        ...(signal === undefined ? {} : { signal }),
         staplerWaitFor: async () => undefined,
         paths: {
           sourceRoot,

@@ -4,9 +4,9 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import {
-  isAllowedRuntimeNativeTarget,
-  isRuntimeNodeModuleTarget,
-} from "./runtime-native-policy.mjs"
+  validateElectronSigningTargetManifest,
+  validateRuntimePackageRootClosure,
+} from "./electron-signing-target-policy.mjs"
 import { discoverSignableCode, SigningInputError } from "./signing-discovery.mjs"
 
 export { discoverSignableCode } from "./signing-discovery.mjs"
@@ -93,16 +93,6 @@ async function verifyTargets(targets, runFile) {
   }
 }
 
-function validateRuntimeNativeTargets(appPath, targets) {
-  const runtimeTargets = targets.filter((target) => isRuntimeNodeModuleTarget(appPath, target.path))
-  if (
-    runtimeTargets.length !== 1 ||
-    !isAllowedRuntimeNativeTarget(appPath, runtimeTargets[0].path)
-  ) {
-    throw new SigningInputError("Unexpected runtime native signing target")
-  }
-}
-
 function invalidArtifactIdentity(artifactKind) {
   const error = new SigningInputError("Recovered artifact signing identity is invalid")
   error.artifactKind = artifactKind
@@ -161,8 +151,9 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   const signingIdentity = await requireIdentity(identity, executeFile)
   const canonicalEntitlementsPath = await validateEntitlements(entitlementsPath, executeFile)
   const rootPath = await realpath(resolve(appPath))
+  await validateRuntimePackageRootClosure(rootPath)
   const targets = await discoverSignableCode({ appPath: rootPath, runFile: executeFile })
-  validateRuntimeNativeTargets(rootPath, targets)
+  await validateElectronSigningTargetManifest({ appPath: rootPath, targets })
 
   for (const target of targets) {
     await executeFile(
@@ -173,7 +164,7 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
   }
 
   const postSignTargets = await discoverSignableCode({ appPath: rootPath, runFile: executeFile })
-  validateRuntimeNativeTargets(rootPath, postSignTargets)
+  await validateElectronSigningTargetManifest({ appPath: rootPath, targets: postSignTargets })
   if (
     targets.length !== postSignTargets.length ||
     targets.some((target, index) => target.path !== postSignTargets[index]?.path)
@@ -197,7 +188,18 @@ export async function signAppBundle({ appPath, identity, entitlementsPath, runFi
 export async function verifyAppSignature({ appPath, identity, runFile }) {
   const executeFile = requireRunner(runFile)
   const rootPath = await realpath(resolve(appPath))
-  const targets = await discoverSignableCode({ appPath: rootPath, runFile: executeFile })
+  let targets
+  try {
+    await validateRuntimePackageRootClosure(rootPath)
+    targets = await discoverSignableCode({ appPath: rootPath, runFile: executeFile })
+    await validateElectronSigningTargetManifest({ appPath: rootPath, targets })
+  } catch (error) {
+    if (error instanceof SigningInputError) {
+      error.artifactKind = "app"
+      error.discardEvidence = true
+    }
+    throw error
+  }
   await verifyTargets(targets, executeFile)
   await executeFile(codesignCommand, ["--verify", "--deep", "--strict", rootPath], {})
   await verifyArtifactIdentity(rootPath, identity, "app", executeFile)

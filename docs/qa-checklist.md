@@ -169,13 +169,14 @@ MOUNT_DIR="$(mktemp -d)"
   test -d "${MOUNT_DIR}/Prompter.app"
   ```
 
-- [ ] The app inside the mounted DMG has a strict valid signature and passes Gatekeeper execute
-      assessment:
+- [ ] The app inside the mounted DMG has a valid stapled ticket, a strict valid signature, and
+       passes Gatekeeper execute assessment:
 
-  ```bash
-  /usr/bin/codesign --verify --deep --strict "${MOUNT_DIR}/Prompter.app"
-  /usr/sbin/spctl --assess --type execute --verbose=4 "${MOUNT_DIR}/Prompter.app"
-  /usr/bin/hdiutil detach "${MOUNT_DIR}"
+   ```bash
+   /usr/bin/xcrun stapler validate "${MOUNT_DIR}/Prompter.app"
+   /usr/bin/codesign --verify --deep --strict "${MOUNT_DIR}/Prompter.app"
+   /usr/sbin/spctl --assess --type execute --verbose=4 "${MOUNT_DIR}/Prompter.app"
+   /usr/bin/hdiutil detach "${MOUNT_DIR}"
   ```
 
 - [ ] The packaged app plist maps to the expected bundle identity and version:

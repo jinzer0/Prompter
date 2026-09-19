@@ -1,4 +1,4 @@
-import { lstat, open } from "node:fs/promises"
+import { lstat, open, readdir } from "node:fs/promises"
 import { extname, isAbsolute, join, relative, sep } from "node:path"
 
 export const runtimePackageRoots = ["better-sqlite3", "bindings", "file-uri-to-path"]
@@ -21,6 +21,23 @@ const machOMagic = new Set([
   "feedfacf",
 ])
 const nativeArtifactExtensions = new Set([".node", ".dylib", ".o", ".a"])
+
+function normalizedPath(path) {
+  return path.split(sep).join("/")
+}
+
+function relativeRuntimePath(appPath, path) {
+  return normalizedPath(relative(appPath, path))
+}
+
+async function optionalMetadata(path) {
+  try {
+    return await lstat(path)
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+    throw error
+  }
+}
 
 function isContained(rootPath, targetPath) {
   const pathFromRoot = relative(rootPath, targetPath)
@@ -72,4 +89,49 @@ export function isAllowedRuntimeNativeTarget(appPath, targetPath) {
     isContained(nodeModulesPath, targetPath) &&
     relative(nodeModulesPath, targetPath) === allowedRuntimeNativePath
   )
+}
+
+export async function runtimePackageRootIssues(appPath) {
+  const nodeModulesPath = join(appPath, runtimeNodeModulesPath)
+  const nodeModulesMetadata = await optionalMetadata(nodeModulesPath)
+  if (nodeModulesMetadata?.isDirectory() !== true || nodeModulesMetadata.isSymbolicLink()) {
+    return {
+      missing: runtimePackageRoots.map((name) =>
+        relativeRuntimePath(appPath, join(nodeModulesPath, name)),
+      ),
+      unexpected: [],
+      mismatched: [relativeRuntimePath(appPath, nodeModulesPath)],
+    }
+  }
+  const entries = await readdir(nodeModulesPath)
+  const missing = []
+  const unexpected = entries
+    .filter((entry) => !runtimePackageRoots.includes(entry))
+    .map((entry) => relativeRuntimePath(appPath, join(nodeModulesPath, entry)))
+  const mismatched = []
+  for (const name of runtimePackageRoots) {
+    const path = join(nodeModulesPath, name)
+    const metadata = await optionalMetadata(path)
+    if (metadata === undefined) missing.push(relativeRuntimePath(appPath, path))
+    else if (metadata.isDirectory() !== true || metadata.isSymbolicLink())
+      mismatched.push(relativeRuntimePath(appPath, path))
+  }
+  return { missing, unexpected, mismatched }
+}
+
+export async function hasExpectedRuntimeNativeTarget({ appPath, targets }) {
+  const rootIssues = await runtimePackageRootIssues(appPath)
+  if (rootIssues.missing.length + rootIssues.unexpected.length + rootIssues.mismatched.length > 0)
+    return false
+  const runtimeTargets = targets.filter((target) => isRuntimeNodeModuleTarget(appPath, target.path))
+  if (
+    runtimeTargets.length !== 1 ||
+    !isAllowedRuntimeNativeTarget(appPath, runtimeTargets[0].path)
+  ) {
+    return false
+  }
+  const metadata = await optionalMetadata(
+    join(appPath, runtimeNodeModulesPath, allowedRuntimeNativePath),
+  )
+  return metadata?.isFile() === true && metadata.isSymbolicLink() === false
 }

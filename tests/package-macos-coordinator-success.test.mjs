@@ -127,7 +127,9 @@ test("validates the mounted app staple before final mounted-app checks and relea
       arguments_[2].endsWith("/Prompter.app"),
   )
   assert.notEqual(mountedStapleIndex, -1)
-  const mountedApp = release.rawCalls[mountedStapleIndex].arguments_[2]
+  const mountedStaple = release.rawCalls[mountedStapleIndex]
+  assert.deepEqual(mountedStaple.options, { timeout: 600_000 })
+  const mountedApp = mountedStaple.arguments_[2]
   const mountedSignatureIndex = release.rawCalls.findIndex(
     ({ command, arguments_ }) =>
       command === "/usr/bin/codesign" &&
@@ -154,6 +156,24 @@ test("validates the mounted app staple before final mounted-app checks and relea
     true,
   )
   assert.equal(result.artifacts.includes("SHA256SUMS"), true)
+})
+
+test("passes the release AbortSignal to mounted app staple validation", async () => {
+  const controller = new AbortController()
+  const release = await fixture({ signal: controller.signal })
+  await release.run()
+  const mountedValidationCalls = release.rawCalls.filter(
+    ({ command, arguments_ }) =>
+      command === "/usr/bin/xcrun" &&
+      arguments_[0] === "stapler" &&
+      arguments_[1] === "validate" &&
+      arguments_[2].includes("prompter-release-mount-"),
+  )
+  assert.equal(mountedValidationCalls.length, 1)
+  assert.deepEqual(mountedValidationCalls[0].options, {
+    signal: controller.signal,
+    timeout: 600_000,
+  })
 })
 
 test("retains only validated final receipts after a successful release", async () => {

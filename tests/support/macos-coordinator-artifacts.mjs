@@ -36,3 +36,15 @@ export async function restoreSnapshot(source, destination, fakeArtifacts) {
     verbatimSymlinks: true,
   })
 }
+
+export async function restoreZipSnapshot(arguments_, fakeArtifacts, mutation) {
+  const destination = arguments_.at(-1)
+  await restoreSnapshot(arguments_[2], destination, fakeArtifacts)
+  await mutation?.(join(destination, "Prompter.app"))
+}
+
+export async function restoreDmgSnapshot(arguments_, fakeArtifacts, mutation) {
+  const destination = arguments_[4]
+  await restoreSnapshot(arguments_.at(-1), destination, fakeArtifacts)
+  await mutation?.(join(destination, "Prompter.app"))
+}

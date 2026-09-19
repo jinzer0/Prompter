@@ -135,6 +135,10 @@ stale implementation-plan row를 교정했다.
 | `scripts/macos/notarization-publication.mjs`, `scripts/macos/notarization-storage.mjs` | post-link directory-sync failure에서 final owner record가 exact match일 때만 tombstone으로 제거하고 directory를 sync한다. replacement owner와 stale claim은 보존한다. |
 | `scripts/package-macos.mjs`, `scripts/release-macos.mjs` | DMG app copy를 `/usr/bin/ditto`로 수행해 xattr를 보존하고 mounted app `stapler validate` 성공 뒤에만 signature, Gatekeeper, checksum으로 진행한다. |
 | Stage 6.31 package/signing/publication/DMG coordinator regressions와 support, `vitest.config.ts` | runtime-root별 adversarial native injection, missing required addon, owner race/cleanup failure/retry, real ditto xattr, mounted staple success/failure order를 direct suites로 고정했다. changed source/test/support/config 21개는 모두 250 pure LOC 이하이며 최대 248이다. |
+| `scripts/macos/electron-signing-target-policy.mjs`, `scripts/macos/runtime-native-policy.mjs`, `scripts/macos/signing.mjs` | Stage 6.32는 exact Electron 43 signing manifest와 sole SQLite addon manifest를 signing/verification이 공유하게 하고, runtime roots를 정확히 `better-sqlite3`, `bindings`, `file-uri-to-path`로 고정했다. |
+| `scripts/macos/notarization-owned-record.mjs`, `scripts/macos/notarization-storage.mjs`, `scripts/macos/notarization-publication.mjs` | owner-safe directory-durable restoration을 분리해 storage module을 250 pure LOC 이하로 유지하고, post-linearization temp cleanup failure는 durable live record 성공을 뒤집지 않도록 했다. |
+| `scripts/macos/apple-command-policy.mjs`, `scripts/macos/notarization-command.mjs`, `scripts/release-macos.mjs` | mounted app `stapler validate`에 timeout `600000`과 AbortSignal을 전달하고, duplicate suite registration/accounting을 정정하며 `package-macos` Vitest project를 scoped sequential로 실행하게 했다. |
+| Stage 6.32 signing/publication/stapler/recovery regressions, support, `docs/qa-checklist.md`, `vitest.config.ts` | manifest mismatch discard metadata, owner restoration, post-durable cleanup, mounted stapler timeout/signal, signing target recovery와 package registration/counting을 regression으로 고정했다. changed source/test/support/config 25개는 모두 250 pure LOC 이하이며 최대 249다. |
 | `docs/release-macos.md`, `docs/qa-checklist.md` | 유지관리자용 후보 부재, preflight timing, app/DMG evidence schema, DMG primary-signature context, no-publication 경계를 교정했다. |
 | `.omo/evidence/task-8-stage6-*-fresh-review-remediation.md` | ignored sanitized evidence로 각 remediation validation과 cleanup receipt를 남겼다. 커밋에는 포함하지 않는다. |
 | `mydocs/working/task_m011_6_stage6.md` | Stage 6 전체 교정, failed-review chronology, 잔여 위험, existing PR #8 update와 pending fresh-review 경계를 기록했다. |
@@ -753,12 +757,43 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - OK: Stage 6.31 changed source/test/support/config 21개는 모두 250 pure LOC 이하이며 최대 248이다.
 - MISS(환경 제한): Stage 6.31 LSP diagnostics는 sibling-worktree request-root 제한으로 사용할 수 없어
   PASS로 기록하지 않는다.
+- REJECT RECORDED: Stage 6.31 remote exact head
+  `9097e124ed5d991e1802a03096f718115fa170ce`의 review는 QA PASS와 Goal FAIL, Code Quality FAIL,
+  Security FAIL, Context FAIL을 기록했다. generic Mach-O discovery의 signing authority 확장,
+  `verifyAppSignature` manifest parity 누락, replacement-owner restoration directory sync 누락,
+  post-durable temp cleanup의 false failure/live record orphan 가능성, mounted stapler timeout/signal 누락,
+  stale QA/order/accounting과 duplicate DMG registration이 blocker였다.
+- RED FIRST: Stage 6.32 signing evidence는 교정 전 8/10 실패 뒤 보강 red에서 5/14 실패를 재현했고,
+  green은 52/52다. publication evidence는 4 failed/2 passed red 뒤 25/25 green과 same-owner 9/9 green으로
+  전환됐다. mounted stapler evidence는 2 failed/42 passed red 뒤 54/54 green이다. integration baseline은
+  35 manifest failures였고 신규 signing-target recovery는 5/5, 요청 regression surface는 19 files/204 tests다.
+- OK: Stage 6.32 signing policy는 exact Electron 43 manifest와 sole SQLite addon manifest를 signing과
+  verification에서 공유한다. verification mismatch는 deterministic failure와 app discard metadata를 남긴다.
+  packaged runtime roots는 정확히 `better-sqlite3`, `bindings`, `file-uri-to-path`이고 retained native target은
+  `better-sqlite3/build/Release/better_sqlite3.node` 하나뿐이다.
+- OK: Stage 6.32 owner-safe restoration은 exact owner record 복구 뒤 containing directory를 sync한다.
+  post-linearization temp cleanup failure는 non-fatal이며 durable live record를 orphan으로 취급하지 않는다.
+  mounted app `stapler validate`는 timeout `600000`과 AbortSignal을 받는다. duplicate registration/accounting은
+  fresh unique counts로 정정됐고 `package-macos` Vitest project는 scoped sequential execution으로 고정됐다.
+- DIAGNOSIS: 기본 package run timeout은 changing victim 양상이었고 두 번째 run은 6 failed/292 passed였다.
+  동일 여섯 파일은 단독 실행에서 각각 1.34s-3.19s로 통과했다. CLI serialization은 29 files/298 tests,
+  config-scoped run도 29/298로 통과했고 full `npm test`는 157 files/1068 tests로 통과했다.
+- OK: Stage 6.32 authoritative validation은 requested regression 19 files/204 tests, typecheck, lint, changed-source
+  syntax, protected diff, diff check, build, unsigned package, smoke 49/49, full `npm test` 157 files/1068 tests다.
+  lint는 기존 Biome deprecated-config info만 출력했다. signed missing-input entrypoint는 exit 1, candidate/evidence
+  absent, tracked mutation unchanged였다. packaged addon은 `/usr/bin/file`에서 Mach-O arm64, `/usr/bin/lipo`에서
+  arm64였고 scans와 generated-output cleanup도 통과했다.
+- OK: Stage 6.32 changed source/test/support/config 25개는 모두 250 pure LOC 이하이며 최대 249다.
+- MISS(환경 제한): Stage 6.32 LSP diagnostics는 sibling-worktree request-root 제한으로 사용할 수 없어
+  PASS로 기록하지 않는다.
 
 ## 잔여 위험
 
 - 실제 Developer ID signing, Apple Notarization, stapling, Gatekeeper assessment, signed artifact manual
   inspection, tag, GitHub Release, upload, public v0.1.1 publication은 Issue #7로 미룬다.
-- Stage 6.31의 runtime native singleton, exact-owner publication rollback, ditto metadata continuity와
+- Stage 6.32의 exact Electron 43 signing manifest parity, exact runtime roots, owner-safe durable restoration,
+  non-fatal post-linearization temp cleanup, mounted stapler timeout/signal, duplicate registration/accounting
+  correction, scoped sequential package Vitest와 Stage 6.31의 runtime native singleton, exact-owner publication rollback, ditto metadata continuity와
   mounted-app staple validation, Stage 6.30의 exact runtime package closure와 parent-directory-durable
   evidence publication, Stage 6.29의
   unknown attempt retention과 exact storage-remnant cleanup, Stage 6.28의 owner-aware
@@ -820,10 +855,13 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
   REJECT와 QA/Quality APPROVE를 기록했고, findings는 Stage 6.30 remediation 입력으로 보존됐다.
 - Stage 6.30 report-inclusive head `1c8ab2d13db90b0edbc4c490ebc53a1e613cbee9`의 review는 QA
   PASS, Goal/Quality/Security/Context FAIL을 기록했고 findings는 Stage 6.31 remediation 입력으로 보존됐다.
-- Stage 6.31 runtime singleton/publication rollback/DMG metadata/staple remediation과 focused, full-suite,
-  build, package, smoke validation은 완료됐다. Stage 6.31은 자신의 아직 알 수 없는 exact SHA를 재귀적으로
-  주장하지 않는다. 다음 fresh exact-head review에서 다섯 lane 모두 exact-head approval을 주고, PR #8 merge와 `origin/master`
-  containment verification을 마칠 때까지 Task #6과 Todo 8은 `진행중`이다.
+- Stage 6.31 remote exact head `9097e124ed5d991e1802a03096f718115fa170ce`의 review는 QA PASS와
+  Goal/Quality/Security/Context FAIL을 기록했고 findings는 Stage 6.32 remediation 입력으로 보존됐다.
+- Stage 6.32 exact manifest parity, owner-safe restoration, post-durable cleanup, mounted stapler bounds,
+  duplicate registration/accounting과 scoped sequential package Vitest remediation 및 validation은 완료됐다.
+  report-inclusive commit/push, fresh five-lane exact-head review, PR #8 merge와 `origin/master` containment
+  verification을 마칠 때까지 Task #6과 Todo 8은 `진행중`이다. Stage 6.32는 자신의 아직 알 수 없는 exact
+  SHA를 재귀적으로 주장하지 않는다.
 
 ## 승인 요청
 
@@ -877,4 +915,9 @@ submission과 DMG submission을 거쳐 fresh Accepted evidence 및 세 release a
 - 작업지시자의 최신 명시 지시에 따라 `1c8ab2d` review의 runtime native singleton bypass,
   post-link claim/guard rollback, DMG xattr/staple continuity와 cumulative accounting findings는 Stage 6.31
   source/test/config와 두 report에서 교정됐다. 이 closure는 자신의 exact SHA를 재귀적으로 주장하지 않는다.
-  Stage 6.31 five-lane fresh exact-head approvals, PR merge, containment는 서로 분리된 후속 gate다.
+  Stage 6.31 remote exact head `9097e124ed5d991e1802a03096f718115fa170ce`의 QA PASS와 Goal/Quality/Security/Context
+  FAIL은 Stage 6.32 입력으로 보존됐다.
+- 작업지시자의 최신 명시 지시에 따라 Stage 6.31 remote exact-head review blocker는 Stage 6.32 source/test/support/config,
+  QA checklist, 두 report와 orders note에서 교정·검증됐다. 이 closure는 자신의 exact SHA를 재귀적으로
+  주장하지 않는다. report-inclusive commit/push, fresh five-lane exact-head review, PR merge, containment는
+  서로 분리된 후속 gate다.

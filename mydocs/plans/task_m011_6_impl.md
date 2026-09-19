@@ -1376,31 +1376,33 @@ Governance:
 
 Source candidates:
 
+- `scripts/macos/apple-command-policy.mjs` (신규)
 - `scripts/macos/electron-signing-target-policy.mjs` (신규)
+- `scripts/macos/notarization-command.mjs`
+- `scripts/macos/notarization-owned-record.mjs` (신규; storage <=250 pure LOC 유지 필수)
+- `scripts/macos/notarization-publication.mjs`
+- `scripts/macos/notarization-storage.mjs`
 - `scripts/macos/runtime-native-policy.mjs`
 - `scripts/macos/signing.mjs`
-- `scripts/macos/notarization-storage.mjs`
-- `scripts/macos/notarization-publication.mjs`
-- `scripts/macos/apple-command-policy.mjs` (신규)
-- `scripts/macos/notarization-command.mjs`
 - `scripts/release-macos.mjs`
 
 Test/support/config candidates:
 
+- `tests/package-macos-coordinator-failures.test.mjs`
+- `tests/package-macos-coordinator-signing-target-recovery.test.mjs` (신규)
+- `tests/package-macos-coordinator-success.test.mjs`
+- `tests/package-macos-notarization-publication-rollback.test.mjs`
+- `tests/package-macos-package.test.mjs`
+- `tests/package-macos-signing-architecture.test.mjs`
+- `tests/package-macos-signing-discovery.test.mjs`
+- `tests/package-macos-signing-flow.test.mjs`
+- `tests/support/macos-coordinator-artifacts.mjs`
+- `tests/support/macos-coordinator-fixtures.mjs`
+- `tests/support/macos-coordinator-target-mutations.mjs` (신규)
 - `tests/support/macos-electron-app-fixture.mjs` (신규)
 - `tests/support/macos-package-fixtures.mjs`
-- `tests/support/macos-signing-target-fixtures.mjs` (신규)
 - `tests/support/macos-signing-fixtures.mjs`
-- `tests/package-macos-signing-flow.test.mjs`
-- `tests/package-macos-signing-discovery.test.mjs`
-- `tests/package-macos-signing-target-policy.test.mjs` (신규)
-- `tests/package-macos-coordinator-signing-target-recovery.test.mjs` (신규)
-- `tests/support/macos-coordinator-target-mutations.mjs` (신규)
-- `tests/support/macos-coordinator-fixtures.mjs`
-- `tests/package-macos-notarization-publication-rollback.test.mjs`
-- `tests/package-macos-coordinator-success.test.mjs`
-- `tests/package-macos-coordinator-failures.test.mjs`
-- `tests/package-macos-package.test.mjs`
+- `tests/support/macos-signing-target-fixtures.mjs` (신규)
 - `vitest.config.ts`
 
 Official documentation candidate:
@@ -1458,6 +1460,7 @@ exact head로 고정한다. report-inclusive exact head의 unanimous five-lane g
 | latest fresh review blockers | arbitrary `Versions/<non-current>/<FrameworkBinary>` symlink alias와 unknown/malformed Notarization issue severity acceptance를 재현 | blocker 2건 교정, Stage 6.5 report 작성, direct reproduction 포함 five-lane PASS 전 closure 0건 | Stage 6.5, task-8-stage6-5 evidence |
 | exact-head fresh review blockers | signed staging native addon allowlist, directory durability ordering, stale report claim을 재현 | blocker 3건 교정, Stage 6.30 report 작성, five fresh exact-head approvals 전 merge와 closure 0건 | Stage 6.30, task-8-stage6-30 evidence |
 | Stage 6.30 exact-head 재검토 blockers | runtime native singleton bypass, post-link claim/guard sync rollback, DMG xattr/staple continuity, stale cumulative accounting을 재현 | blocker 전건 교정, Stage 6.31 report 작성, five fresh exact-head approvals 전 merge와 closure 0건 | Stage 6.31, task-8-stage6-31 evidence |
+| Stage 6.31 exact-head review blockers | generic Mach-O authority 확장, verification manifest parity 누락, replacement-owner sync 누락, post-durable cleanup false failure, mounted stapler timeout/signal 누락, stale accounting을 재현 | blocker 전건 교정, Stage 6.32 report 작성, unanimous exact-head five-lane approval 전 merge와 closure 0건 | Stage 6.32, task-8-stage6-32 evidence |
 
 ## 검증
 
@@ -1489,6 +1492,9 @@ exact head로 고정한다. report-inclusive exact head의 unanimous five-lane g
 - Stage 6.30 exact-head 재검토 blocker가 확인된 뒤에는 Stage 6.31 red-first 교정, full validation,
   cumulative report correction과 five fresh exact-head approvals 전까지 merge, orders/Todo 8 완료,
   `origin/master` containment와 Issue #7 진입을 완료로 취급하지 않는다.
+- Stage 6.31 exact-head review blocker가 확인된 뒤에는 Stage 6.32 red-first 교정, unique-count
+  validation, cumulative report correction과 unanimous exact-head five-lane approval 전까지 merge,
+  orders/Todo 8 완료, `origin/master` containment와 Issue #7 진입을 완료로 취급하지 않는다.
 
 ## 커밋
 

@@ -1,5 +1,6 @@
 import { constants } from "node:os"
 
+import { appleCommandTimeoutMs } from "./apple-command-policy.mjs"
 import {
   exactNotarizationObject,
   failNotarization,
@@ -13,7 +14,6 @@ import {
 import { hasSafeNotarizationIssues } from "./notarization-evidence.mjs"
 import { createStaplingClient } from "./notarization-stapling.mjs"
 
-const appleCommandTimeoutMs = 10 * 60 * 1000
 const terminationSignals = new Set(Object.keys(constants.signals))
 const xcrunCommand = "/usr/bin/xcrun"
 const spctlCommand = "/usr/sbin/spctl"

@@ -125,6 +125,33 @@ test("detaches but suppresses downstream release work when mounted staple valida
   await assert.rejects(access(release.candidate))
 })
 
+test.each([
+  ["timeout", Object.assign(new Error(syntheticSecret), { code: "ETIMEDOUT" })],
+  ["abort", Object.assign(new Error(syntheticSecret), { name: "AbortError" })],
+])("detaches without retrying or trusting a mounted app after %s", async (_failureKind, error) => {
+  const release = await fixture({
+    failure: { error, stage: "mounted-app-stapler-validate" },
+  })
+  await assert.rejects(release.run(), assertSanitizedReleaseFailure)
+  const validationCalls = release.rawCalls.filter(
+    ({ command, arguments_ }) =>
+      command === "/usr/bin/xcrun" &&
+      arguments_[0] === "stapler" &&
+      arguments_[1] === "validate" &&
+      arguments_[2].includes("prompter-release-mount-"),
+  )
+  assert.equal(validationCalls.length, 1)
+  const validationIndex = release.calls.indexOf("mounted-app-stapler-validate")
+  assert.notEqual(validationIndex, -1)
+  assert.deepEqual(
+    release.calls.slice(validationIndex + 1).filter((stage) => releaseStages.includes(stage)),
+    ["detach"],
+  )
+  for (const stage of ["app-verify-3", "mounted-app-gatekeeper", "checksum"])
+    assert.equal(release.calls.includes(stage), false)
+  await assert.rejects(access(release.candidate))
+})
+
 test("preserves a mounted image when detach cleanup fails and reports aggregate failure", async () => {
   const release = await fixture({ failure: "detach" })
   await assert.rejects(release.run(), (error) => error instanceof AggregateError)

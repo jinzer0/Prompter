@@ -1,34 +1,19 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
-import {
-  access,
-  chmod,
-  cp,
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  symlink,
-  writeFile,
-} from "node:fs/promises"
+import { access, cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
 
+import {
+  createElectronAppFixture,
+  electronHelperNames,
+  helperSuffix,
+} from "./macos-electron-app-fixture.mjs"
+
 const executeFile = promisify(execFile)
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
-const electronHelperNames = [
-  "Electron Helper",
-  "Electron Helper (Renderer)",
-  "Electron Helper (GPU)",
-  "Electron Helper (Plugin)",
-]
-
-function helperSuffix(helperName) {
-  return helperName.slice(15).replaceAll(" (", ".").replaceAll(")", "").toLowerCase()
-}
-
 export function createTemporaryDirectoryTracker() {
   const directories = new Set()
   return {
@@ -140,76 +125,6 @@ export function dmgOptions(fixture, arch) {
   }
 }
 
-function createPlist({
-  bundleIdentifier,
-  bundleName,
-  executable,
-  includeDisplayName = true,
-  includeExecutable = true,
-}) {
-  return [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<plist version="1.0">',
-    "<dict>",
-    "<key>CFBundleIdentifier</key>",
-    `<string>${bundleIdentifier}</string>`,
-    ...(includeExecutable
-      ? ["<key>CFBundleExecutable</key>", `<string>${executable}</string>`]
-      : []),
-    "<key>CFBundleName</key>",
-    `<string>${bundleName}</string>`,
-    ...(includeDisplayName
-      ? ["<key>CFBundleDisplayName</key>", `<string>${bundleName}</string>`]
-      : []),
-    "<key>LSEnvironment</key>",
-    "<dict>",
-    "<key>NESTED_VALUE</key>",
-    "<string>preserve-me</string>",
-    "</dict>",
-    "<key>ElectronAsarIntegrity</key>",
-    "<string>preserve-me</string>",
-    "</dict>",
-    "</plist>",
-  ].join("\n")
-}
-
-async function createElectronBundle(bundlePath, bundleName, bundleIdentifier, plistOptions) {
-  const contentsPath = join(bundlePath, "Contents")
-  const executablePath = join(contentsPath, "MacOS", bundleName)
-  await mkdir(join(contentsPath, "MacOS"), { recursive: true })
-  await writeFile(executablePath, `${bundleName} executable`)
-  await writeFile(
-    join(contentsPath, "Info.plist"),
-    createPlist({ bundleIdentifier, bundleName, executable: bundleName, ...plistOptions }),
-  )
-  await chmod(executablePath, 0o755)
-}
-
-export async function createElectronAppFixture() {
-  const root = await mkdtemp(join(tmpdir(), "prompter-electron-app-test-"))
-  const appPath = join(root, "Electron.app")
-  const frameworksPath = join(appPath, "Contents", "Frameworks")
-  await createElectronBundle(appPath, "Electron", "com.github.Electron")
-  for (const helperName of electronHelperNames) {
-    const helperIdentifier = `com.github.Electron.helper${helperSuffix(helperName)}`
-    await createElectronBundle(
-      join(frameworksPath, `${helperName}.app`),
-      helperName,
-      helperIdentifier,
-      { includeDisplayName: false, includeExecutable: false },
-    )
-  }
-  const frameworkName = "Electron Framework"
-  const frameworkPath = join(frameworksPath, `${frameworkName}.framework`)
-  const frameworkBinaryPath = join(frameworkPath, "Versions", "A", frameworkName)
-  await mkdir(join(frameworkBinaryPath, ".."), { recursive: true })
-  await writeFile(frameworkBinaryPath, "framework binary")
-  await symlink("A", join(frameworkPath, "Versions", "Current"))
-  const frameworkLinkPath = join(frameworkPath, frameworkName)
-  await symlink(`Versions/Current/${frameworkName}`, frameworkLinkPath)
-  return { appPath, frameworkBinaryPath, frameworkLinkPath, temporaryDirectories: [root] }
-}
-
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
@@ -225,4 +140,4 @@ export function assertBundlePlist(plist, identifier, name) {
     assert.match(plist, new RegExp(`<key>${key}</key>\\s*<string>${escapeRegExp(value)}</string>`))
 }
 
-export { electronHelperNames, helperSuffix }
+export { createElectronAppFixture, electronHelperNames, helperSuffix }

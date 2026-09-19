@@ -20,13 +20,13 @@ A local-first macOS app for turning rough ideas into reusable prompts for coding
 
 ### macOS (Apple Silicon)
 
-1. Download `Prompter-0.1.0-mac-arm64.dmg` from
+1. Download `Prompter-0.1.1-mac-arm64.dmg` from
    [Releases](https://github.com/jinzer0/Prompter/releases).
 2. Open the DMG and drag `Prompter.app` to `Applications`.
 3. Launch Prompter from `Applications`.
 
-Release builds are currently unsigned. If macOS blocks the first launch, right-click the app and
-choose **Open**, or allow it from **System Settings > Privacy & Security**.
+The v0.1.1 Apple Silicon release is Developer ID signed, notarized, and stapled. If OpenAI key
+status does not carry over from an older unsigned build, re-enter the key in Settings.
 
 ### From Source
 
@@ -55,8 +55,7 @@ npm run package:release:macos
 ```
 
 That command is for release maintainers only. It signs and notarizes the v0.1.1 candidate, but it
-does not publish a GitHub Release, create or rewrite tags, or change the public download notice.
-Public installation remains on the v0.1.0 unsigned release until the release issue completes.
+does not publish a GitHub Release or create or rewrite tags.
 
 ## Basic Use
 

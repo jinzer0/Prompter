@@ -143,11 +143,12 @@ export async function createCoordinatorFixture({
       }
     }
     if (stage === "signer-display") {
-      const certificatePrefixIndex = arguments_.indexOf("--extract-certificates")
-      const certificatePrefix = arguments_[certificatePrefixIndex + 1]
-      if (certificatePrefixIndex !== -1 && certificateExtraction === "valid")
+      const certificatePrefix = arguments_
+        .find((argument) => argument.startsWith("--extract-certificates="))
+        ?.slice("--extract-certificates=".length)
+      if (certificatePrefix !== undefined && certificateExtraction === "valid")
         await writeFile(`${certificatePrefix}0`, certificateContents)
-      if (certificatePrefixIndex !== -1 && certificateExtraction === "malformed")
+      if (certificatePrefix !== undefined && certificateExtraction === "malformed")
         await writeFile(`${certificatePrefix}0`, "")
       options.finalDmgExistsDuringSignerDisplay = await access(
         join(releaseRoot, "v0.1.1", "Prompter-0.1.1-mac-arm64.dmg"),

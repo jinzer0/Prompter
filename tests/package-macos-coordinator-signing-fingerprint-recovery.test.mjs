@@ -47,7 +47,7 @@ function finalArtifactSignerDisplays(release) {
     ({ command, arguments_ }) =>
       command === "/usr/bin/codesign" &&
       arguments_[0] === "--display" &&
-      arguments_.includes("--extract-certificates"),
+      arguments_.some((argument) => argument.startsWith("--extract-certificates=")),
   )
 }
 

@@ -35,8 +35,8 @@ b9c63063084c547242dbbb1e23d4c273eb0ca16bcbf5ed964d9c548f025b8786  Prompter-0.1.1
 
 Local sizes at verification time:
 
-- DMG: `139976511` bytes
-- ZIP: `124214492` bytes
+- DMG: `139678009` bytes
+- ZIP: `124214527` bytes
 - `SHA256SUMS`: `190` bytes
 
 ## 검증 결과

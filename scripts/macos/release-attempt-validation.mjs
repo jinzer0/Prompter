@@ -1,0 +1,246 @@
+import { lstat, readdir, readFile, realpath, rm, unlink } from "node:fs/promises"
+import { dirname, isAbsolute, join, relative, sep } from "node:path"
+
+import {
+  createNotarizationEvidence,
+  identifyNotarizationArtifact,
+  validateFinalNotarizationEvidence,
+} from "./notarization-evidence.mjs"
+import { finalNotarizationReceiptFileName } from "./notarization-final-receipt.mjs"
+import { isGeneratedNotarizationStorageRemnant } from "./notarization-storage-remnants.mjs"
+import { validateOwnedDirectory } from "./owned-directory.mjs"
+
+const terminalAttemptErrors = new Set(["Notarization submission was not accepted"])
+const transientEvidenceFileNames = new Set([
+  "notarization-resume.json",
+  ".notarization-submit.claim",
+  ".notarization-submit.reclaim",
+])
+const activeLogFileName =
+  /^notary-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.json$/u
+
+function fail() {
+  throw new Error("Invalid retained notarization attempt")
+}
+
+function invalidAttemptError(attempt, dependentArtifactKind) {
+  const error = new Error("Invalid retained notarization attempt")
+  error.artifactKind = attempt.artifactKind
+  error.discardEvidence = true
+  if (dependentArtifactKind !== undefined) error.dependentArtifactKind = dependentArtifactKind
+  return error
+}
+
+function isContained(rootPath, targetPath) {
+  const pathFromRoot = relative(rootPath, targetPath)
+  return (
+    pathFromRoot !== "" &&
+    pathFromRoot !== ".." &&
+    !pathFromRoot.startsWith(`..${sep}`) &&
+    !isAbsolute(pathFromRoot)
+  )
+}
+
+async function metadata(path) {
+  try {
+    return await lstat(path)
+  } catch (error) {
+    if (error?.code === "ENOENT") return undefined
+    throw error
+  }
+}
+
+export async function identifyRetainedAttempt(attempt) {
+  const evidenceCanonical = await validateAttemptEvidenceDirectory(attempt)
+  if (evidenceCanonical === undefined) return undefined
+  const directoryMetadata = await metadata(attempt.directory)
+  if (directoryMetadata === undefined) return undefined
+  if (!directoryMetadata.isDirectory() || directoryMetadata.isSymbolicLink()) fail()
+  if (JSON.stringify(await readdir(attempt.directory)) !== JSON.stringify([attempt.artifactName])) {
+    fail()
+  }
+  const artifactMetadata = await lstat(attempt.artifactPath)
+  if (!artifactMetadata.isFile() || artifactMetadata.isSymbolicLink()) fail()
+  const [directoryCanonical, artifactCanonical] = await Promise.all([
+    realpath(attempt.directory),
+    realpath(attempt.artifactPath),
+  ])
+  if (
+    !isContained(evidenceCanonical, directoryCanonical) ||
+    !isContained(directoryCanonical, artifactCanonical) ||
+    dirname(artifactCanonical) !== directoryCanonical
+  ) {
+    fail()
+  }
+  return identifyNotarizationArtifact(artifactCanonical)
+}
+
+export async function validateAttemptEvidenceDirectory(attempt) {
+  const rootCanonical = await validateOwnedDirectory({
+    trustedAnchor: attempt.trustedAnchor,
+    targetPath: attempt.evidenceRoot,
+  })
+  if (rootCanonical === undefined) return undefined
+  const parentPath = dirname(attempt.evidenceDirectory)
+  const parentCanonical = await validateOwnedDirectory({
+    trustedAnchor: attempt.trustedAnchor,
+    targetPath: parentPath,
+  })
+  if (parentCanonical === undefined) return undefined
+  if (!isContained(rootCanonical, parentCanonical)) fail()
+  const evidenceCanonical = await validateOwnedDirectory({
+    trustedAnchor: attempt.trustedAnchor,
+    targetPath: attempt.evidenceDirectory,
+  })
+  if (evidenceCanonical === undefined) return undefined
+  if (!isContained(rootCanonical, evidenceCanonical)) fail()
+  return evidenceCanonical
+}
+
+export async function validateReleaseAttemptDirectories(attempts) {
+  try {
+    await Promise.all([
+      validateAttemptEvidenceDirectory(attempts.app),
+      validateAttemptEvidenceDirectory(attempts.dmg),
+    ])
+  } catch {
+    fail()
+  }
+}
+
+async function readBoundAttempt(attempt) {
+  try {
+    const artifactIdentity = await identifyRetainedAttempt(attempt)
+    if (artifactIdentity === undefined) return undefined
+    const evidence = createNotarizationEvidence({
+      evidenceDir: attempt.evidenceDirectory,
+      artifactIdentity,
+    })
+    const saved = await evidence.readResume()
+    if (
+      saved === undefined ||
+      !evidence.matchesArtifact(saved) ||
+      !["unknown", "accepted", "Accepted"].includes(saved.status)
+    ) {
+      fail()
+    }
+    return Object.freeze({ attempt, saved })
+  } catch {
+    throw invalidAttemptError(attempt)
+  }
+}
+
+async function savedEvidenceStatus(attempt) {
+  try {
+    if ((await validateAttemptEvidenceDirectory(attempt)) === undefined) return undefined
+    const value = JSON.parse(
+      await readFile(join(attempt.evidenceDirectory, "notarization-resume.json"), "utf8"),
+    )
+    if (value?.status !== "Accepted") return "pending"
+    try {
+      await readFile(join(attempt.evidenceDirectory, finalNotarizationReceiptFileName), "utf8")
+    } catch (error) {
+      if (error?.code === "ENOENT") return "Accepted"
+      throw error
+    }
+    await validateFinalNotarizationEvidence({
+      evidenceDir: attempt.evidenceDirectory,
+      artifactKind: attempt.artifactKind,
+    })
+    return "Accepted"
+  } catch (error) {
+    if (error?.code === "ENOENT") return undefined
+    throw invalidAttemptError(attempt)
+  }
+}
+
+export async function inspectReleaseAttempts(attempts) {
+  try {
+    const [app, dmg, appEvidenceStatus, dmgEvidenceStatus] = await Promise.all([
+      readBoundAttempt(attempts.app),
+      readBoundAttempt(attempts.dmg),
+      savedEvidenceStatus(attempts.app),
+      savedEvidenceStatus(attempts.dmg),
+    ])
+    if (app !== undefined && dmg !== undefined) {
+      return Object.freeze({ ...dmg, appAttempt: app.attempt })
+    }
+    if (app !== undefined && dmgEvidenceStatus !== undefined) fail()
+    if (dmg !== undefined && app === undefined) throw invalidAttemptError(dmg.attempt, "app")
+    if (dmg !== undefined && appEvidenceStatus !== "Accepted") fail()
+    if (app === undefined && dmg === undefined && (appEvidenceStatus || dmgEvidenceStatus)) fail()
+    if (app === undefined && appEvidenceStatus === "pending") fail()
+    if (dmg === undefined && dmgEvidenceStatus === "pending") fail()
+    return app ?? dmg
+  } catch (error) {
+    if (error?.artifactKind === "app" || error?.artifactKind === "dmg") throw error
+    fail()
+  }
+}
+
+export async function removeAttempt(attempt) {
+  const evidenceCanonical = await validateAttemptEvidenceDirectory(attempt)
+  if (evidenceCanonical === undefined) return
+  const directoryMetadata = await metadata(attempt.directory)
+  if (directoryMetadata === undefined) return
+  if (directoryMetadata.isSymbolicLink() || !directoryMetadata.isDirectory()) {
+    await unlink(attempt.directory)
+    return
+  }
+  const directoryCanonical = await realpath(attempt.directory)
+  if (!isContained(evidenceCanonical, directoryCanonical)) fail()
+  await rm(attempt.directory, { recursive: true })
+}
+
+async function removeAttemptEvidence(attempt) {
+  const evidenceCanonical = await validateAttemptEvidenceDirectory(attempt)
+  if (evidenceCanonical === undefined) return
+  await rm(evidenceCanonical, { recursive: true })
+}
+
+async function removeTransientAttemptEvidence(attempt) {
+  const evidenceCanonical = await validateAttemptEvidenceDirectory(attempt)
+  if (evidenceCanonical === undefined) return
+  await removeAttempt(attempt)
+  const entries = await readdir(evidenceCanonical, { withFileTypes: true })
+  await Promise.all(
+    entries
+      .filter(
+        (entry) =>
+          (transientEvidenceFileNames.has(entry.name) ||
+            activeLogFileName.test(entry.name) ||
+            isGeneratedNotarizationStorageRemnant(entry.name)) &&
+          (entry.isFile() || entry.isSymbolicLink()),
+      )
+      .map((entry) => unlink(join(evidenceCanonical, entry.name))),
+  )
+}
+
+export async function cleanupReleaseAttempts(attempts, error, attemptHandlingStarted) {
+  if (!attemptHandlingStarted) return
+  for (const attempt of [attempts.app, attempts.dmg]) {
+    if (error === undefined) {
+      await removeTransientAttemptEvidence(attempt)
+      continue
+    }
+    let retain = false
+    const affectedAttempt = error?.artifactKind === attempt.artifactKind
+    const dependentAttempt = error?.dependentArtifactKind === attempt.artifactKind
+    const invalidatedAttempt = affectedAttempt || dependentAttempt
+    const terminalError = error?.blocksPublication || terminalAttemptErrors.has(error?.message)
+    const discardEvidence = invalidatedAttempt && (error?.discardEvidence === true || terminalError)
+    try {
+      const retained = await readBoundAttempt(attempt)
+      retain =
+        retained !== undefined &&
+        (!invalidatedAttempt ||
+          (!terminalError &&
+            error?.discardEvidence !== true &&
+            ["unknown", "accepted", "Accepted"].includes(retained.saved.status)))
+    } catch {
+      retain = false
+    }
+    if (discardEvidence) await removeAttemptEvidence(attempt)
+    else if (!retain) await removeAttempt(attempt)
+  }
+}

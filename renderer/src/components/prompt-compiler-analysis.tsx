@@ -4,6 +4,7 @@ import type { CompiledPromptResult } from "../lib/prompt-compiler/types"
 import { scenarioLabel, targetAgentLabel } from "../lib/prompter-options"
 import { Badge } from "./ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
+import { Checkbox } from "./ui/checkbox"
 import { Textarea } from "./ui/textarea"
 
 type PromptCompilerAnalysisProps = {
@@ -117,13 +118,14 @@ export function PromptCompilerAnalysis({
                   {compiled.suggestedTags.map((tag) => (
                     <label
                       key={tag}
+                      htmlFor={`compiler-suggested-tag-${tag}`}
                       className="inline-flex min-h-[22px] items-center gap-2 rounded-full border border-border bg-panel-muted px-2.5 text-[11px] font-medium text-muted-strong"
                     >
-                      <input
+                      <Checkbox
+                        id={`compiler-suggested-tag-${tag}`}
                         aria-label={`Save tag ${tag}`}
                         checked={selectedSuggestedTags.includes(tag)}
-                        className="accent-accent"
-                        type="checkbox"
+                        className="mt-0 size-3"
                         onChange={(event) => onSuggestedTagChange(tag, event.currentTarget.checked)}
                       />
                       <span>{tag}</span>

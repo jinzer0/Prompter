@@ -12,6 +12,7 @@ import {
   projectContextProfileTextFields,
 } from "../lib/project-context-profile-form"
 import { Button } from "./ui/button"
+import { Checkbox } from "./ui/checkbox"
 import { Input } from "./ui/input"
 import { Textarea } from "./ui/textarea"
 
@@ -120,10 +121,13 @@ export function ProjectContextProfileEditor({
         <p className="text-[12px] text-muted-strong">{errorFor("name")}</p>
       )}
 
-      <label className="flex items-center gap-2 text-[12px] text-muted-strong">
-        <input
-          type="checkbox"
-          className="size-4 rounded-control accent-accent"
+      <label
+        htmlFor="context-profile-default"
+        className="flex items-center gap-2 text-[12px] text-muted-strong"
+      >
+        <Checkbox
+          id="context-profile-default"
+          className="mt-0"
           checked={form.isDefault}
           onChange={(event) => setForm({ ...form, isDefault: event.currentTarget.checked })}
         />

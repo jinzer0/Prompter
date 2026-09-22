@@ -8,6 +8,7 @@ import {
 } from "../../hooks/use-privacy-settings"
 import { Button } from "../ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
+import { Checkbox } from "../ui/checkbox"
 
 const privacySettingRows = [
   {
@@ -64,11 +65,11 @@ export function PrivacySettingsPanelView({ controller }: PrivacySettingsPanelVie
             {privacySettingRows.map((row) => (
               <label
                 key={row.key}
+                htmlFor={`privacy-setting-${row.key}`}
                 className="flex items-start gap-2 rounded-card border border-border bg-panel-muted p-3 text-[12px] leading-5 text-muted-strong"
               >
-                <input
-                  className="mt-1 accent-accent"
-                  type="checkbox"
+                <Checkbox
+                  id={`privacy-setting-${row.key}`}
                   checked={controller.settings[row.key]}
                   disabled={controller.isWorking}
                   onChange={(event) => controller.setSetting(row.key, event.currentTarget.checked)}

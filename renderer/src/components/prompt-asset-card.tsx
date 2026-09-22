@@ -2,8 +2,8 @@ import type { PromptAsset, PromptVersion } from "../../../electron/ipc-types"
 import { formatTimestamp } from "../lib/format-timestamp"
 import { parsePromptVersionMetadata } from "../lib/prompt-version-diff"
 import { scenarioLabel, targetAgentLabel } from "../lib/prompter-options"
-import { cn } from "../lib/utils"
 import { Badge } from "./ui/badge"
+import { SelectableCard } from "./ui/selectable-card"
 
 type PromptAssetCardProps = {
   readonly asset: PromptAsset
@@ -35,15 +35,7 @@ export function PromptAssetCard({
   const metadata = currentVersion === null ? null : parsePromptVersionMetadata(currentVersion)
 
   return (
-    <button
-      type="button"
-      aria-pressed={isSelected}
-      onClick={onSelect}
-      className={cn(
-        "rounded-card border bg-panel-elevated p-4 text-left transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45",
-        isSelected ? "border-accent/35" : "border-border hover:border-border-subtle",
-      )}
-    >
+    <SelectableCard selected={isSelected} onClick={onSelect}>
       <span className="flex items-center justify-between gap-3">
         <span className="text-[14px] font-semibold text-foreground">{asset.title}</span>
         <Badge variant={currentVersion === null ? "neutral" : "accent"}>
@@ -61,6 +53,6 @@ export function PromptAssetCard({
       <span className="mt-3 line-clamp-2 block text-[12px] leading-5 text-muted-strong">
         {compiledPromptPreview(currentVersion)}
       </span>
-    </button>
+    </SelectableCard>
   )
 }

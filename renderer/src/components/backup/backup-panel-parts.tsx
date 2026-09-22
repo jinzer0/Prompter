@@ -3,7 +3,9 @@ import type { BackupImportResult, BackupItemCounts, Project } from "../../../../
 import { assertNever, type BackupValidationView } from "../../hooks/backup-state"
 import { Button } from "../ui/button"
 import { MetricCard, MetricGrid } from "../ui/metric-card"
+import { MutedWell } from "../ui/muted-well"
 import { Select } from "../ui/select"
+import { MetaLabel } from "../ui/text"
 
 const countLabels = {
   projects: "Projects",
@@ -92,7 +94,7 @@ export function DestinationSelector({
 
   return (
     <label className="grid gap-2" htmlFor={destinationSelectId}>
-      <span className="font-mono text-[11px] text-muted">destination project required</span>
+      <MetaLabel>destination project required</MetaLabel>
       <Select
         aria-label="Backup import destination project"
         disabled={disabled}
@@ -121,7 +123,7 @@ export function ImportSummary({
   const importedProjectId = result.createdProjectIds[0] ?? null
 
   return (
-    <div className="space-y-3 rounded-card border border-border bg-panel-muted p-3">
+    <MutedWell>
       <p className="text-[13px] font-medium text-foreground">Import complete</p>
       <p className="text-[12px] leading-5 text-muted-strong">{result.message}</p>
       <CountGrid counts={result.importedCounts} />
@@ -143,6 +145,6 @@ export function ImportSummary({
           View imported project
         </Button>
       )}
-    </div>
+    </MutedWell>
   )
 }

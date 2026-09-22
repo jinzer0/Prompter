@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
+import { MetricCard } from "../ui/metric-card"
 
 type InsightPanelProps = {
   readonly children: ReactNode
@@ -28,10 +29,13 @@ type InsightMetricProps = {
 
 export function InsightMetric({ label, value }: InsightMetricProps) {
   return (
-    <div className="rounded-card border border-border-subtle bg-panel-muted p-3">
-      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted">{label}</dt>
-      <dd className="mt-1 text-[16px] font-semibold text-foreground">{value}</dd>
-    </div>
+    <MetricCard
+      className="border-border-subtle p-3"
+      label={label}
+      labelClassName="font-medium uppercase tracking-[0.08em]"
+      value={value}
+      valueClassName="text-[16px] font-semibold"
+    />
   )
 }
 

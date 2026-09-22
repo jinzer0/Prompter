@@ -2,6 +2,7 @@ import { useId } from "react"
 import type { BackupImportResult, BackupItemCounts, Project } from "../../../../electron/ipc-types"
 import { assertNever, type BackupValidationView } from "../../hooks/backup-state"
 import { Button } from "../ui/button"
+import { MetricCard, MetricGrid } from "../ui/metric-card"
 import { MutedWell } from "../ui/muted-well"
 import { Select } from "../ui/select"
 import { MetaLabel } from "../ui/text"
@@ -39,16 +40,11 @@ export function backupTypeLabel(type: BackupValidationView["backupType"]): strin
 
 export function CountGrid({ counts }: { readonly counts: BackupItemCounts }) {
   return (
-    <dl className="grid grid-cols-2 gap-2">
+    <MetricGrid>
       {countKeys.map((key) => (
-        <div key={key} className="rounded-card border border-border bg-panel-muted p-2">
-          <dt>
-            <MetaLabel>{countLabels[key]}</MetaLabel>
-          </dt>
-          <dd className="mt-1 text-[13px] font-medium text-foreground">{counts[key]}</dd>
-        </div>
+        <MetricCard key={key} label={countLabels[key]} value={counts[key]} />
       ))}
-    </dl>
+    </MetricGrid>
   )
 }
 

@@ -5,6 +5,7 @@ import {
 } from "../../hooks/use-app-lock-settings"
 import { Button } from "../ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
+import { Checkbox } from "../ui/checkbox"
 import { Input } from "../ui/input"
 import { AppLockCredentialFlows } from "./app-lock-credential-flows"
 
@@ -51,10 +52,12 @@ export function AppLockSettingsPanelView({ controller }: AppLockSettingsPanelVie
         ) : (
           <>
             <div className="grid gap-3">
-              <label className="flex items-start gap-2 rounded-card border border-border bg-panel-muted p-3 text-[12px] leading-5 text-muted-strong">
-                <input
-                  className="mt-1 accent-accent"
-                  type="checkbox"
+              <label
+                htmlFor="app-lock-on-start"
+                className="flex items-start gap-2 rounded-card border border-border bg-panel-muted p-3 text-[12px] leading-5 text-muted-strong"
+              >
+                <Checkbox
+                  id="app-lock-on-start"
                   checked={settings.lockOnStart}
                   disabled={isWorking}
                   onChange={(event) =>

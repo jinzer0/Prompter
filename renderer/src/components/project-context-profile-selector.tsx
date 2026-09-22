@@ -6,6 +6,7 @@ import type { CompilerProjectContextPreviewStatus } from "../hooks/use-compiler-
 import type { ProjectContextProfilesStatus } from "../hooks/use-project-context-profiles"
 import { Badge } from "./ui/badge"
 import { Button } from "./ui/button"
+import { Checkbox } from "./ui/checkbox"
 import { Select } from "./ui/select"
 
 type ProjectContextProfileSelectorProps = {
@@ -92,13 +93,16 @@ export function ProjectContextProfileSelector({
         </Select>
       </div>
 
-      <label className="flex items-center gap-2 text-[12px] text-muted-strong">
-        <input
+      <label
+        htmlFor="include-project-context-profile"
+        className="flex items-center gap-2 text-[12px] text-muted-strong"
+      >
+        <Checkbox
+          id="include-project-context-profile"
           aria-label="Include project context profile"
           checked={includeProjectContextProfile}
-          className="size-4 rounded-control accent-accent"
+          className="mt-0"
           disabled={!canInclude}
-          type="checkbox"
           onChange={(event) => onIncludeChange(event.currentTarget.checked)}
         />
         Include this profile in analyze/compile payloads

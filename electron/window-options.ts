@@ -6,6 +6,7 @@ export function createWindowOptions(preloadPath: string): BrowserWindowConstruct
     height: 768,
     show: true,
     title: "Prompter",
+    titleBarStyle: "hiddenInset",
     webPreferences: {
       preload: preloadPath,
       contextIsolation: true,

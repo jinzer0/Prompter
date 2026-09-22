@@ -1,5 +1,6 @@
 import type { MaintenanceScanOptions } from "../../hooks/maintenance-state"
 import { Button } from "../ui/button"
+import { Checkbox } from "../ui/checkbox"
 import { type ScanOptionKey, scanOptionRows } from "./maintenance-labels"
 
 type MaintenanceScanControlsProps = {
@@ -49,10 +50,12 @@ export function MaintenanceScanControls({
         </Button>
       </div>
 
-      <label className="flex items-start gap-2 rounded-card border border-border bg-panel-elevated p-2 text-[12px] leading-5 text-muted-strong">
-        <input
-          className="mt-1 accent-accent"
-          type="checkbox"
+      <label
+        htmlFor="maintenance-current-project-only"
+        className="flex items-start gap-2 rounded-card border border-border bg-panel-elevated p-2 text-[12px] leading-5 text-muted-strong"
+      >
+        <Checkbox
+          id="maintenance-current-project-only"
           checked={currentProjectOnly}
           disabled={!canFilterCurrentProject || isWorking}
           onChange={(event) => onCurrentProjectFilterChange(event.currentTarget.checked)}
@@ -72,10 +75,10 @@ export function MaintenanceScanControls({
           <label
             key={option.key}
             className="flex items-start gap-2 rounded-card border border-border bg-panel-elevated p-2 text-[12px] leading-5 text-muted-strong"
+            htmlFor={`maintenance-scan-${option.key}`}
           >
-            <input
-              className="mt-1 accent-accent"
-              type="checkbox"
+            <Checkbox
+              id={`maintenance-scan-${option.key}`}
               checked={scanOptions[option.key]}
               disabled={isWorking}
               onChange={(event) => setScanOption(option.key, event.currentTarget.checked)}

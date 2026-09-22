@@ -1,7 +1,7 @@
 import type { PromptSearchResultItem } from "../../../electron/ipc-types"
 import { scenarioLabel, targetAgentLabel } from "../lib/prompter-options"
-import { cn } from "../lib/utils"
 import { Badge } from "./ui/badge"
+import { SelectableCard } from "./ui/selectable-card"
 
 type PromptSearchResultCardProps = {
   readonly isSelected: boolean
@@ -15,15 +15,7 @@ export function PromptSearchResultCard({
   onSelect,
 }: PromptSearchResultCardProps) {
   return (
-    <button
-      type="button"
-      aria-pressed={isSelected}
-      onClick={onSelect}
-      className={cn(
-        "rounded-card border bg-panel-elevated p-4 text-left transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45",
-        isSelected ? "border-accent/35" : "border-border hover:border-border-subtle",
-      )}
-    >
+    <SelectableCard selected={isSelected} onClick={onSelect}>
       <span className="flex items-center justify-between gap-3">
         <span className="text-[14px] font-semibold text-foreground">{item.title}</span>
         <Badge variant="accent">v{item.versionNumber}</Badge>
@@ -45,6 +37,6 @@ export function PromptSearchResultCard({
       <span className="mt-3 line-clamp-2 block text-[12px] leading-5 text-muted-strong">
         {item.matchedTextPreview.length > 0 ? item.matchedTextPreview : item.compiledPromptPreview}
       </span>
-    </button>
+    </SelectableCard>
   )
 }

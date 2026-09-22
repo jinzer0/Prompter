@@ -2,7 +2,9 @@ import { useId } from "react"
 import type { BackupImportResult, BackupItemCounts, Project } from "../../../../electron/ipc-types"
 import { assertNever, type BackupValidationView } from "../../hooks/backup-state"
 import { Button } from "../ui/button"
+import { MutedWell } from "../ui/muted-well"
 import { Select } from "../ui/select"
+import { MetaLabel } from "../ui/text"
 
 const countLabels = {
   projects: "Projects",
@@ -40,7 +42,9 @@ export function CountGrid({ counts }: { readonly counts: BackupItemCounts }) {
     <dl className="grid grid-cols-2 gap-2">
       {countKeys.map((key) => (
         <div key={key} className="rounded-card border border-border bg-panel-muted p-2">
-          <dt className="font-mono text-[11px] text-muted">{countLabels[key]}</dt>
+          <dt>
+            <MetaLabel>{countLabels[key]}</MetaLabel>
+          </dt>
           <dd className="mt-1 text-[13px] font-medium text-foreground">{counts[key]}</dd>
         </div>
       ))}
@@ -94,7 +98,7 @@ export function DestinationSelector({
 
   return (
     <label className="grid gap-2" htmlFor={destinationSelectId}>
-      <span className="font-mono text-[11px] text-muted">destination project required</span>
+      <MetaLabel>destination project required</MetaLabel>
       <Select
         aria-label="Backup import destination project"
         disabled={disabled}
@@ -123,7 +127,7 @@ export function ImportSummary({
   const importedProjectId = result.createdProjectIds[0] ?? null
 
   return (
-    <div className="space-y-3 rounded-card border border-border bg-panel-muted p-3">
+    <MutedWell>
       <p className="text-[13px] font-medium text-foreground">Import complete</p>
       <p className="text-[12px] leading-5 text-muted-strong">{result.message}</p>
       <CountGrid counts={result.importedCounts} />
@@ -145,6 +149,6 @@ export function ImportSummary({
           View imported project
         </Button>
       )}
-    </div>
+    </MutedWell>
   )
 }

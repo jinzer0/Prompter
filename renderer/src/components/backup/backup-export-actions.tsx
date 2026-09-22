@@ -1,5 +1,6 @@
 import type { useBackup } from "../../hooks/use-backup"
 import { Button } from "../ui/button"
+import { MutedWell } from "../ui/muted-well"
 import { CountGrid } from "./backup-panel-parts"
 import { EncryptedBackupDialog } from "./encrypted-backup-dialog"
 import { PlaintextBackupDialog } from "./plaintext-backup-dialog"
@@ -109,12 +110,12 @@ export function BackupExportActions({
       </div>
 
       {backup.exportResult !== null && !backup.exportResult.cancelled && (
-        <div className="space-y-2 rounded-card border border-border bg-panel-muted p-3">
+        <MutedWell className="space-y-2">
           <p className="text-[13px] font-medium text-foreground">Export ready</p>
           {"itemCounts" in backup.exportResult && (
             <CountGrid counts={backup.exportResult.itemCounts} />
           )}
-        </div>
+        </MutedWell>
       )}
 
       {backup.state.kind === "plaintext_confirmation" && (

@@ -1,7 +1,6 @@
-import { type KeyboardEvent as ReactKeyboardEvent, type ReactNode, useEffect, useRef } from "react"
+import { type ReactNode, useEffect, useRef } from "react"
 
-import { focusPrivacyDialog, handlePrivacyDialogKeyDown } from "../privacy/privacy-warning-dialog"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
+import { DialogShell, focusDialog } from "../ui/dialog"
 
 type BackupDialogProps = {
   readonly children: ReactNode
@@ -34,7 +33,7 @@ export function BackupDialog({
     const restoreFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null
     dialogElement.showModal()
-    const restore = focusPrivacyDialog({ initialFocus, restoreFocus })
+    const restore = focusDialog({ initialFocus, restoreFocus })
     return () => {
       dialogElement.close()
       restore()
@@ -42,24 +41,16 @@ export function BackupDialog({
   }, [])
 
   return (
-    <dialog
+    <DialogShell
       ref={dialog}
-      aria-describedby={descriptionId}
-      aria-labelledby={titleId}
-      aria-modal="true"
-      className="m-auto max-h-full w-full max-w-lg bg-transparent p-4 text-inherit backdrop:bg-shell/90"
+      description={description}
+      descriptionId={descriptionId}
+      onCancel={onCancel}
       role={role}
-      onKeyDown={(event: ReactKeyboardEvent<HTMLDialogElement>) =>
-        handlePrivacyDialogKeyDown({ event, onCancel })
-      }
+      title={title}
+      titleId={titleId}
     >
-      <Card className="max-h-full w-full max-w-lg overflow-y-auto shadow-panel">
-        <CardHeader>
-          <CardTitle id={titleId}>{title}</CardTitle>
-          <CardDescription id={descriptionId}>{description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">{children}</CardContent>
-      </Card>
-    </dialog>
+      {children}
+    </DialogShell>
   )
 }

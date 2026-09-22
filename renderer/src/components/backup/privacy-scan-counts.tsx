@@ -1,4 +1,5 @@
 import type { SensitiveScanResult } from "../../../../electron/ipc-types"
+import { MetricCard, MetricGrid } from "../ui/metric-card"
 
 const findingCounts = [
   ["Critical", "criticalCount"],
@@ -9,13 +10,10 @@ const findingCounts = [
 
 export function PrivacyScanCounts({ scan }: { readonly scan: SensitiveScanResult }) {
   return (
-    <dl className="grid grid-cols-2 gap-2">
+    <MetricGrid>
       {findingCounts.map(([label, key]) => (
-        <div key={key} className="rounded-card border border-border bg-panel-muted p-2">
-          <dt className="font-mono text-[11px] text-muted">{label}</dt>
-          <dd className="mt-1 text-[13px] font-medium text-foreground">{scan[key]}</dd>
-        </div>
+        <MetricCard key={key} label={label} value={scan[key]} />
       ))}
-    </dl>
+    </MetricGrid>
   )
 }

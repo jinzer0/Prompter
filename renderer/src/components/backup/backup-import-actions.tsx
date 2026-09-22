@@ -1,6 +1,8 @@
 import type { Project } from "../../../../electron/ipc-types"
 import type { useBackup } from "../../hooks/use-backup"
 import { Button } from "../ui/button"
+import { MutedWell } from "../ui/muted-well"
+import { HelperText } from "../ui/text"
 import {
   BackupLedger,
   backupTypeLabel,
@@ -54,7 +56,7 @@ export function BackupImportActions({
       </div>
 
       {preview !== null && (
-        <div className="space-y-3 rounded-card border border-border bg-panel-muted p-3">
+        <MutedWell>
           <div className="space-y-1">
             <p className="text-[13px] font-medium text-foreground">
               {backupTypeLabel(preview.backupType)} preview
@@ -75,10 +77,10 @@ export function BackupImportActions({
           {preview.requiresDestinationProject &&
             selectedProjectId !== null &&
             backup.destinationProjectId.length === 0 && (
-              <p className="text-[12px] leading-5 text-muted">
+              <HelperText className="text-muted">
                 Current project is available, but import stays disabled until you explicitly choose
                 a destination.
-              </p>
+              </HelperText>
             )}
           <BackupLedger preview={preview} />
           <label className="flex items-start gap-2 text-[12px] leading-5 text-muted-strong">
@@ -105,13 +107,13 @@ export function BackupImportActions({
               Cancel import
             </Button>
           </div>
-        </div>
+        </MutedWell>
       )}
 
       {backup.state.kind === "import_failure" && (
-        <p className="text-[12px] leading-5 text-muted-strong">
+        <HelperText>
           Rollback complete. Review the preview, reopen the file, and try again if needed.
-        </p>
+        </HelperText>
       )}
       {backup.importResult !== null && (
         <ImportSummary result={backup.importResult} onViewImportedProject={onViewImportedProject} />

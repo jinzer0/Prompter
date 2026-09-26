@@ -6,15 +6,12 @@ import type { SensitiveFinding, SensitiveScanResult } from "../electron/ipc-type
 import { CompiledPromptPreview } from "../renderer/src/components/compiled-prompt-preview"
 import { PrivacyScanPanel } from "../renderer/src/components/privacy/privacy-scan-panel"
 import { PrivacySettingsPanel } from "../renderer/src/components/privacy/privacy-settings-panel"
-import {
-  focusPrivacyDialog,
-  handlePrivacyDialogKeyDown,
-  PrivacyWarningDialog,
-} from "../renderer/src/components/privacy/privacy-warning-dialog"
+import { PrivacyWarningDialog } from "../renderer/src/components/privacy/privacy-warning-dialog"
 import { SensitiveFindingList } from "../renderer/src/components/privacy/sensitive-finding-list"
 import { PromptCompilerForm } from "../renderer/src/components/prompt-compiler-form"
 import { PromptCompilerPrivacyScan } from "../renderer/src/components/prompt-compiler-privacy-scan"
 import { PromptExportActions } from "../renderer/src/components/prompt-export-actions"
+import { focusDialog, handleDialogKeyDown } from "../renderer/src/components/ui/dialog"
 import { emptyCompilerInput } from "../renderer/src/lib/prompt-compiler/llm-compiler-flow"
 
 const finding = {
@@ -208,12 +205,12 @@ describe("Phase 19 privacy renderer UI", () => {
     // Given: focus observers and an Escape keyboard event.
     const initialFocus = { focus: vi.fn<() => void>() }
     const restoreFocus = { focus: vi.fn<() => void>() }
-    const restore = focusPrivacyDialog({ initialFocus, restoreFocus })
+    const restore = focusDialog({ initialFocus, restoreFocus })
     const preventDefault = vi.fn<() => void>()
     const onCancel = vi.fn<() => void>()
 
     // When: Escape is handled and the dialog cleanup runs.
-    handlePrivacyDialogKeyDown({ event: { key: "Escape", preventDefault }, onCancel })
+    handleDialogKeyDown({ event: { key: "Escape", preventDefault }, onCancel })
     restore()
 
     // Then: safe cancellation and focus lifecycle match the button path.

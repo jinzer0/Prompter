@@ -149,3 +149,13 @@ Stage 1–5의 과거 검증 수치는 유지하며 아래 결과가 최신 코�
   `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check` 통과.
   native/Vite/Biome 기존 경고는 유지하며 새로운 OS 손동작/원격 CI 인증을 주장하지 않는다.
 - 승인 범위는 리뷰 대응 수정과 게시이며 merge·Issue close·배포는 실행하지 않는다.
+
+### 재리뷰 승인 및 병합
+
+- 최신 `6cae6ac`에 대해 Codex가 [“Didn't find any major issues. Bravo.”](https://github.com/jinzer0/Prompter/pull/32#issuecomment-6015788223)를 반환했다.
+- 작업지시자가 재리뷰 결과를 승인하고 이어 merge·Issue 종료·작업 브랜치/worktree 정리를 명시 승인했다.
+- 2026-10-06 21:09:29 KST [PR #32](https://github.com/jinzer0/Prompter/pull/32)의 merge를 확인했다.
+  merge commit은 `8e5b9a8338a48d25a27f00c2c552b72407ca5082`이며 Issue #31도 종료했다.
+- 위 미실행 경계는 각 단계 당시 기록이다. 이번 승인은 병합·종료·정리까지이며 배포는 수행하지 않았다.
+- 병합 후 완료 기록만 갱신하므로 제품 검증은 앞선 1182/65 통과 근거를 유지한다.
+  문서 변경은 `git diff --check`로 검증하고 테스트를 중복 실행하지 않는다. 원격 CI 통과를 주장하지 않는다.

@@ -1,5 +1,84 @@
 # Task #26 최종 결과보고서 — M012 디자인 리팩토링 통합 검증
 
+## 2026-10-06 최신 재검증 최종 보고
+
+GitHub Issue: [#26](https://github.com/jinzer0/Prompter/issues/26) / 마일스톤: M012
+
+**최신 통합 판정: PASS.** 아래 최신 보고 뒤의 과거 FAIL 기록은 당시 근거로 보존하며
+현재 결과와 구분한다. 제품 수정 없이 최신 통합 기준선의 검증을 수행했다.
+
+### 작업 요약
+
+- 작업지시자가 #26 → 의존성 정리 → 배포 순서를 지정했다. #26은 통합 검증과 보고에 한정한다.
+- 기존 `local/task26` 계획/보고/커밋을 보존하고 전용 worktree에서 3단계 재검증했다.
+- 승인받은 `origin/master` 통합 기준선은 `e3c44a6f05e1df9085d080350f1c5c1e7d309f47`이다.
+  통합 커밋은 `383ec5e99d954d138801f75102e823754eff82a1`, Stage 2 검증 HEAD는
+  `b1fbb822d3e2907cf4dffd8093c7424259e5ac49`, Stage 3 검증 HEAD는
+  `482e717a3072df25946f4acc3b656507e250cd74`다. HEAD 간 변경은 작업 문서뿐이다.
+- #27/PR #28의 과거 실패 수정과 #31/PR #32의 네이티브 UX·잠금 재리뷰 수정이 포함된다.
+- 기존 lockfile로 `npm ci` 후 정적 검사/전체 Vitest, fresh build/전체 Electron smoke를 실행했다.
+
+### 변경 파일 목록과 영향 범위
+
+| 경로 | 변경 요약 | 영향 범위 |
+|---|---|---|
+| `mydocs/plans/task_m012_26.md` | 기존 계획에 최신 기준선 재검증 범위·승인 경계 추가 | 내부 작업 계획 |
+| `mydocs/plans/task_m012_26_impl.md` | 기존 3단계 계획 보존 | 내부 실행 기준 |
+| `mydocs/working/task_m012_26_stage1.md` | 기준선 merge·과거 실패 수정 경로 확인 | 내부 검증 근거 |
+| `mydocs/working/task_m012_26_stage2.md` | 최신 정적 검사·전체 Vitest 결과 추가 | 내부 검증 근거 |
+| `mydocs/working/task_m012_26_stage3.md` | fresh build·전체 Electron 결과 추가 | 내부 검증 근거 |
+| `mydocs/report/task_m012_26_report.md` | 최신 PASS와 과거 FAIL을 구분하여 보존 | 최종 보고 |
+| `mydocs/orders/20260922.md` | 기존 #26 작업 행 보존 | 과거 진행 이력 |
+| `mydocs/orders/20261006.md` | 재개·Stage 승인·최종 보고 대기 상태 기록 | 현재 진행 상태 |
+
+기준선 대비 제품/테스트 source, IPC/DB schema, migration, dependency/lockfile 변경은 없다.
+원본 checkout과 사용자 BMAD/미추적 데이터는 보존했으며 local runtime/build 산출물은 게시 대상이 아니다.
+
+### 문서 위치 검증
+
+- 제품/사용자/기여자/API/아키텍처/로드맵 문서 변경은 해당 없음. 검증-only 작업이다.
+- 기존 계획의 `mydocs/plans/`, 단계 근거의 `mydocs/working/`, 최종 결과의 `mydocs/report/`,
+  오늘할일의 `mydocs/orders/` 배치가 수행계획과 일치한다. 새 공식 문서 루트는 만들지 않았다.
+
+### 변경 전·후 정량 비교 및 검증 결과
+
+| 검증 | 과거 기록 | 최신 재검증 |
+|---|---|---|
+| typecheck | stale import로 FAIL | PASS, Electron/renderer/tests 검사 |
+| lint | runtime JSON 포함으로 FAIL | PASS, 597파일·deprecated info 1건 유지 |
+| Vitest | 157파일 중 1실패, 1068개 중 1실패 | PASS, 163파일/1182개 |
+| build | 선행 typecheck FAIL | PASS, native Electron rebuild·main/preload·renderer fresh build |
+| Electron smoke | 49개 PASS, stale build 가능성 | PASS, fresh build 성공 뒤 65개 |
+| diff-check | PASS | PASS |
+
+테스트 수 증가는 통합된 후속 변경을 포함한 집계이며 이 검증 task에서 테스트를 추가한 결과가 아니다.
+최신 실행은 각 명령 exit 0을 확인했다. 과거 실패 두 경로는 최신 typecheck/lint/전체 테스트에서 재현되지 않았다.
+
+### 단계별 근거
+
+- [Stage 1](../working/task_m012_26_stage1.md): 충돌 없는 기준선 통합, 제품 diff 없음, #28/#32 MERGED 확인.
+- [Stage 2](../working/task_m012_26_stage2.md): typecheck/lint/Vitest 1182개 통과, 기존 native:node 사용.
+- [Stage 3](../working/task_m012_26_stage3.md): fresh build 및 Electron 65개 통과, 기존 native:electron 사용.
+
+### 잔여 위험과 후속 작업
+
+- native 컴파일·Vite bundle 크기·Biome deprecated info·npm deprecated/install-script 차단 경고는 유지했다.
+  install script 허용 정책을 완화하지 않았으며 이번 build는 정상 완료됐다.
+- 자동 Electron 결과를 실제 OS 손동작, 전체 접근성 인증, 무flash 프레임 검증으로 확대하지 않는다.
+- 원격 CI, 의존성 취약점 해소, signed package/notarization, release/tag/배포는 수행하지 않았다.
+- 후속은 작업지시자가 지정한 의존성 PR 검토/정리 후 별도 배포 task다. 이 보고는 배포 승인/인증이 아니다.
+- Issue #26은 OPEN이다. push/PR/merge/Issue close·worktree 정리는 각각 승인 범위에 따라 수행한다.
+
+### 작업지시자 승인 요청
+
+- 최신 PASS 판정과 최종 보고의 범위·한계에 대한 승인을 요청한다.
+- 원격 `publish/task26` push와 `master` 대상 Open PR 게시는 별도 승인 후 진행한다.
+
+---
+
+**이하 과거 검증 기록:** 후속 #27 수정 전 실행의 FAIL과 stale build 한계를 그대로 보존한다.
+아래 “결론”은 당시 판정이며 현재 최종 판정은 위 최신 PASS다.
+
 ## 요약
 
 - 최신 `master` 기반 `local/task26`에서 M012 디자인 리팩토링 통합 검증을 수행했다.

@@ -2,7 +2,7 @@
 
 GitHub Issue: [#31](https://github.com/jinzer0/Prompter/issues/31)
 마일스톤: M012
-상태: Stage 1–5 구현·검증·보고 승인 완료. “커밋·push·PR 게시 승인”에 따라 Open PR 게시 진행
+상태: Stage 1–5 구현·검증·보고 승인 완료. [Open PR #32](https://github.com/jinzer0/Prompter/pull/32) 게시 완료, merge 미실행
 
 ## 작업 요약
 
@@ -104,3 +104,4 @@ GitHub Issue: [#31](https://github.com/jinzer0/Prompter/issues/31)
 - 소급 단계 snapshot을 만들지 않고 검증된 최종 코드와 Stage 1–5 보고를 통합 커밋한다. 단계별 검증 이력은 각 보고서에 유지한다.
 - 사용자 BMAD 설치·로컬 workspace·memlog·PID/임시 경로·runtime JSON·build 산출물은 게시에서 제외한다. 로컬 근거와 공개 보고를 구분한다.
 - merge·Issue close·배포 승인은 포함하지 않는다.
+- 통합 커밋 `658374e`를 원격 `publish/task31`로 push하고 `master` 대상 Open PR #32를 생성했다. 게시 직후 원격 Check 목록은 비어 있어 CI 통과를 주장하지 않는다.

@@ -3,7 +3,7 @@
 수행계획서: [task_m012_31.md](task_m012_31.md)
 GitHub Issue: [#31](https://github.com/jinzer0/Prompter/issues/31)
 마일스톤: M012
-상태: Stage 1–5 구현·검증·보고 승인 완료. 커밋·push·Open PR 게시 승인에 따라 진행
+상태: Stage 1–5 구현·검증·보고 승인 완료. [Open PR #32](https://github.com/jinzer0/Prompter/pull/32) 게시 완료, merge 미실행
 
 ## 단계 개요
 

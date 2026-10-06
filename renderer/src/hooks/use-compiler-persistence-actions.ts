@@ -1,4 +1,4 @@
-import { useRef, useState } from "react"
+import { useState, useSyncExternalStore } from "react"
 
 import type {
   CreateDerivedPromptAssetInput,
@@ -17,6 +17,7 @@ import {
   type CompilerProjectBinding,
   executeGuardedCompilerPersistence,
 } from "../lib/compiler-project-binding"
+import type { CompilerMemory, SavedCompilerRefresh } from "../lib/prompt-compiler/compiler-memory"
 import type { CompiledPromptResult } from "../lib/prompt-compiler/types"
 import { versionInputFromCompiled } from "../lib/prompt-compiler/version-input"
 import type { CreatePrompt } from "./prompt-library-data"
@@ -32,13 +33,13 @@ export type DerivedPromptSaveSource = {
 }
 
 type SuggestedTagsActions = {
-  readonly attachSelectedSuggestedTags: (promptAssetId: string) => Promise<void>
   readonly clearSuggestedTags: () => void
   readonly selectedSuggestedTags: readonly string[]
 }
 
 type UseCompilerPersistenceActionsConfig = {
   readonly binding: CompilerProjectBinding
+  readonly compilerMemory: CompilerMemory
   readonly compiled: CompiledPromptResult | null
   readonly createDerivedAsset: CreateDerivedAsset
   readonly createNextVersion: CreateNextVersion
@@ -61,6 +62,7 @@ export {
 
 export function useCompilerPersistenceActions({
   binding,
+  compilerMemory,
   compiled,
   createDerivedAsset,
   createNextVersion,
@@ -75,11 +77,10 @@ export function useCompilerPersistenceActions({
   suggestedTags,
 }: UseCompilerPersistenceActionsConfig) {
   const [isSaving, setIsSaving] = useState(false)
-  const [isSavingNextVersion, setIsSavingNextVersion] = useState(false)
-  const savingNextVersion = useRef(false)
-  const [pendingSavedRefreshes, setPendingSavedRefreshes] = useState<
-    readonly (() => Promise<void>)[]
-  >([])
+  const savedRefreshState = useSyncExternalStore(
+    compilerMemory.subscribeSavedRefresh,
+    compilerMemory.savedRefreshState,
+  )
   const saveDisabledReasons = promptSaveDisabledReasons({
     compiled,
     editablePrompt,
@@ -148,8 +149,20 @@ export function useCompilerPersistenceActions({
     )
   }
 
+  async function refreshSavedVersion(refresh: SavedCompilerRefresh): Promise<void> {
+    await window.prompter.search.rebuildIndex()
+    for (const tagName of refresh.tagNames) {
+      await window.prompter.tags.createAndAttachToPrompt({
+        promptAssetId: refresh.promptAssetId,
+        tagName,
+      })
+    }
+    if (refresh.tagNames.length > 0) onTagsChanged()
+    compilerMemory.completeSavedRefresh(refresh)
+  }
+
   async function saveNextVersion(): Promise<void> {
-    if (savingNextVersion.current) return
+    if (compilerMemory.savedRefreshState().isRunning) return
     const guardResult = await executeGuardedCompilerPersistence(
       { action: "save_next_version", binding, currentProjectId: selectedProject?.id ?? null },
       () => undefined,
@@ -169,9 +182,11 @@ export function useCompilerPersistenceActions({
       return
     }
 
-    if (savingNextVersion.current) return
-    savingNextVersion.current = true
-    setIsSavingNextVersion(true)
+    if (!compilerMemory.beginSavedRefresh()) return
+    const refresh: SavedCompilerRefresh = {
+      promptAssetId: selectedAsset.id,
+      tagNames: [...suggestedTags.selectedSuggestedTags],
+    }
     setMessage(null)
 
     try {
@@ -180,15 +195,10 @@ export function useCompilerPersistenceActions({
         ...versionInputFromCompiled(compiled, editablePrompt.trim()),
         makeCurrent: true,
       })
-      const refresh = async () => {
-        await window.prompter.search.rebuildIndex()
-        await suggestedTags.attachSelectedSuggestedTags(selectedAsset.id)
-      }
-      setPendingSavedRefreshes((pending) => [...pending, refresh])
+      compilerMemory.enqueueSavedRefresh(refresh)
       onSavedNextVersion()
       try {
-        await refresh()
-        setPendingSavedRefreshes((pending) => pending.filter((item) => item !== refresh))
+        await refreshSavedVersion(refresh)
         setMessage("Saved as a new version.")
       } catch {
         setMessage(
@@ -198,26 +208,22 @@ export function useCompilerPersistenceActions({
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Prompt version could not be saved")
     } finally {
-      savingNextVersion.current = false
-      setIsSavingNextVersion(false)
+      compilerMemory.endSavedRefresh()
     }
   }
 
   async function retrySavedRefresh(): Promise<void> {
-    if (pendingSavedRefreshes.length === 0 || savingNextVersion.current) return
-    savingNextVersion.current = true
-    setIsSavingNextVersion(true)
+    const pending = compilerMemory.savedRefreshState().pending
+    if (pending.length === 0 || !compilerMemory.beginSavedRefresh()) return
     try {
-      for (const refresh of pendingSavedRefreshes) {
-        await refresh()
-        setPendingSavedRefreshes((pending) => pending.filter((item) => item !== refresh))
+      for (const refresh of pending) {
+        await refreshSavedVersion(refresh)
       }
       setMessage("저장 후 목록·태그 갱신을 완료했습니다.")
     } catch {
       setMessage("버전은 저장됐지만 목록·태그 갱신을 완료하지 못했습니다. 다시 갱신해 주세요.")
     } finally {
-      savingNextVersion.current = false
-      setIsSavingNextVersion(false)
+      compilerMemory.endSavedRefresh()
     }
   }
 
@@ -238,8 +244,8 @@ export function useCompilerPersistenceActions({
   return {
     copyPrompt,
     isSaving,
-    isSavingNextVersion,
-    hasPendingSavedRefresh: pendingSavedRefreshes.length > 0,
+    isSavingNextVersion: savedRefreshState.isRunning,
+    hasPendingSavedRefresh: savedRefreshState.pending.length > 0,
     retrySavedRefresh,
     saveDisabledReasons,
     saveNextVersion,

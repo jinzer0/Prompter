@@ -75,7 +75,7 @@ export function usePromptCompilerPanel({
 
   const outputRevisionGate = outputRevisionGateRef.current
   const [outputRevision, setOutputRevision] = useState(outputRevisionGate.current())
-  const suggestedTags = useCompilerSuggestedTags({ onTagsChanged })
+  const suggestedTags = useCompilerSuggestedTags()
 
   const replaceEditablePrompt = useCallback(
     (prompt: string): number => {
@@ -183,6 +183,7 @@ export function usePromptCompilerPanel({
 
   const persistenceActions = useCompilerPersistenceActions({
     binding: projectBinding.state,
+    compilerMemory,
     compiled,
     createDerivedAsset,
     createNextVersion,

@@ -6,6 +6,7 @@ import { expect, test } from "@playwright/test"
 
 import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
 import { launchPrompter, type RunningApp } from "./electron-playwright-helpers"
+import { phase5CompileResponse } from "./phase5-llm-compiler-fixtures"
 
 const originalBody = "Saved current editor body"
 const historicalBody = "Saved historical editor body"
@@ -508,6 +509,174 @@ for (const destination of ["same prompt", "other prompt"] as const) {
           Reflect.deleteProperty(globalThis, "__compilerRefreshCalls")
         }, PERSISTENCE_CHANNELS.rebuildSearchIndex)
         await restoreEditorIpc(app)
+      }
+    })
+  })
+}
+
+for (const failure of ["search rebuild", "tag attachment"] as const) {
+  test(`compiler retains its saved asset/tag snapshot through lock after ${failure} failure`, async () => {
+    await withEditorFixture(async ({ app, page }) => {
+      const { assetId, projectId } = await seedEditor(page)
+      const otherAssetId = await page.evaluate(async (id) => {
+        const assets = await window.prompter.prompts.listAssets({ projectId: id })
+        const other = assets.find((asset) => asset.title === "Other editor prompt")
+        if (!other) throw new Error("Missing other fixture prompt")
+        return other.id
+      }, projectId)
+      const otherBefore = await storedPrompt(page, otherAssetId)
+      await interceptEditorIpc(app)
+      try {
+        await app.evaluate(
+          ({ ipcMain }, { channels, failedChannel, output }) => {
+            const handlers = Reflect.get(ipcMain, "_invokeHandlers")
+            if (!(handlers instanceof Map)) throw new Error("Expected Electron IPC handlers")
+            const originals = new Map()
+            const attachments: { promptAssetId: string; tagName: string }[] = []
+            let failed = false
+            Reflect.set(globalThis, "__compilerLockOriginalHandlers", originals)
+            Reflect.set(globalThis, "__compilerLockAttachments", attachments)
+            Reflect.set(globalThis, "__compilerLockTags", [
+              "saved-first",
+              "saved-second",
+              "not-selected",
+            ])
+            for (const channel of channels) {
+              const original = handlers.get(channel)
+              if (typeof original !== "function") throw new Error(`Missing handler: ${channel}`)
+              originals.set(channel, original)
+              ipcMain.removeHandler(channel)
+              ipcMain.handle(channel, (event, ...args) => {
+                if (channel === channels[0]) {
+                  return {
+                    ok: true,
+                    value: {
+                      ...output,
+                      suggestedTags: Reflect.get(globalThis, "__compilerLockTags"),
+                    },
+                  }
+                }
+                if (channel === channels[2]) attachments.push(args[0])
+                if (channel === failedChannel && !failed) {
+                  failed = true
+                  throw new Error("Injected compiler post-save failure")
+                }
+                return original(event, ...args)
+              })
+            }
+          },
+          {
+            channels: [
+              PERSISTENCE_CHANNELS.promptCompilerCompile,
+              PERSISTENCE_CHANNELS.rebuildSearchIndex,
+              PERSISTENCE_CHANNELS.createAndAttachTagToPrompt,
+            ],
+            failedChannel:
+              failure === "search rebuild"
+                ? PERSISTENCE_CHANNELS.rebuildSearchIndex
+                : PERSISTENCE_CHANNELS.createAndAttachTagToPrompt,
+            output: JSON.parse(phase5CompileResponse),
+          },
+        )
+        const compiler = page.getByTestId("prompt-compiler")
+        await compiler.getByRole("textbox", { name: "Original request" }).fill("Saved snapshot")
+        await compiler.getByRole("button", { name: "최종 프롬프트 생성", exact: true }).click()
+        await compiler.getByRole("checkbox", { name: "Save tag saved-first", exact: true }).check()
+        await compiler.getByRole("checkbox", { name: "Save tag saved-second", exact: true }).check()
+        await compiler
+          .getByRole("textbox", { name: "Generated prompt preview" })
+          .fill("# Objective\nSaved snapshot")
+        await compiler.getByRole("button", { name: "Save as new version", exact: true }).click()
+        await expect(compiler.getByText(/버전은 저장됐지만 목록·태그 갱신/)).toBeVisible()
+        const saved = await storedPrompt(page, assetId)
+        expect(saved.versions).toHaveLength(3)
+        expect(saved.current?.compiledPrompt).toBe("# Objective\nSaved snapshot")
+        expect(
+          await page.evaluate((id) => window.prompter.tags.listForPrompt(id), assetId),
+        ).toEqual([])
+
+        await page.locator('[data-menu-action-target="open-settings"]').click()
+        await page.getByRole("button", { name: "Enable app lock", exact: true }).click()
+        await page
+          .getByRole("textbox", { name: "New passphrase", exact: true })
+          .fill("compiler snapshot lock passphrase")
+        await page
+          .getByRole("textbox", { name: "Confirm new passphrase", exact: true })
+          .fill("compiler snapshot lock passphrase")
+        await page.getByRole("button", { name: "Enable app lock", exact: true }).click()
+        await page.getByRole("button", { name: "Lock Prompter now", exact: true }).click()
+        await expect(page.getByRole("main", { name: "Prompter locked" })).toBeVisible()
+        await expect(page.getByTestId("app-shell")).toHaveCount(0)
+        await page.getByLabel("App-lock passphrase").fill("compiler snapshot lock passphrase")
+        await page.getByRole("button", { name: "Unlock Prompter", exact: true }).click()
+        await expect(page.getByTestId("app-shell")).toBeVisible()
+        const retry = compiler.getByRole("button", {
+          name: "저장 후 목록·태그 갱신 재시도",
+          exact: true,
+        })
+        await expect(retry).toBeVisible()
+
+        await page
+          .getByTestId("prompt-library")
+          .getByRole("button", { name: new RegExp(otherPromptName) })
+          .click()
+        await expect(
+          editor(page).getByRole("heading", { name: otherPromptName, exact: true }),
+        ).toBeVisible()
+        await app.evaluate(() => Reflect.set(globalThis, "__compilerLockTags", ["new-selection"]))
+        await compiler.getByRole("textbox", { name: "Original request" }).fill("New unsaved output")
+        await compiler.getByRole("button", { name: "최종 프롬프트 생성", exact: true }).click()
+        const newTag = compiler.getByRole("checkbox", {
+          name: "Save tag new-selection",
+          exact: true,
+        })
+        await newTag.check()
+        await expect(retry).toBeVisible()
+        await retry.click()
+        await expect(retry).toHaveCount(0)
+        await expect(newTag).toBeChecked()
+        expect(await storedPrompt(page, assetId)).toEqual(saved)
+        expect(await storedPrompt(page, otherAssetId)).toEqual(otherBefore)
+        const tags = await page.evaluate(
+          async ({ assetId, otherAssetId }) => ({
+            saved: (await window.prompter.tags.listForPrompt(assetId))
+              .map((tag) => tag.name)
+              .sort(),
+            other: await window.prompter.tags.listForPrompt(otherAssetId),
+          }),
+          { assetId, otherAssetId },
+        )
+        expect(tags).toEqual({ saved: ["saved-first", "saved-second"], other: [] })
+        expect(
+          await app.evaluate(() => Reflect.get(globalThis, "__compilerLockAttachments")),
+        ).toEqual(
+          (failure === "tag attachment"
+            ? ["saved-first", "saved-first", "saved-second"]
+            : ["saved-first", "saved-second"]
+          ).map((tagName) => ({ promptAssetId: assetId, tagName })),
+        )
+        expect(
+          (await editorIpcCalls(app)).filter(
+            (channel) => channel === PERSISTENCE_CHANNELS.createNextPromptVersion,
+          ),
+        ).toHaveLength(1)
+      } finally {
+        try {
+          await app.evaluate(({ ipcMain }) => {
+            const originals = Reflect.get(globalThis, "__compilerLockOriginalHandlers")
+            if (originals instanceof Map) {
+              for (const [channel, handler] of originals) {
+                ipcMain.removeHandler(channel)
+                ipcMain.handle(channel, handler)
+              }
+            }
+            Reflect.deleteProperty(globalThis, "__compilerLockOriginalHandlers")
+            Reflect.deleteProperty(globalThis, "__compilerLockAttachments")
+            Reflect.deleteProperty(globalThis, "__compilerLockTags")
+          })
+        } finally {
+          await restoreEditorIpc(app)
+        }
       }
     })
   })

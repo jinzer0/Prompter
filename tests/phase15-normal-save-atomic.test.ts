@@ -213,18 +213,17 @@ describe("Phase 15 normal prompt saves", () => {
   })
 
   it("keeps post-create rebuild and tag attachment out of new save paths", async () => {
-    const [librarySource, compilerSource] = await Promise.all([
+    const [librarySource, compilerSource, compilerCreatePath] = await Promise.all([
       readFile("renderer/src/hooks/use-prompt-library-panel.ts", "utf8"),
       readFile("renderer/src/hooks/use-compiler-persistence-actions.ts", "utf8"),
+      readFile("renderer/src/lib/compiler-persistence-save.ts", "utf8"),
     ])
-    const compilerCreatePath = compilerSource.slice(
-      compilerSource.indexOf("export async function executeCompiledPromptSave"),
-      compilerSource.indexOf("export function useCompilerPersistenceActions"),
-    )
 
     expect(librarySource).not.toContain("search.rebuildIndex")
+    expect(compilerCreatePath).toContain("await actions.createPrompt({")
     expect(compilerCreatePath).not.toContain("search.rebuildIndex")
-    expect(compilerCreatePath).not.toContain("attachSelectedSuggestedTags")
-    expect(compilerSource).toContain("suggestedTags.attachSelectedSuggestedTags(selectedAsset.id)")
+    expect(compilerCreatePath).not.toContain("tags.createAndAttachToPrompt")
+    expect(compilerSource).not.toContain("attachSelectedSuggestedTags")
+    expect(compilerSource).toContain("window.prompter.tags.createAndAttachToPrompt({")
   })
 })

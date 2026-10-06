@@ -127,3 +127,25 @@ Stage 1–5의 과거 검증 수치는 유지하며 아래 결과가 최신 코�
 - 검증: `npm test` **163파일/1181개**, `npm run test:smoke` **63개** 통과.
   `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check` 통과.
   기존 native/Vite/Biome 경고는 유지했다. 새 OS 손동작/원격 CI 인증을 주장하지 않는다.
+
+### 최신 HEAD 재리뷰: 잠금 후 갱신 작업 보존
+
+작업지시자의 “PR 32 재리뷰 대응해”에 따라 최신 `4bb21fd`의 추가 P2를 수정했다.
+
+- [잠금 remount의 후속 작업 유실](https://github.com/jinzer0/Prompter/pull/32#discussion_r4194080929):
+  AppShell hook의 지역 큐를 root App이 소유하는 기존 `compilerMemory`로 옮겼다.
+  항목은 callback 대신 저장 당시 asset ID와 선택 tag 이름의 descriptor이며, 실행중 상태도
+  같은 memory에 보존한다. 잠금 화면은 여전히 AppShell DOM을 제거하고 잠금 중 자동 재시도하지 않는다.
+- 해제 후 hook은 현재 목록 갱신 callback과 원래 descriptor를 사용한다. 성공 항목만 제거하며,
+  태그 연결은 순차 처리하고 재시도는 기존 idempotent 연결 경로를 사용한다. 새 버전 write와
+  실패한 후속 작업 재시도는 분리한다. 기존 compiler binding/trusted IPC 보호는 변경하지 않았다.
+- 실제 Electron에서 search rebuild/태그 연결 실패를 각각 주입하고 잠금·해제 후 재시도 버튼,
+  다른 asset/새 tag 선택과 원래 asset/tag snapshot의 분리, 정확한 태그 연결, 새 버전 write 없음,
+  새 tag 체크 상태 보존을 검증했다. memory 구독 교체/실행중 중복 차단/항목별 제거도 검증했다.
+- 변경 파일: `compiler-memory.ts`, compiler persistence/panel/suggested-tags hooks,
+  기존 app-lock renderer/atomic-save/editor Electron 테스트, 이 보고서와 오늘할일.
+  obsolete tag callback helper는 제거했고 제품 계약·IPC·DB schema·migration은 변경하지 않았다.
+- 최신 union 검증: `npm test` **163파일/1182개**, `npm run test:smoke` **65개** 통과.
+  `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check` 통과.
+  native/Vite/Biome 기존 경고는 유지하며 새로운 OS 손동작/원격 CI 인증을 주장하지 않는다.
+- 승인 범위는 리뷰 대응 수정과 게시이며 merge·Issue close·배포는 실행하지 않는다.

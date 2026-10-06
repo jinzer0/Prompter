@@ -274,6 +274,30 @@ describe("Phase 20 app-lock renderer state", () => {
     expect(restored.compiled).toBeNull()
   })
 
+  it("keeps committed refresh descriptors and execution ownership across subscriptions", () => {
+    const memory = createCompilerMemory()
+    const first = { promptAssetId: "first", tagNames: ["original tag"] }
+    const second = { promptAssetId: "second", tagNames: ["later tag"] }
+    const oldListener = vi.fn()
+    const unsubscribe = memory.subscribeSavedRefresh(oldListener)
+    memory.enqueueSavedRefresh(first)
+    expect(memory.beginSavedRefresh()).toBe(true)
+    unsubscribe()
+    const newListener = vi.fn()
+    memory.subscribeSavedRefresh(newListener)
+    expect(memory.savedRefreshState().pending).toEqual([first])
+    expect(memory.beginSavedRefresh()).toBe(false)
+    memory.enqueueSavedRefresh(second)
+    memory.completeSavedRefresh(first)
+    expect(memory.savedRefreshState().pending).toEqual([second])
+    expect(memory.savedRefreshState().isRunning).toBe(true)
+    memory.endSavedRefresh()
+    expect(memory.beginSavedRefresh()).toBe(true)
+    expect(oldListener).toHaveBeenCalledTimes(2)
+    expect(newListener).toHaveBeenCalledTimes(4)
+    expect(memory.hasSnapshot()).toBe(false)
+  })
+
   it("rejects stale async settings responses and all responses after unmount", () => {
     // Given: two ordered requests and a mounted guard.
     const guard = createLatestRequestGuard()

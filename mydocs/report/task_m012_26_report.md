@@ -81,6 +81,14 @@ GitHub Issue: [#26](https://github.com/jinzer0/Prompter/issues/26) / 마일스�
 - 원격 게시 브랜치는 `publish/task26`, base는 `master`이며 로컬 `local/task26`은 원격에 push하지 않는다.
 - merge·Issue #26 종료·worktree 정리·의존성 정리·배포는 이번 승인에 포함하지 않는다.
 
+### Open PR 게시 결과
+
+- 승인 기록 커밋 `16222e8`을 원격 `publish/task26`로 push하고
+  [Open PR #34](https://github.com/jinzer0/Prompter/pull/34)를 `master` 대상으로 생성했다.
+- 문서 링크는 head SHA 고정 GitHub blob URL을 사용한다. local/task26은 로컬 유지했다.
+- 로컬 검증 통과와 원격 CI를 구분한다. PR 생성만으로 리뷰/CI 통과를 주장하지 않는다.
+- merge·Issue 종료·의존성 정리·배포는 실행하지 않았다.
+
 ---
 
 **이하 과거 검증 기록:** 후속 #27 수정 전 실행의 FAIL과 stale build 한계를 그대로 보존한다.

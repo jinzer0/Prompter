@@ -74,6 +74,13 @@ GitHub Issue: [#26](https://github.com/jinzer0/Prompter/issues/26) / 마일스�
 - 최신 PASS 판정과 최종 보고의 범위·한계에 대한 승인을 요청한다.
 - 원격 `publish/task26` push와 `master` 대상 Open PR 게시는 별도 승인 후 진행한다.
 
+### 최종 보고 및 게시 승인
+
+- 작업지시자의 “최종 보고 승인 및 push·Open PR 게시 승인”으로 최신 최종 보고와 원격 게시 승인을 받았다.
+- 기존 계획·과거 FAIL·재검증 PASS 보고를 그대로 게시하며 제품/테스트/의존성 변경은 없다.
+- 원격 게시 브랜치는 `publish/task26`, base는 `master`이며 로컬 `local/task26`은 원격에 push하지 않는다.
+- merge·Issue #26 종료·worktree 정리·의존성 정리·배포는 이번 승인에 포함하지 않는다.
+
 ---
 
 **이하 과거 검증 기록:** 후속 #27 수정 전 실행의 FAIL과 stale build 한계를 그대로 보존한다.

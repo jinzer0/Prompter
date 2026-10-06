@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import type {
+  appearanceStateSchema,
   appLockSettingsSchema,
   appLockStateSchema,
   applyPromptQualityScoreToVersionInputSchema,
@@ -182,6 +183,10 @@ import type {
   validateEncryptedBackupResultSchema,
   versionActivityInsightsSchema,
   versionedPromptInsightSchema,
+  windowCloseConfirmationInputSchema,
+  windowCloseConfirmationResultSchema,
+  windowCloseRequestSchema,
+  windowCloseStateInputSchema,
 } from "./ipc-contract.js"
 
 // allow: SIZE_OK - central renderer-facing IPC type surface mirrors the typed contract.
@@ -254,6 +259,11 @@ export type PromptTemplateListResult = z.infer<typeof promptTemplateListResultSc
 export type DeletePromptTemplateResult = z.infer<typeof deletePromptTemplateResultSchema>
 export type Setting = z.infer<typeof settingSchema>
 export type SettingsDefaults = z.infer<typeof settingsDefaultsSchema>
+export type AppearanceState = z.infer<typeof appearanceStateSchema>
+export type WindowCloseRequest = z.infer<typeof windowCloseRequestSchema>
+export type WindowCloseStateInput = z.infer<typeof windowCloseStateInputSchema>
+export type WindowCloseConfirmationInput = z.infer<typeof windowCloseConfirmationInputSchema>
+export type WindowCloseConfirmationResult = z.infer<typeof windowCloseConfirmationResultSchema>
 export type AppLockState = z.infer<typeof appLockStateSchema>
 export type AppLockSettings = z.infer<typeof appLockSettingsSchema>
 export type SetupAppLockInput = z.input<typeof setupAppLockInputSchema>
@@ -509,6 +519,17 @@ export type UpdateDefaultsInput = z.output<typeof updateDefaultsInputSchema>
 export type { PingResponse }
 
 export type ElectronBridge = {
+  readonly windowClose: {
+    readonly onRequested: (callback: (request: WindowCloseRequest) => void) => () => void
+    readonly updateState: (input: WindowCloseStateInput) => Promise<void>
+    readonly confirm: (
+      input: WindowCloseConfirmationInput,
+    ) => Promise<WindowCloseConfirmationResult>
+  }
+  readonly appearance: {
+    readonly getState: () => AppearanceState
+    readonly onChanged: (callback: (state: AppearanceState) => void) => () => void
+  }
   readonly ping: () => Promise<PingResponse>
   readonly menu: {
     readonly onAction: (callback: (action: MenuAction) => void) => () => void

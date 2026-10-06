@@ -75,6 +75,7 @@ describe("Phase 19 privacy renderer UI", () => {
         copyButtonLabel: "Copy export",
         exportBase: null,
         formatLabel: "Export format",
+        menuActionTarget: null,
         rawContent: "",
         saveButtonLabel: "Save export",
         saveDisabledDescriptionId: null,

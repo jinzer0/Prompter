@@ -59,6 +59,84 @@ describe("Electron shell contract", () => {
     expect(() => duplicateResultSchema.parse({ ...result, extra: true })).toThrow()
   })
 
+  it("편집 복제의 제목과 스냅샷을 허용하고 본문·메타데이터 공백을 보존한다", () => {
+    const duplicateSchema = registeredSchema(ipcContract, "duplicatePromptAssetInputSchema")
+    const editedVersion = {
+      originalInput: "  Original input\n\t",
+      compiledPrompt: "\n  Edited prompt  \n",
+      assumptions: "  Assumptions  \n",
+      questions: "\tQuestions\n",
+      answers: "  Answers  ",
+      acceptanceCriteria: "\n  Acceptance  \n",
+      validationCommands: "  npm test\n",
+      qualityScore: null,
+    }
+    const input = {
+      sourcePromptAssetId: validPromptAssetId,
+      sourcePromptVersionId: validPromptVersionId,
+      title: "Edited duplicate",
+      editedVersion,
+      copyTags: false,
+    }
+
+    expect(duplicateSchema.parse(input)).toEqual(input)
+    expect(() => duplicateSchema.parse({ ...input, title: " \n\t" })).toThrow()
+    for (const field of ["originalInput", "compiledPrompt"]) {
+      expect(() =>
+        duplicateSchema.parse({
+          ...input,
+          editedVersion: { ...editedVersion, [field]: " \n\t" },
+        }),
+      ).toThrow()
+    }
+    expect(() => duplicateSchema.parse({ ...input, editedVersion: {} })).toThrow()
+    for (const extra of [
+      { unknown: true },
+      { promptAssetId: validPromptAssetId },
+      { projectId: validProjectId },
+      { scenario: "docs" },
+      { targetAgent: "cursor" },
+      { tagNames: ["snapshot-tag"] },
+    ]) {
+      expect(() =>
+        duplicateSchema.parse({ ...input, editedVersion: { ...editedVersion, ...extra } }),
+      ).toThrow()
+    }
+  })
+
+  it("버전·초기 저장·파생 저장 스키마에서 입력과 본문의 정확한 공백을 보존한다", () => {
+    const versionSchema = registeredSchema(ipcContract, "createPromptVersionInputSchema")
+    const initialSchema = registeredSchema(ipcContract, "createPromptWithInitialVersionInputSchema")
+    const derivedSchema = registeredSchema(ipcContract, "createDerivedPromptAssetInputSchema")
+    const fields = {
+      originalInput: "  Original input\n\t",
+      compiledPrompt: "\n  Compiled prompt  \n",
+    }
+    const versionInput = { promptAssetId: validPromptAssetId, ...fields }
+    const initialInput = {
+      projectId: validProjectId,
+      title: "Initial prompt",
+      scenario: "feature",
+      targetAgent: "codex",
+      ...fields,
+    }
+    const derivedInput = {
+      sourcePromptAssetId: validPromptAssetId,
+      sourcePromptVersionId: validPromptVersionId,
+      title: "Derived prompt",
+      ...fields,
+    }
+
+    expect(versionSchema.parse(versionInput)).toEqual(versionInput)
+    expect(initialSchema.parse(initialInput)).toEqual(initialInput)
+    expect(derivedSchema.parse(derivedInput)).toEqual(derivedInput)
+    for (const field of ["originalInput", "compiledPrompt"]) {
+      expect(() => versionSchema.parse({ ...versionInput, [field]: " \n\t" })).toThrow()
+      expect(() => initialSchema.parse({ ...initialInput, [field]: " \n\t" })).toThrow()
+      expect(() => derivedSchema.parse({ ...derivedInput, [field]: " \n\t" })).toThrow()
+    }
+  })
+
   it("parses prompt lineage as one nullable-parent and children response", () => {
     // Given: exact parent and child summaries plus the deleted-parent state.
     const lineageSchema = registeredSchema(ipcContract, "promptLineageSchema")

@@ -33,10 +33,15 @@ test("analyzes, compiles, and saves an LLM prompt through the compiler panel", a
       run.page.getByText("Add an OpenAI API key in Settings before using LLM prompt compilation."),
     ).toBeVisible()
 
+    await run.page.locator('[data-menu-action-target="open-settings"]').click()
     await run.page.getByRole("textbox", { name: "OpenAI API key" }).fill(phase5PlaintextKey)
     await run.page.getByRole("button", { name: "Save API key" }).click()
     await expect(run.page.getByText("OpenAI key saved.")).toBeVisible()
     await expect(run.page.getByText(phase5PlaintextKey)).toHaveCount(0)
+    await run.page
+      .getByTestId("settings-workspace")
+      .getByRole("button", { name: "라이브러리로 돌아가기" })
+      .click()
 
     await run.page.getByRole("button", { name: "분석하기" }).click()
     await expect(

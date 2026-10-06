@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import {
   createApplicationMenuTemplate,
@@ -8,6 +8,15 @@ import {
   menuActionSchema,
 } from "../electron/app-menu"
 import { createWindowOptions } from "../electron/window-options"
+import {
+  handleMenuAction,
+  handleMenuKeyDown,
+  OPEN_SETTINGS_EVENT,
+} from "../renderer/src/lib/menu-actions"
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 type MenuTemplateItem = ReturnType<typeof createApplicationMenuTemplate>[number]
 function findMenuItem(items: readonly MenuTemplateItem[], label: string): MenuTemplateItem {
@@ -66,6 +75,107 @@ function findButtonBlock(source: string, text: string, handler: string): string 
 }
 
 describe("Electron shell contract", () => {
+  it.each([
+    ["exportFullBackup", "backup-export-full"],
+    ["importBackup", "backup-import-open"],
+  ] as const)("reveals Settings before the explicit %s action", (action, target) => {
+    const events: string[] = []
+    const frames: FrameRequestCallback[] = []
+    class MenuButton {
+      disabled = false
+      focus() {
+        events.push("focus")
+      }
+      scrollIntoView() {
+        events.push("scroll")
+      }
+      click() {
+        events.push("click")
+      }
+    }
+    const button = new MenuButton()
+    vi.stubGlobal("HTMLButtonElement", MenuButton)
+    vi.stubGlobal("window", {
+      dispatchEvent: (event: Event) => {
+        expect(event.type).toBe(OPEN_SETTINGS_EVENT)
+        events.push("settings")
+      },
+      requestAnimationFrame: (callback: FrameRequestCallback) => frames.push(callback),
+    })
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => {
+        expect(selector).toBe(`[data-menu-action-target="${target}"]`)
+        return button
+      },
+    })
+    handleMenuAction(action)
+    expect(events).toEqual(["settings"])
+    frames[0]?.(0)
+    expect(events).toEqual(["settings", "focus", "scroll", "click"])
+    events.length = 0
+    button.disabled = true
+    handleMenuAction(action)
+    frames[1]?.(0)
+    expect(events).toEqual(["settings", "focus", "scroll"])
+  })
+
+  it.each([
+    ["openSettings", "settings-panel"],
+    ["openLibraryMaintenance", "settings-maintenance"],
+  ] as const)("reveals Settings before %s focuses its destination", (action, target) => {
+    const events: string[] = []
+    const frames: FrameRequestCallback[] = []
+    const windowEvents = new EventTarget()
+    windowEvents.addEventListener(OPEN_SETTINGS_EVENT, () => events.push("reveal-settings"))
+    vi.stubGlobal("window", {
+      dispatchEvent: windowEvents.dispatchEvent.bind(windowEvents),
+      requestAnimationFrame: (callback: FrameRequestCallback) => frames.push(callback),
+    })
+    const querySelector = vi.fn((selector: string) => {
+      expect(selector).toBe(`[data-menu-action-target="${target}"]`)
+      expect(events).toEqual(["reveal-settings"])
+      return {
+        focus: () => events.push("focus"),
+        scrollIntoView: (options: ScrollIntoViewOptions) => {
+          expect(options).toEqual({ block: "nearest" })
+          events.push("scroll")
+        },
+      }
+    })
+    vi.stubGlobal("document", { querySelector })
+
+    handleMenuAction(action)
+
+    expect(events).toEqual(["reveal-settings"])
+    expect(querySelector).not.toHaveBeenCalled()
+    expect(frames).toHaveLength(1)
+    frames[0]?.(0)
+    expect(events).toEqual(["reveal-settings", "focus", "scroll"])
+    expect(querySelector).toHaveBeenCalledOnce()
+  })
+
+  it("handles Cmd+, and Ctrl+, through the same deferred Settings destination", () => {
+    const dispatchEvent = vi.fn()
+    const requestAnimationFrame = vi.fn()
+    vi.stubGlobal("window", { dispatchEvent, requestAnimationFrame })
+    for (const modifier of ["metaKey", "ctrlKey"] as const) {
+      const preventDefault = vi.fn()
+      handleMenuKeyDown({
+        key: ",",
+        defaultPrevented: false,
+        metaKey: modifier === "metaKey",
+        ctrlKey: modifier === "ctrlKey",
+        preventDefault,
+      } as unknown as KeyboardEvent)
+      expect(preventDefault).toHaveBeenCalledOnce()
+    }
+    expect(dispatchEvent).toHaveBeenCalledTimes(2)
+    for (const [event] of dispatchEvent.mock.calls) expect(event.type).toBe(OPEN_SETTINGS_EVENT)
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(2)
+    handleMenuKeyDown({ key: ",", metaKey: true, defaultPrevented: true } as KeyboardEvent)
+    expect(dispatchEvent).toHaveBeenCalledTimes(2)
+  })
+
   it("maps menu shortcuts to the intended renderer targets", async () => {
     const appSource = await readFile("renderer/src/app.tsx", "utf8")
     const menuActionSource = await readFile("renderer/src/lib/menu-actions.ts", "utf8")
@@ -121,7 +231,7 @@ describe("Electron shell contract", () => {
   it("uses secure BrowserWindow defaults for the main window", () => {
     const preloadPath = "/tmp/prompter-preload.js"
 
-    const options = createWindowOptions(preloadPath)
+    const options = createWindowOptions(preloadPath, "light")
 
     expect(options.webPreferences).toMatchObject({
       preload: preloadPath,
@@ -194,6 +304,7 @@ describe("Electron shell contract", () => {
     clickMenuItem(findMenuItem(template, "Quick Capture from Clipboard"))
     clickMenuItem(findMenuItem(template, "Export Full Backup..."))
     clickMenuItem(findMenuItem(template, "Import Backup..."))
+    clickMenuItem(findMenuItem(template, "Settings..."))
     clickMenuItem(findMenuItem(template, "Search"))
     clickMenuItem(findMenuItem(template, "Copy Compiled Prompt"))
     clickMenuItem(findMenuItem(template, "Library Maintenance"))
@@ -206,6 +317,7 @@ describe("Electron shell contract", () => {
       "quickCaptureFromClipboard",
       "exportFullBackup",
       "importBackup",
+      "openSettings",
       "focusSearch",
       "copyCompiledPrompt",
       "openLibraryMaintenance",

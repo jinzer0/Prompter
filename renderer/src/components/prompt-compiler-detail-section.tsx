@@ -23,7 +23,6 @@ type PromptCompilerDetailSectionProps = {
   readonly status: LoadStatus
   readonly versions: readonly PromptVersion[]
   readonly onDerivePrompt: (asset: PromptAsset, version: PromptVersion) => void
-  readonly onDuplicatePrompt: (asset: PromptAsset, version: PromptVersion) => Promise<void>
   readonly onNavigatePrompt: (id: string) => void
   readonly onPromptTemplatesChanged: () => void
   readonly onSelectVersion: (id: string) => void
@@ -41,7 +40,6 @@ export function PromptCompilerDetailSection({
   status,
   versions,
   onDerivePrompt,
-  onDuplicatePrompt,
   onNavigatePrompt,
   onPromptTemplatesChanged,
   onSelectVersion,
@@ -68,7 +66,7 @@ export function PromptCompilerDetailSection({
       {selectedAsset !== null && status === "loading" && (
         <p className="text-[12px] text-muted">Loading prompt detail...</p>
       )}
-      {selectedAsset !== null && status === "error" && (
+      {selectedAsset !== null && error !== null && (
         <p className="text-[12px] text-muted-strong">{error}</p>
       )}
 
@@ -93,7 +91,6 @@ export function PromptCompilerDetailSection({
           setCurrentVersion={onSetCurrentVersion}
           versions={versions}
           onDerivePrompt={onDerivePrompt}
-          onDuplicatePrompt={onDuplicatePrompt}
           onNavigatePrompt={onNavigatePrompt}
           onPromptTemplateSaved={onPromptTemplatesChanged}
         />

@@ -24,43 +24,62 @@ type MenuActionHandlers = {
   readonly refreshAppLock?: () => void
 }
 
+export const OPEN_SETTINGS_EVENT = "prompter:open-settings"
+export const OPEN_LIBRARY_EVENT = "prompter:open-library"
+
+function revealSettings(action: () => void): void {
+  window.dispatchEvent(new Event(OPEN_SETTINGS_EVENT))
+  window.requestAnimationFrame(action)
+}
+
+function revealLibrary(action: () => void): void {
+  window.dispatchEvent(new Event(OPEN_LIBRARY_EVENT))
+  window.requestAnimationFrame(action)
+}
+
 export function handleMenuAction(action: MenuAction, handlers: MenuActionHandlers = {}): void {
   switch (action) {
     case "newPrompt":
-      clickMenuTarget("new-prompt")
+      revealLibrary(() => clickMenuTarget("new-prompt"))
       return
     case "newProject":
       clickMenuTarget("new-project")
       return
     case "quickCaptureFromClipboard":
-      clickMenuTarget("quick-capture-from-clipboard")
+      revealLibrary(() => clickMenuTarget("quick-capture-from-clipboard"))
       return
     case "focusSearch":
-      focusMenuTarget("search-prompts")
+      revealLibrary(() => focusMenuTarget("search-prompts"))
       return
     case "savePrompt":
-      clickMenuTarget("save-compiled-prompt")
+      revealLibrary(() => clickMenuTarget("save-editor-version"))
       return
     case "copyCompiledPrompt":
-      clickMenuTarget("copy-compiled-prompt")
+      revealLibrary(() => clickMenuTarget("copy-compiled-prompt"))
       return
     case "exportPrompt":
-      clickMenuTarget("save-compiled-export")
+      revealLibrary(() => clickMenuTarget("save-compiled-export"))
       return
     case "exportFullBackup":
-      clickMenuTarget("backup-export-full")
+      revealSettings(() => {
+        focusMenuTarget("backup-export-full")
+        clickMenuTarget("backup-export-full")
+      })
       return
     case "importBackup":
-      clickMenuTarget("backup-import-open")
+      revealSettings(() => {
+        focusMenuTarget("backup-import-open")
+        clickMenuTarget("backup-import-open")
+      })
       return
     case "openSettings":
-      focusMenuTarget("settings-panel")
+      revealSettings(() => focusMenuTarget("settings-panel"))
       return
     case "openLibraryInsights":
       clickMenuTarget("library-insights")
       return
     case "openLibraryMaintenance":
-      focusMenuTarget("settings-maintenance")
+      revealSettings(() => focusMenuTarget("settings-maintenance"))
       return
     case "lockPrompter":
       handlers.refreshAppLock?.()
@@ -75,6 +94,23 @@ export function handleMenuAction(action: MenuAction, handlers: MenuActionHandler
 
 export function handleMenuKeyDown(event: KeyboardEvent): void {
   if (event.defaultPrevented) {
+    return
+  }
+
+  if (
+    event.key.toLowerCase() === "s" &&
+    (event.metaKey || event.ctrlKey) &&
+    !event.shiftKey &&
+    !event.altKey
+  ) {
+    event.preventDefault()
+    handleMenuAction("savePrompt")
+    return
+  }
+
+  if (event.key === "," && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault()
+    handleMenuAction("openSettings")
     return
   }
 

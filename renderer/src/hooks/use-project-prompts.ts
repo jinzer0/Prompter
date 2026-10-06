@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import type {
   CreateNextPromptVersionInput,
+  CreateNextPromptVersionResult,
   CreatePromptWithInitialVersionInput,
   CreatePromptWithInitialVersionResult,
   PromptVersion,
@@ -10,8 +11,6 @@ import type { ScopedPromptVersions } from "../lib/prompt-scope"
 import { reloadProjectPromptAssets } from "./project-prompt-reload"
 import {
   comparePromptVersions,
-  createNextPromptVersionState,
-  createPromptWithVersion,
   type LoadStatus,
   loadPromptAssets,
   type ScopedPromptAssets,
@@ -22,8 +21,18 @@ import { promptSelectionState } from "./prompt-selection-state"
 import { useProjectPromptMutations } from "./use-project-prompt-mutations"
 import { usePromptVersionLoader } from "./use-prompt-version-loader"
 
-export function useProjectPrompts(projectId: string | null) {
+type RestoredPromptSelection = {
+  readonly projectId: string
+  readonly assetId: string
+  readonly versionId: string
+}
+
+export function useProjectPrompts(
+  projectId: string | null,
+  restoredSelection: RestoredPromptSelection | null = null,
+) {
   const projectIdRef = useRef(projectId)
+  const restoredSelectionRef = useRef(restoredSelection)
   const [scopedAssets, setScopedAssets] = useState<ScopedPromptAssets | null>(null)
   const [assetScopeProjectId, setAssetScopeProjectId] = useState<string | null>(null)
   const [assetStatus, setAssetStatus] = useState<LoadStatus>("ready")
@@ -50,6 +59,62 @@ export function useProjectPrompts(projectId: string | null) {
     setVersionStatus("ready")
     setVersionError(null)
   }, [])
+
+  const acceptPersistedPrompt = useCallback(
+    (result: CreateNextPromptVersionResult, select: boolean): void => {
+      const activeProjectId = projectIdRef.current
+      if (activeProjectId === null || result.asset.projectId !== activeProjectId) return
+      setScopedAssets((current) => ({
+        projectId: activeProjectId,
+        assets: [
+          result.asset,
+          ...(current?.projectId === activeProjectId
+            ? current.assets.filter((asset) => asset.id !== result.asset.id)
+            : []),
+        ],
+      }))
+      setScopedVersionSummaries((current) => ({
+        projectId: activeProjectId,
+        summaries: [
+          { assetId: result.asset.id, version: result.version },
+          ...(current?.projectId === activeProjectId
+            ? current.summaries.filter((summary) => summary.assetId !== result.asset.id)
+            : []),
+        ],
+      }))
+      setAssetScopeProjectId(activeProjectId)
+      setAssetStatus("ready")
+      if (!select) return
+      setAssetId(result.asset.id)
+      setVersionId(result.version.id)
+      setScopedVersions((current) => ({
+        assetId: result.asset.id,
+        versions: [
+          result.version,
+          ...(current?.assetId === result.asset.id
+            ? current.versions.filter((version) => version.id !== result.version.id)
+            : []),
+        ],
+      }))
+      setVersionScopeAssetId(result.asset.id)
+      setVersionStatus("ready")
+      setVersionError(null)
+    },
+    [],
+  )
+
+  const refreshPersistedPrompt = useCallback(
+    async (result: CreateNextPromptVersionResult, select: boolean): Promise<void> => {
+      acceptPersistedPrompt(result, select)
+      const activeProjectId = result.asset.projectId
+      if (activeProjectId === null || projectIdRef.current !== activeProjectId) return
+      const snapshot = await loadPromptAssets(activeProjectId)
+      if (projectIdRef.current !== activeProjectId) return
+      setScopedAssets({ projectId: activeProjectId, assets: snapshot.assets })
+      setScopedVersionSummaries({ projectId: activeProjectId, summaries: snapshot.summaries })
+    },
+    [acceptPersistedPrompt],
+  )
 
   const mutationState = useMemo(
     () => ({
@@ -116,7 +181,11 @@ export function useProjectPrompts(projectId: string | null) {
             projectId: activeProjectId,
             summaries: snapshot.summaries,
           })
-          setAssetId(selectedAssetId(null, snapshot.assets))
+          const restored = restoredSelectionRef.current
+          const canRestore = restored?.projectId === activeProjectId
+          setAssetId(selectedAssetId(canRestore ? restored.assetId : null, snapshot.assets))
+          if (canRestore) setVersionId(restored.versionId)
+          restoredSelectionRef.current = null
           setAssetStatus("ready")
         }
       } catch (error) {
@@ -137,6 +206,7 @@ export function useProjectPrompts(projectId: string | null) {
 
   usePromptVersionLoader({
     assetId,
+    loadedVersions: scopedVersions,
     scopedAssets,
     setScopedVersions,
     setVersionError,
@@ -155,25 +225,17 @@ export function useProjectPrompts(projectId: string | null) {
         throw new TypeError("Prompt project scope changed before save")
       }
 
-      const snapshot = await createPromptWithVersion(activeProjectId, input)
-
-      if (projectIdRef.current === activeProjectId) {
-        setScopedAssets({ projectId: activeProjectId, assets: snapshot.assets })
-        mutations.applyAssets(activeProjectId, {
-          projectId: activeProjectId,
-          summaries: snapshot.summaries,
-        })
-        setAssetId(snapshot.asset.id)
-        setVersionId(snapshot.version.id)
-        setScopedVersions({ assetId: snapshot.asset.id, versions: [snapshot.version] })
-        setVersionScopeAssetId(snapshot.asset.id)
-        setVersionStatus("ready")
-        setVersionError(null)
+      const result = await window.prompter.prompts.createWithInitialVersion(input)
+      try {
+        await refreshPersistedPrompt(result, true)
+      } catch (error) {
+        setAssetError(
+          `프롬프트는 저장되었지만 목록을 갱신하지 못했습니다: ${error instanceof Error ? error.message : "갱신 실패"}`,
+        )
       }
-
-      return { asset: snapshot.asset, version: snapshot.version }
+      return result
     },
-    [mutations.applyAssets, projectId],
+    [refreshPersistedPrompt, projectId],
   )
 
   const createNextVersion = useCallback(
@@ -184,25 +246,17 @@ export function useProjectPrompts(projectId: string | null) {
         throw new TypeError("Prompt project scope changed before version save")
       }
 
-      const snapshot = await createNextPromptVersionState(activeProjectId, input)
-
-      if (projectIdRef.current === activeProjectId) {
-        setScopedAssets({ projectId: activeProjectId, assets: snapshot.assets })
-        mutations.applyAssets(activeProjectId, {
-          projectId: activeProjectId,
-          summaries: snapshot.summaries,
-        })
-        setAssetId(snapshot.asset.id)
-        setScopedVersions({ assetId: snapshot.asset.id, versions: snapshot.versions })
-        setVersionScopeAssetId(snapshot.asset.id)
-        setVersionId(snapshot.version.id)
-        setVersionStatus("ready")
-        setVersionError(null)
+      const result = await window.prompter.prompts.createNextVersion(input)
+      try {
+        await refreshPersistedPrompt(result, true)
+      } catch (error) {
+        setAssetError(
+          `버전은 저장되었지만 목록을 갱신하지 못했습니다: ${error instanceof Error ? error.message : "갱신 실패"}`,
+        )
       }
-
-      return snapshot.version
+      return result.version
     },
-    [mutations.applyAssets, projectId],
+    [refreshPersistedPrompt, projectId],
   )
 
   const selection = promptSelectionState({
@@ -231,6 +285,8 @@ export function useProjectPrompts(projectId: string | null) {
     createPrompt,
     duplicateAsset: mutations.duplicateAsset,
     ...selection,
+    acceptPersistedPrompt,
+    refreshPersistedPrompt,
     reloadAssets,
     selectAsset,
     selectVersion: setVersionId,

@@ -51,9 +51,9 @@ async function createPrompt(page: Page): Promise<void> {
   const promptCard = promptLibrary.getByRole("button", { name: /Phase 3 Prompt/ })
   await expect(promptCard).toBeVisible()
   await expect(promptCard).toContainText("Updated")
-  await expect(
-    page.getByText("Compiled phase 3 instructions for the selected project."),
-  ).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
+    "Compiled phase 3 instructions for the selected project.",
+  )
   await expect(page.getByText("Version 1")).toBeVisible()
 }
 
@@ -68,7 +68,9 @@ test("supports project and prompt library CRUD through the UI", async ({
     await access(join(userDataDirectory, "prompter.sqlite"))
 
     await expect(firstRun.page.getByText("No projects yet")).toBeVisible()
-    await expect(firstRun.page.getByText("Select a project to view prompts")).toBeVisible()
+    await expect(
+      firstRun.page.getByRole("heading", { name: "Select a project to view prompts", exact: true }),
+    ).toBeVisible()
     await expect(firstRun.page.getByText("prompt_runs")).toHaveCount(0)
     await expect(firstRun.page.getByText("execution_results")).toHaveCount(0)
 
@@ -109,9 +111,9 @@ test("supports project and prompt library CRUD through the UI", async ({
     const secondRun = await launchPrompter(userDataDirectory)
     await expect(secondRun.page.getByRole("button", { name: /Phase 3 Project/ })).toBeVisible()
     await expect(secondRun.page.getByRole("button", { name: /Phase 3 Prompt/ })).toBeVisible()
-    await expect(
-      secondRun.page.getByText("Compiled phase 3 instructions for the selected project."),
-    ).toBeVisible()
+    await expect(secondRun.page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
+      "Compiled phase 3 instructions for the selected project.",
+    )
     await mkdir("test-results", { recursive: true })
     await secondRun.page.screenshot({ path: phase3ScreenshotPath, fullPage: true })
     await testInfo.attach("phase3-ui", {
@@ -164,6 +166,10 @@ test("compiles and saves a static prompt through the compiler panel", async ({
     await firstRun.page
       .getByRole("textbox", { name: "Original request" })
       .fill("Add a settings screen for local prompt preferences.")
+    await firstRun.page
+      .getByTestId("prompt-compiler")
+      .locator("summary", { hasText: "추가 옵션" })
+      .click()
     await firstRun.page.getByRole("combobox", { name: "Compile mode" }).selectOption("feature")
     await firstRun.page.getByRole("combobox", { name: "Compile runner" }).selectOption("codex")
     await firstRun.page.getByRole("textbox", { name: "Project context" }).fill("Prompter Phase 4")
@@ -240,7 +246,9 @@ test("compiles and saves a static prompt through the compiler panel", async ({
         name: /Add a settings screen for local prompt preferences/,
       }),
     ).toBeVisible()
-    await expect(secondRun.page.getByText("# Objective")).toBeVisible()
+    await expect(secondRun.page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
+      "# Objective\nManual preview edit before save.",
+    )
     await secondRun.app.close()
   } finally {
     await rm(userDataDirectory, { recursive: true, force: true })

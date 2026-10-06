@@ -20,6 +20,7 @@ type PromptExportActionsProps = {
   readonly copyButtonLabel: string
   readonly exportBase: PromptExportBase | null
   readonly formatLabel: string
+  readonly menuActionTarget: "save-compiled-export" | null
   readonly rawContent: string
   readonly saveButtonLabel: string
   readonly saveDisabledDescriptionId: string | null
@@ -35,6 +36,7 @@ export function PromptExportActions({
   copyButtonLabel,
   exportBase,
   formatLabel,
+  menuActionTarget,
   rawContent,
   saveButtonLabel,
   saveDisabledDescriptionId,
@@ -149,7 +151,7 @@ export function PromptExportActions({
               aria-describedby={
                 canSaveToFile ? undefined : (saveDisabledDescriptionId ?? undefined)
               }
-              data-menu-action-target="save-compiled-export"
+              data-menu-action-target={menuActionTarget}
               type="button"
               variant="ghost"
               disabled={!canSaveToFile || !hasContent || destinationIsBusy}

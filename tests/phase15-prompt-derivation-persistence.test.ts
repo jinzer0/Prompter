@@ -4,7 +4,11 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, it } from "vitest"
 import { openPrompterDatabase } from "../electron/db/connection"
-import { PromptLineageCycleError, PromptVersionOwnershipError } from "../electron/db/errors"
+import {
+  PersistenceNotFoundError,
+  PromptLineageCycleError,
+  PromptVersionOwnershipError,
+} from "../electron/db/errors"
 
 type TestDatabase = ReturnType<typeof openPrompterDatabase>
 
@@ -76,6 +80,161 @@ describe("Phase 15 prompt derivation persistence", () => {
         qualityScore: null,
       })
       expect(database.services.listTagsForPrompt(historicalDuplicate.asset.id)).toEqual([])
+    } finally {
+      database.close()
+    }
+  })
+
+  it.each([
+    true,
+    false,
+  ])("원본 저장 없이 편집 스냅샷을 복제한다 (copyTags=%s)", async (copyTags) => {
+    const database = await createTestDatabase()
+
+    try {
+      const project = database.services.createProject({ name: "Editor duplicate project" })
+      const source = database.services.createPromptWithInitialVersion({
+        projectId: project.id,
+        title: "Original title",
+        scenario: "docs",
+        targetAgent: "cursor",
+        originalInput: "Saved input",
+        compiledPrompt: "Saved output",
+        assumptions: "Saved assumptions",
+        qualityScore: 91,
+        tagNames: ["original-tag", "shared-tag"],
+      })
+      const current = database.services.createNextPromptVersion({
+        promptAssetId: source.asset.id,
+        originalInput: "Current input",
+        compiledPrompt: "Current output",
+        makeCurrent: true,
+      })
+      const originalVersions = database.services.listPromptVersions(source.asset.id)
+      const originalTags = database.services.listTagsForPrompt(source.asset.id)
+      const editedVersion = {
+        originalInput: "  Edited input\n\t",
+        compiledPrompt: "\n  Edited output  \n",
+        assumptions: "  Edited assumptions  \n",
+        questions: "\tEdited questions\n",
+        answers: "  Edited answers  ",
+        acceptanceCriteria: "\n  Edited acceptance  \n",
+        validationCommands: "  npm test\n",
+        qualityScore: 99,
+      }
+
+      const duplicate = database.services.duplicatePromptAsset({
+        sourcePromptAssetId: source.asset.id,
+        sourcePromptVersionId: source.version.id,
+        title: "Edited duplicate title",
+        editedVersion,
+        copyTags,
+      })
+
+      expect(duplicate.asset).toMatchObject({
+        projectId: project.id,
+        title: "Edited duplicate title",
+        scenario: source.asset.scenario,
+        targetAgent: source.asset.targetAgent,
+        currentVersionId: duplicate.version.id,
+        parentPromptId: source.asset.id,
+        parentPromptVersionId: source.version.id,
+        derivationType: "duplicate",
+      })
+      expect(duplicate.asset.id).not.toBe(source.asset.id)
+      expect(duplicate.version.id).not.toBe(source.version.id)
+      expect(duplicate.version.id).not.toBe(current.version.id)
+      expect(duplicate.version).toMatchObject({
+        ...editedVersion,
+        promptAssetId: duplicate.asset.id,
+        versionNumber: 1,
+        qualityScore: null,
+      })
+      expect(database.services.listPromptVersions(duplicate.asset.id)).toEqual([duplicate.version])
+      expect(database.services.getCurrentPromptVersion(duplicate.asset.id)).toEqual(
+        duplicate.version,
+      )
+      expect(database.services.getPromptAsset(source.asset.id)).toEqual(current.asset)
+      expect(database.services.getCurrentPromptVersion(source.asset.id)).toEqual(current.version)
+      expect(database.services.listPromptVersions(source.asset.id)).toEqual(originalVersions)
+      expect(database.services.listTagsForPrompt(source.asset.id)).toEqual(originalTags)
+      expect(database.services.listTagsForPrompt(duplicate.asset.id)).toEqual(
+        copyTags ? originalTags : [],
+      )
+    } finally {
+      database.close()
+    }
+  })
+
+  it("편집 복제의 잘못된 출처와 쓰기 실패는 원본과 모든 테이블을 보존한다", async () => {
+    const database = await createTestDatabase()
+
+    try {
+      const source = database.services.createPromptWithInitialVersion({
+        projectId: null,
+        title: "Original",
+        scenario: "feature",
+        targetAgent: "codex",
+        originalInput: "Source input",
+        compiledPrompt: "Source output",
+        tagNames: ["source-tag"],
+      })
+      const other = database.services.createPromptWithInitialVersion({
+        projectId: null,
+        title: "Other",
+        scenario: "docs",
+        targetAgent: "cursor",
+        originalInput: "Other input",
+        compiledPrompt: "Other output",
+      })
+      const tables = [
+        "prompt_assets",
+        "prompt_versions",
+        "tags",
+        "prompt_tags",
+        "prompt_search_fts",
+      ]
+      const before = tables.map((table) =>
+        database.sqlite.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all(),
+      )
+      const input = {
+        sourcePromptAssetId: source.asset.id,
+        title: "Rejected edited duplicate",
+        editedVersion: { originalInput: "Edited input", compiledPrompt: "Edited output" },
+        copyTags: true,
+      }
+
+      expect(() =>
+        database.services.duplicatePromptAsset({ ...input, sourcePromptAssetId: "malformed" }),
+      ).toThrow(PersistenceNotFoundError)
+      expect(() =>
+        database.services.duplicatePromptAsset({ ...input, sourcePromptVersionId: "missing" }),
+      ).toThrow(PersistenceNotFoundError)
+      expect(() =>
+        database.services.duplicatePromptAsset({
+          ...input,
+          sourcePromptVersionId: other.version.id,
+        }),
+      ).toThrow(PromptVersionOwnershipError)
+      expect(
+        tables.map((table) =>
+          database.sqlite.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all(),
+        ),
+      ).toEqual(before)
+
+      database.sqlite.exec(
+        "CREATE TRIGGER edited_duplicate_tag_fault AFTER INSERT ON prompt_tags BEGIN SELECT RAISE(ABORT, 'edited duplicate tag failure'); END",
+      )
+      expect(() => database.services.duplicatePromptAsset(input)).toThrow(
+        "edited duplicate tag failure",
+      )
+      expect(
+        tables.map((table) =>
+          database.sqlite.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all(),
+        ),
+      ).toEqual(before)
+      expect(database.services.getPromptAsset(source.asset.id)).toEqual(source.asset)
+      expect(database.services.listPromptVersions(source.asset.id)).toEqual([source.version])
     } finally {
       database.close()
     }

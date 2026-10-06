@@ -30,7 +30,6 @@ type PromptVersionManagementProps = {
   readonly setCurrentVersion: (promptAssetId: string, versionId: string) => Promise<void>
   readonly versions: readonly PromptVersion[]
   readonly onDerivePrompt: (asset: PromptAsset, version: PromptVersion) => void
-  readonly onDuplicatePrompt: (asset: PromptAsset, version: PromptVersion) => Promise<void>
   readonly onNavigatePrompt: (promptAssetId: string) => void
   readonly onPromptTemplateSaved: () => void
 }
@@ -52,7 +51,6 @@ export function PromptVersionManagement({
   setCurrentVersion,
   versions,
   onDerivePrompt,
-  onDuplicatePrompt,
   onNavigatePrompt,
   onPromptTemplateSaved,
 }: PromptVersionManagementProps) {
@@ -95,7 +93,7 @@ export function PromptVersionManagement({
     <Card data-insights-target="prompt-version" tabIndex={-1} className="flex flex-1 flex-col">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
-          <CardTitle>{selectedAsset.title}</CardTitle>
+          <CardTitle>버전 관리</CardTitle>
           {currentVersion !== null && (
             <Badge variant="accent">v{currentVersion.versionNumber}</Badge>
           )}
@@ -158,7 +156,6 @@ export function PromptVersionManagement({
                   selectedAsset={selectedAsset}
                   selectedVersion={selectedVersion}
                   onMakeSelectedCurrent={makeSelectedCurrent}
-                  onDuplicatePrompt={() => onDuplicatePrompt(selectedAsset, selectedVersion)}
                   onDerivePrompt={() => onDerivePrompt(selectedAsset, selectedVersion)}
                   onPromptTemplateSaved={onPromptTemplateSaved}
                 />

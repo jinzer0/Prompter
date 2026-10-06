@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test"
 
 export type InsightsLayoutSnapshot = {
+  readonly chromeHeight: number
   readonly dashboardClientHeight: number
   readonly dashboardClientWidth: number
   readonly dashboardScrollHeight: number
@@ -24,6 +25,7 @@ export type InsightsLayoutSnapshot = {
 export async function readInsightsLayout(page: Page): Promise<InsightsLayoutSnapshot> {
   return page.evaluate(() => {
     const shell = document.querySelector<HTMLElement>('[data-testid="app-shell"]')
+    const chrome = document.querySelector<HTMLElement>(".prompter-window-chrome")
     const grid = document.querySelector<HTMLElement>(".prompter-shell-grid")
     const sidebar = document.querySelector<HTMLElement>('[data-testid="left-sidebar"]')
     const workspace = document.querySelector<HTMLElement>('[data-testid="insights-workspace"]')
@@ -32,6 +34,7 @@ export async function readInsightsLayout(page: Page): Promise<InsightsLayoutSnap
     )
     if (
       shell === null ||
+      chrome === null ||
       grid === null ||
       sidebar === null ||
       workspace === null ||
@@ -40,6 +43,7 @@ export async function readInsightsLayout(page: Page): Promise<InsightsLayoutSnap
       throw new TypeError("Expected complete Insights shell geometry")
     }
     return {
+      chromeHeight: chrome.getBoundingClientRect().height,
       dashboardClientHeight: dashboard.clientHeight,
       dashboardClientWidth: dashboard.clientWidth,
       dashboardScrollHeight: dashboard.scrollHeight,

@@ -1,7 +1,12 @@
 import { desc, eq } from "drizzle-orm"
 
 import { APP_LOCK_METADATA_SETTING_KEY } from "../../app-lock/app-lock-metadata.js"
-import { settingKeyIsPublic, settingsDefaultsSchema } from "../../ipc-contract.js"
+import {
+  appThemeSchema,
+  settingKeyIsPublic,
+  settingsDefaultsSchema,
+  updateDefaultsInputSchema,
+} from "../../ipc-contract.js"
 import type {
   PrivacySettings,
   Setting,
@@ -112,6 +117,9 @@ export function createSettingsRepository(db: AppDatabase): SettingsRepository {
     setSetting(key, value) {
       const updatedAt = createTimestamp()
       const publicKey = publicSettingKey(key)
+      if (publicKey === "app_theme") {
+        appThemeSchema.parse(value)
+      }
 
       return requireRow(
         db
@@ -161,31 +169,34 @@ export function createSettingsRepository(db: AppDatabase): SettingsRepository {
       return defaultsFromSettings(db.select().from(schema.settings).all())
     },
     updateDefaults(input) {
-      if (input.defaultModel !== undefined) {
-        this.setSetting("default_model", input.defaultModel)
-      }
+      const parsed = updateDefaultsInputSchema.parse(input)
+      return db.transaction(() => {
+        if (parsed.defaultModel !== undefined) {
+          this.setSetting("default_model", parsed.defaultModel)
+        }
 
-      if (input.defaultTargetAgent !== undefined) {
-        this.setSetting("default_target_agent", input.defaultTargetAgent)
-      }
+        if (parsed.defaultTargetAgent !== undefined) {
+          this.setSetting("default_target_agent", parsed.defaultTargetAgent)
+        }
 
-      if (input.defaultProjectId !== undefined) {
-        this.setSetting("default_project_id", input.defaultProjectId ?? "")
-      }
+        if (parsed.defaultProjectId !== undefined) {
+          this.setSetting("default_project_id", parsed.defaultProjectId ?? "")
+        }
 
-      if (input.defaultScenario !== undefined) {
-        this.setSetting("default_scenario", input.defaultScenario)
-      }
+        if (parsed.defaultScenario !== undefined) {
+          this.setSetting("default_scenario", parsed.defaultScenario)
+        }
 
-      if (input.appTheme !== undefined) {
-        this.setSetting("app_theme", input.appTheme)
-      }
+        if (parsed.appTheme !== undefined) {
+          this.setSetting("app_theme", parsed.appTheme)
+        }
 
-      if (input.compilerDefaultLanguage !== undefined) {
-        this.setSetting("compiler_default_language", input.compilerDefaultLanguage)
-      }
+        if (parsed.compilerDefaultLanguage !== undefined) {
+          this.setSetting("compiler_default_language", parsed.compilerDefaultLanguage)
+        }
 
-      return this.getDefaults()
+        return this.getDefaults()
+      })
     },
     getPrivacySettings() {
       return privacySettingsFromSettings(db.select().from(schema.settings).all())

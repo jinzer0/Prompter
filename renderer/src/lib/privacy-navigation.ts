@@ -33,7 +33,7 @@ export type PrivacyFindingDestination =
 
 type PrivacyNavigationActions = {
   readonly navigate: (intent: InsightsNavigationIntent) => void
-  readonly openLibrary: () => void
+  readonly openSettings: () => void
   readonly projectIds: readonly string[]
 }
 
@@ -143,7 +143,7 @@ export async function navigateToPrivacyFinding(
       actions.navigate(destination.intent)
       return
     case "settings":
-      actions.openLibrary()
+      actions.openSettings()
       focusInsightsTarget(destination.target)
       return
     default:

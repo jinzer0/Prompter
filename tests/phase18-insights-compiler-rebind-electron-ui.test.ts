@@ -47,6 +47,9 @@ test("preserved compiler output requires explicit project rebind before B persis
       .getByTestId("left-sidebar")
       .getByRole("button", { name: new RegExp(compilerProjectAName) })
       .click()
+    const compilerPanel = run.page.getByTestId("prompt-compiler")
+    await expect(compilerPanel.getByRole("textbox", { name: "Compiler title" })).toHaveCount(0)
+    await compilerPanel.locator("summary").filter({ hasText: "추가 옵션" }).click()
     const title = run.page.getByRole("textbox", { name: "Compiler title" })
     const originalRequest = run.page.getByRole("textbox", { name: "Original request" })
     const manualContext = run.page.getByRole("textbox", { name: "Project context" })
@@ -55,7 +58,6 @@ test("preserved compiler output requires explicit project rebind before B persis
     const harness = run.page.getByRole("combobox", { name: "Harness template" })
     const profile = run.page.getByRole("combobox", { name: "Project context profile" })
     const preview = run.page.getByRole("textbox", { name: "Generated prompt preview" })
-    const compilerPanel = run.page.getByTestId("prompt-compiler")
     await expect(profile).toHaveValue(seed.profileAId)
     await title.fill("Phase 18 A authored prompt")
     await originalRequest.fill(compilerOriginalRequest)
@@ -88,6 +90,16 @@ test("preserved compiler output requires explicit project rebind before B persis
       .getByRole("button", { name: `Open ${compilerProjectBName} project context` })
       .click()
     await expect(run.page.locator('[data-insights-target="project-context"]')).toBeFocused()
+    const contextWorkspace = run.page.getByTestId("context-workspace")
+    await expect(contextWorkspace).toBeVisible()
+    await expect(run.page.getByTestId("prompt-library")).toBeHidden()
+    await expect(compilerPanel).toBeHidden()
+    await expect(
+      compilerPanel.getByRole("textbox", { name: "Generated prompt preview", includeHidden: true }),
+    ).toHaveValue(compilerTemplateOutput)
+    await contextWorkspace.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
+    await expect(contextWorkspace).toBeHidden()
+    await expect(compilerPanel).toBeVisible()
     await expect(preview).toHaveValue(compilerTemplateOutput)
     await expect(profile).toHaveValue(seed.profileAId)
     await expect(profile.locator("option:checked")).toHaveText("Unavailable Context Profile")
@@ -96,6 +108,9 @@ test("preserved compiler output requires explicit project rebind before B persis
     await expect(bindingNotice).toContainText(compilerProjectBName)
     await expectCompilerBindingNoticeGeometry(bindingNotice, compilerProjectBName)
     await run.page.getByRole("button", { name: new RegExp(compilerExistingBPromptTitle) }).click()
+    await expect(
+      compilerPanel.locator('[data-menu-action-target="save-compiled-export"]'),
+    ).toHaveCount(1)
     const saveExport = await expectPreservedUnboundOutputBoundary({
       app: run.app,
       compilerPanel,

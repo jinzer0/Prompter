@@ -37,6 +37,7 @@ test.describe("project context profile management", () => {
     await withPhase13Prompter("prompter-phase13-profiles", async ({ page }) => {
       const projectName = "Phase 13 Project"
 
+      await page.getByTestId("left-sidebar").getByRole("button", { name: "컨텍스트 관리" }).click()
       await expect(page.getByText("프로젝트를 선택하세요")).toBeVisible()
       await createNamedProject(page, projectName)
       await expect(page.getByRole("button", { name: /^Default Context, Updated/ })).toBeVisible()
@@ -94,7 +95,8 @@ test.describe("project context profile management", () => {
 
     await withPhase13Project("Phase 13 Static Project", async ({ app, page }) => {
       const ids = await defaultProfileForProject(page, "Phase 13 Static Project")
-      const profileEditor = page.getByTestId("left-sidebar")
+      await page.getByTestId("left-sidebar").getByRole("button", { name: "컨텍스트 관리" }).click()
+      const profileEditor = page.getByTestId("context-workspace")
       await page.getByRole("button", { name: /^Default Context, Updated/ }).click()
       await profileEditor
         .getByRole("textbox", { name: "Summary" })
@@ -103,6 +105,8 @@ test.describe("project context profile management", () => {
         .getByRole("textbox", { name: "Validation commands" })
         .fill("npm run typecheck")
       await page.getByRole("button", { name: "Save Context Profile" }).click()
+      await profileEditor.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
+      await page.locator("summary").filter({ hasText: "추가 옵션" }).click()
       await expect(
         page.locator("pre", { hasText: "Compiler selector bridge preview" }),
       ).toBeVisible()
@@ -165,15 +169,21 @@ test.describe("project context profile management", () => {
       const preview = generatedPreview(page)
 
       await installPromptCompilerIpcRecorder(app)
+      await page.locator("summary").filter({ hasText: "추가 옵션" }).click()
       await includeToggle.check()
       await originalRequest(page).fill("Keep deletion input exact")
       await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
       await expect(preview).toHaveValue(/Keep deletion input exact/)
       await expect(page.getByRole("button", { exact: true, name: "Copy" })).toBeEnabled()
 
+      await page.getByTestId("left-sidebar").getByRole("button", { name: "컨텍스트 관리" }).click()
       await page.getByRole("button", { name: /^Default Context, Updated/ }).click()
       await page.getByRole("textbox", { name: "Summary" }).fill("Edited included profile preview")
       await page.getByRole("button", { name: "Save Context Profile" }).click()
+      await page
+        .getByTestId("context-workspace")
+        .getByRole("button", { name: "라이브러리로 돌아가기" })
+        .click()
       await expect(
         page.locator("pre", { hasText: "Edited included profile preview" }),
       ).toBeVisible()
@@ -182,8 +192,13 @@ test.describe("project context profile management", () => {
       await expect(page.getByRole("button", { name: "Save compiled prompt" })).toBeDisabled()
       await expectNoPromptCompilerIpcCalls(app)
 
+      await page.getByTestId("left-sidebar").getByRole("button", { name: "컨텍스트 관리" }).click()
       await page.getByRole("button", { name: "Delete Context Profile" }).click()
       await page.getByRole("button", { name: "Confirm Delete Context Profile" }).click()
+      await page
+        .getByTestId("context-workspace")
+        .getByRole("button", { name: "라이브러리로 돌아가기" })
+        .click()
       await expect(selector).toHaveValue("")
       await expect(includeToggle).toBeDisabled()
       const deletedResult = await page.evaluate(
@@ -216,9 +231,15 @@ test.describe("project context profile management", () => {
           constraints: "Never scan repoPath during UI tests.",
         })
 
+        await page.locator('[data-menu-action-target="open-settings"]').click()
         await page.getByRole("textbox", { name: "OpenAI API key" }).fill(phase5PlaintextKey)
         await page.getByRole("button", { name: "Save API key" }).click()
         await expect(page.getByText("OpenAI key saved.")).toBeVisible()
+        await page
+          .getByTestId("settings-workspace")
+          .getByRole("button", { name: "라이브러리로 돌아가기" })
+          .click()
+        await page.locator("summary").filter({ hasText: "추가 옵션" }).click()
         await installPromptCompilerIpcRecorder(app)
         await includeProfileToggle(page).check()
         await originalRequest(page).fill("Build the Phase 13 LLM profile include flow.")
@@ -262,6 +283,7 @@ test.describe("project context profile management", () => {
       await page.getByRole("button", { name: "Import from Clipboard" }).click()
       await expect(originalRequest(page)).toHaveValue(exactHarnessQuickCaptureText)
 
+      await page.locator("summary").filter({ hasText: "추가 옵션" }).click()
       await includeProfileToggle(page).check()
       await profileSelector(page).selectOption("")
       await profileSelector(page).selectOption(

@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useEffect } from "react"
+import { type Dispatch, type SetStateAction, useEffect, useRef } from "react"
 
 import type { PromptAsset } from "../../../electron/ipc-types"
 import type { ScopedPromptVersions } from "../lib/prompt-scope"
@@ -10,6 +10,7 @@ import {
 
 type PromptVersionLoaderConfig = {
   readonly assetId: string | null
+  readonly loadedVersions: ScopedPromptVersions | null
   readonly scopedAssets: ScopedPromptAssets | null
   readonly setScopedVersions: Dispatch<SetStateAction<ScopedPromptVersions | null>>
   readonly setVersionError: Dispatch<SetStateAction<string | null>>
@@ -20,6 +21,7 @@ type PromptVersionLoaderConfig = {
 
 export function usePromptVersionLoader({
   assetId,
+  loadedVersions,
   scopedAssets,
   setScopedVersions,
   setVersionError,
@@ -27,6 +29,8 @@ export function usePromptVersionLoader({
   setVersionScopeAssetId,
   setVersionStatus,
 }: PromptVersionLoaderConfig): void {
+  const loadedVersionsRef = useRef(loadedVersions)
+  loadedVersionsRef.current = loadedVersions
   useEffect(() => {
     if (assetId === null) {
       setScopedVersions(null)
@@ -55,9 +59,10 @@ export function usePromptVersionLoader({
     const activePromptAsset = selectedPromptAsset
 
     async function loadVersions(promptAsset: PromptAsset): Promise<void> {
-      setScopedVersions(null)
+      const hasCachedVersions = loadedVersionsRef.current?.assetId === selectedPromptAssetId
+      if (!hasCachedVersions) setScopedVersions(null)
       setVersionScopeAssetId(selectedPromptAssetId)
-      setVersionStatus("loading")
+      setVersionStatus(hasCachedVersions ? "ready" : "loading")
       setVersionError(null)
 
       try {
@@ -73,7 +78,7 @@ export function usePromptVersionLoader({
         if (isActive) {
           setVersionScopeAssetId(selectedPromptAssetId)
           setVersionError(error instanceof Error ? error.message : "Unexpected persistence error")
-          setVersionStatus("error")
+          setVersionStatus(hasCachedVersions ? "ready" : "error")
         }
       }
     }

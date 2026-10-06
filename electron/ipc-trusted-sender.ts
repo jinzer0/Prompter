@@ -20,7 +20,7 @@ export type TrustedIpcSenderConfig = {
 }
 
 export function createTrustedIpcSenderAssertion(config: TrustedIpcSenderConfig) {
-  return (event: IpcMainInvokeEvent): void => {
+  return (event: Pick<IpcMainInvokeEvent, "sender" | "senderFrame">): void => {
     if (
       !config.getTrustedWebContents().includes(event.sender) ||
       event.senderFrame !== event.sender.mainFrame ||

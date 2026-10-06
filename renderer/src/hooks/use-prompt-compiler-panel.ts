@@ -236,6 +236,8 @@ export function usePromptCompilerPanel({
     isReadingClipboard: quickCapture.isReadingClipboard,
     isSaving: persistenceActions.isSaving,
     isSavingNextVersion: persistenceActions.isSavingNextVersion,
+    hasPendingSavedRefresh: persistenceActions.hasPendingSavedRefresh,
+    retrySavedRefresh: persistenceActions.retrySavedRefresh,
     isTemplateApplyConfirmationPending: template.isTemplateApplyConfirmationPending,
     handleProjectTransition: routingDraftActions.handleProjectTransition,
     message,

@@ -58,6 +58,7 @@ export function PromptCompilerOutputPanel({
         copyButtonLabel="Copy compiled export"
         exportBase={compiledExportBase}
         formatLabel="Compiled preview export format"
+        menuActionTarget="save-compiled-export"
         rawContent={editablePrompt}
         saveButtonLabel="Save compiled export"
         saveDisabledDescriptionId={guardDescriptionId}

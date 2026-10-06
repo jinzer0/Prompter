@@ -83,10 +83,12 @@ async function seedDuplicateTags(page: Page): Promise<readonly string[]> {
 }
 
 async function expectCompilerDraftUnchanged(page: Page): Promise<void> {
-  await expect(page.getByRole("textbox", { name: "Compiler title" })).toHaveValue(compilerTitle)
-  await expect(page.getByRole("textbox", { name: "Original request" })).toHaveValue(
-    compilerOriginalRequest,
-  )
+  await expect(
+    page.getByRole("textbox", { name: "Compiler title", includeHidden: true }),
+  ).toHaveValue(compilerTitle)
+  await expect(
+    page.getByRole("textbox", { name: "Original request", includeHidden: true }),
+  ).toHaveValue(compilerOriginalRequest)
 }
 
 test("opens Settings Maintenance and exercises scan, preview, cancel, stale retry", async ({
@@ -102,6 +104,11 @@ test("opens Settings Maintenance and exercises scan, preview, cancel, stale retr
     await createNamedProject(page, projectName)
     const seededPrompt = await seedPromptWithoutMaintenanceIssues(page)
 
+    await page
+      .getByTestId("prompt-compiler")
+      .locator("summary")
+      .filter({ hasText: "추가 옵션" })
+      .click()
     await page.getByRole("textbox", { name: "Compiler title" }).fill(compilerTitle)
     await page.getByRole("textbox", { name: "Original request" }).fill(compilerOriginalRequest)
 

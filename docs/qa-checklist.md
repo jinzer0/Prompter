@@ -241,15 +241,67 @@ MOUNT_DIR="$(mktemp -d)"
 - [ ] OpenAI API key can be saved, masked, and deleted.
 - [ ] App restart preserves projects, prompts, versions, tags, and settings.
 
+## 현재 소스의 작업 공간·편집 수동 점검
+
+아래는 현재 소스를 대상으로 수행할 절차이며 Stage 5 결과나 공개 v0.1.1 배포본의 동작 증거가
+아니다. 실행한 환경·관찰 결과·실패/차단 사유는 별도로 기록하고 수행하지 않은 항목은 체크하지 않는다.
+시각·행동 판정 기준은 [DESIGN](../DESIGN.md)과 [EXPERIENCE](ux/EXPERIENCE.md)를 따른다.
+실패 주입은 격리된 테스트 데이터와 환경에서 수행하고 실제 라이브러리는 변경하지 않는다.
+
+- [ ] Settings의 ‘화면 및 기본값’에서 light와 dark를 각각 선택·저장한다. shell, 패널, 입력,
+      버튼, 대화상자, 잠금 화면에 적용되고 텍스트·placeholder·선택·초점이 읽히는지 확인한다.
+- [ ] 테마 선택만으로는 저장한 테마가 바뀌지 않는지 확인하고, 각 선택을 저장한 뒤 앱을 재시작해
+      선택값과 실제 화면이 유지되는지 확인한다. system을 저장한 상태에서는 macOS 테마를 직접
+      전환해 실행 중 화면과 재시작 후 화면이 OS를 따르는지 확인한다.
+- [ ] 새 창의 기본 크기 1180×760과 축소 한계 1024×720을 실제 macOS 프레임에서 확인한다.
+      두 크기·양 테마에서 Library 세 열과 본문 우선 배치가 유지되고 shell 가로 스크롤 없이
+      복사·저장에 접근 가능한지 확인한다. 긴 제목·본문·컴파일 추가 옵션과 확대/축소를 사용해
+      줄바꿈·내부 세로 스크롤·키보드 접근이 주요 조작을 가리지 않는지 확인한다.
+- [ ] 제목 막대의 빈 드래그 영역으로 창을 이동하고 native traffic lights를 조작한다.
+      검색·본문·컴파일 요청에서 텍스트를 드래그 선택하고 입력·버튼·select를 조작했을 때
+      창이 이동하지 않는지 확인한다.
+- [ ] 프로젝트→검색/태그 필터→행 선택 후 컴파일 없이 본문을 편집한다. 앞뒤 공백·탭·개행을
+      포함한 미저장 텍스트를 ‘복사’하고 다른 편집기에 붙여 넣어 정확히 일치하는지 확인한다.
+      복사 전후 저장된 본문과 버전 수가 바뀌지 않는지 확인한다.
+- [ ] ‘새 버전 저장’과 Cmd+S를 각각 사용해 같은 프롬프트에 버전이 한 번 추가되고 current가
+      갱신되는지 확인한다. 변경 없는 반복 저장과 저장 중 반복 제출이 중복 버전을 만들지 않는지,
+      저장 중 추가 입력은 덮어쓰지 않고 미저장으로 남는지 확인한다.
+- [ ] 본문을 수정한 뒤 ‘복제하여 저장’에서 제목을 입력한다. 독립 프롬프트에 편집 스냅샷이
+      저장되고 원본 본문·버전 이력이 그대로인지 확인한다. 생성 실패 시 원본 선택·초안 유지,
+      저장 중 추가 입력 시 해당 초안을 잃지 않는지도 확인한다.
+- [ ] 컴파일 결과를 생성해도 편집 본문·저장 버전이 바뀌지 않는지 확인한다. ‘편집에 적용’의
+      dirty 교체 확인에서 취소하면 본문·preview가 유지되고, 적용하면 미저장 본문만 바뀌는지
+      확인한다. 별도 저장 전까지 버전이 추가되지 않는지 확인한다.
+- [ ] 미저장 본문으로 다른 프로젝트·프롬프트·이력을 각각 선택한다. Save/Discard/Cancel을
+      각각 실행해 저장 성공 후 한 번만 이동, 현재 변경만 폐기 후 이동, 취소 후 기존 선택·초안
+      유지를 확인한다. 초기 초점은 Cancel이고 Escape·취소 후 초점이 편집 위치로 복귀하는지 확인한다.
+- [ ] 미저장 상태에서 native 빨간 닫기 버튼으로 같은 Save/Discard/Cancel 절차를 반복한다.
+      Cancel/Escape는 창과 초안을 유지하고, Save 후 재시작하면 저장 본문이 남는지 확인한다.
+- [ ] 격리 환경에서 저장 실패를 유도한 뒤 선택 전환·닫기의 Save를 실행한다. 오류·재시도·취소가
+      남고 선택·초안·창이 유지되는지 확인한다. DB 저장 성공 후 목록/검색 갱신만 실패하는 경우에는
+      저장 성공과 갱신 실패가 구분되고 갱신 재시도가 버전을 다시 만들지 않는지 확인한다.
+- [ ] 미저장 본문을 남기고 앱을 잠근 뒤 native 닫기를 요청한다. 본문은 노출되지 않고
+      Save/Discard가 차단되는지 확인한다. 취소·잠금 해제 후 같은 선택·초안이 돌아오는지 확인한다.
+- [ ] 미저장 상태에서 Cmd+Q와 앱 메뉴의 Quit를 각각 실행하고 Cancel/Escape를 선택한다.
+      앱이 종료되지 않고 창·초안이 유지되며 다시 종료를 요청해도 확인을 우회하지 않는지 확인한다.
+      잠긴 상태에서도 종료 취소와 저장/버리기 차단을 확인한다.
+- [ ] 선택·검색/필터·편집 본문·컴파일 요청/결과를 준비하고 Settings, Insights, Privacy Center,
+      컨텍스트/템플릿/하네스 관리자를 열었다가 Library로 돌아온다. 단순 진입에는 저장 확인이 없고
+      기존 맥락이 유지되는지 확인한다. 진입·복귀만으로 저장·적용·LLM·백업·검사·정리·파일/저장소
+      스캔이 실행되지 않는지 확인한다. Insights 정보 순서는 유지하고 Privacy 검사는 명시적으로만 실행한다.
+- [ ] 위 작업 공간에 미저장 본문을 보존한 채 native 닫기·Quit를 요청해 동일한 보호가 적용되는지
+      확인한다. finding에서 다른 편집 대상으로 이동할 때는 선택 전환 보호를 확인한다.
+
 ## Keyboard And Menu
 
 - [ ] CmdOrCtrl+N opens the new prompt flow when a project is selected.
 - [ ] CmdOrCtrl+Shift+N opens the new project flow.
 - [ ] CmdOrCtrl+F focuses the prompt search input when visible.
-- [ ] CmdOrCtrl+S saves the current compiled prompt when available.
+- [ ] CmdOrCtrl+S는 현재 Library 편집 대상의 변경을 새 current 버전으로 저장한다. 컴파일·복제를
+      실행하지 않으며 대상이 없거나 변경이 없으면 새 버전을 만들지 않는다.
 - [ ] CmdOrCtrl+Shift+C copies the current compiled prompt when available.
 - [ ] CmdOrCtrl+Shift+V imports clipboard text through the app-focused quick capture flow.
-- [ ] CmdOrCtrl+, focuses the settings panel.
+- [ ] CmdOrCtrl+,로 별도 Settings 작업 공간을 열고 설정 영역에 초점이 가는지 확인한다.
 - [ ] File -> Quick Capture from Clipboard follows the same import flow as the button.
 - [ ] Esc or close action does not corrupt unsaved form state.
 - [ ] Development-only Reload and Toggle Developer Tools are absent from production menu templates.

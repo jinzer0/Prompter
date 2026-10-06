@@ -6,6 +6,7 @@
       "!node_modules",
       "!.codegraph",
       "!.omo",
+      "!.gjc",
       "!dist",
       "!dist-electron",
       "!release",

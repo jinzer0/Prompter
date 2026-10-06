@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { createElectronBridge, PING_RESPONSE } from "../electron/bridge"
+import { createAppearanceBridge, createElectronBridge, PING_RESPONSE } from "../electron/bridge"
 
 describe("Electron shell contract", () => {
   it("exposes only grouped typed ping and persistence bridge methods", async () => {
-    const bridge = createElectronBridge(async (channel) => {
+    const requests = createElectronBridge(async (channel) => {
       if (channel === "prompter:ping") {
         return PING_RESPONSE
       }
@@ -19,6 +19,13 @@ describe("Electron shell contract", () => {
 
       throw new Error(`Unexpected channel ${channel}`)
     })
+    const bridge = {
+      ...requests,
+      appearance: createAppearanceBridge(
+        () => ({ preference: "system", effectiveTheme: "light" }),
+        () => () => undefined,
+      ),
+    }
 
     await expect(bridge.ping()).resolves.toBe(PING_RESPONSE)
     expect(Object.keys(bridge)).toEqual([
@@ -42,7 +49,9 @@ describe("Electron shell contract", () => {
       "clipboard",
       "backup",
       "appLock",
+      "appearance",
     ])
+    expect(Object.keys(bridge.appearance)).toEqual(["getState", "onChanged"])
     expect(Object.keys(bridge)).not.toContain("appEvents")
     expect(Object.keys(bridge)).not.toContain("shortcuts")
     expect(Object.keys(bridge.menu)).toEqual(["onAction"])

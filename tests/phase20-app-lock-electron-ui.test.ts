@@ -22,6 +22,7 @@ test("protects and restores the live renderer workspace", async ({
     const draft = page.getByRole("textbox", { name: "Original request" })
     await draft.fill("Unsaved Phase 20 draft must survive locking exactly.  ")
 
+    await page.locator('[data-menu-action-target="open-settings"]').click()
     await page.getByRole("heading", { name: "App lock", exact: true }).scrollIntoViewIfNeeded()
     await page.getByRole("checkbox", { name: "Lock on start" }).check()
     await page.getByRole("spinbutton", { name: "Inactivity timeout" }).fill("2")
@@ -51,6 +52,7 @@ test("protects and restores the live renderer workspace", async ({
     await draft.waitFor()
     await expect(draft).toHaveValue("Unsaved Phase 20 draft must survive locking exactly.  ")
 
+    await page.locator('[data-menu-action-target="open-settings"]').click()
     await page.getByRole("heading", { name: "App lock", exact: true }).scrollIntoViewIfNeeded()
     await page.getByRole("checkbox", { name: "Lock on start" }).uncheck()
     await page.getByRole("spinbutton", { name: "Inactivity timeout" }).fill("3")
@@ -82,6 +84,7 @@ test("protects and restores the live renderer workspace", async ({
     await page.getByRole("button", { name: "Unlock Prompter" }).click()
     await page.locator('[data-testid="app-shell"]').waitFor({ state: "visible" })
 
+    await page.locator('[data-menu-action-target="open-settings"]').click()
     await page.getByRole("heading", { name: "App lock", exact: true }).scrollIntoViewIfNeeded()
     await page.getByRole("button", { name: "Disable app lock" }).click()
     await page
@@ -158,6 +161,7 @@ test("mounted auto-lock listeners reset deadlines, restore protection, and clean
     await page.reload()
     await page.locator('[data-testid="app-shell"]').waitFor({ state: "visible" })
 
+    await page.locator('[data-menu-action-target="open-settings"]').click()
     await page.getByRole("heading", { name: "App lock", exact: true }).scrollIntoViewIfNeeded()
     await page.getByRole("spinbutton", { name: "Inactivity timeout" }).fill("1")
     await page.getByRole("button", { name: "Enable app lock" }).click()

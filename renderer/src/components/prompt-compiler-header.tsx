@@ -1,12 +1,11 @@
 export function PromptCompilerHeader() {
   return (
-    <header className="border-b border-border-subtle pb-4">
-      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">Detail</p>
-      <h2 id="prompt-compiler-heading" className="mt-2 text-[24px] font-medium tracking-[-0.012em]">
-        Prompt Compiler
-      </h2>
+    <header className="space-y-1">
+      <h3 id="prompt-compiler-heading" className="text-[16px] font-medium">
+        프롬프트 컴파일러
+      </h3>
       <p className="mt-1 text-[14px] text-muted">
-        Analyze requests with LLMs or generate local template prompts.
+        요청을 분석하거나 템플릿으로 별도 결과를 생성합니다. 저장된 본문은 바뀌지 않습니다.
       </p>
     </header>
   )

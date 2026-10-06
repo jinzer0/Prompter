@@ -106,10 +106,10 @@ describe("Electron shell contract", () => {
     )
   })
 
-  it("keeps shell copy aligned with Phase 1 UI-only scope", async () => {
+  it("keeps actual workspace copy free of retired scaffold claims", async () => {
     const shellCopy = await Promise.all([
       readFile("renderer/src/app.tsx", "utf8"),
-      readFile("renderer/src/components/shell/sidebar-section.tsx", "utf8"),
+      readFile("renderer/src/components/shell/app-shell.tsx", "utf8"),
       readFile("renderer/src/components/prompt-library-panel.tsx", "utf8"),
       readFile("renderer/src/components/prompt-compiler-panel.tsx", "utf8"),
       readFile("DESIGN.md", "utf8"),
@@ -124,5 +124,7 @@ describe("Electron shell contract", () => {
     expect(combinedCopy).not.toContain("persistence exists behind IPC")
     expect(combinedCopy).not.toContain("real storage exists")
     expect(combinedCopy).not.toContain("no data boundary exists")
+    expect(shellCopy[1]).not.toContain("Bridge status")
+    expect(shellCopy[1]).not.toContain("DB-backed")
   })
 })

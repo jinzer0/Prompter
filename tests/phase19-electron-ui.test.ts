@@ -152,7 +152,7 @@ test("Phase 19 privacy and encrypted-backup user flow stays manual and masked", 
       expect(layout.sidebarScrollWidth).toBeLessThanOrEqual(layout.sidebarClientWidth)
       expect(layout.workspaceWidth).toBeGreaterThan(layout.sidebarWidth * 3)
       expect(
-        Math.abs(layout.gridWidth - layout.sidebarWidth - 16 - layout.workspaceWidth),
+        Math.abs(layout.gridWidth - layout.sidebarWidth - layout.workspaceWidth),
       ).toBeLessThanOrEqual(1)
       await attachPng(
         run.page,
@@ -219,7 +219,9 @@ test("Phase 19 privacy and encrypted-backup user flow stays manual and masked", 
     expect(await promptCompilerIpcSnapshot(run.app)).toMatchObject({ analyze: 1, compile: 0 })
 
     // When: encrypted full-backup preparation opens, mismatched confirmation blocks saving.
-    const encryptedBackupButton = sidebar.getByRole("button", {
+    await sidebar.locator('[data-menu-action-target="open-settings"]').click()
+    await expect(run.page.getByTestId("settings-workspace")).toBeVisible()
+    const encryptedBackupButton = run.page.getByTestId("settings-workspace").getByRole("button", {
       name: "Export encrypted full backup",
     })
     await encryptedBackupButton.scrollIntoViewIfNeeded()

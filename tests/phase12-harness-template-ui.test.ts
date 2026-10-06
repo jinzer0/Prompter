@@ -5,6 +5,7 @@ import {
   createHarnessTemplateViaUi,
   defaultHarnessTemplateNames,
   exactHarnessQuickCaptureText,
+  expandCompilerOptions,
   expectDefaultHarnessTemplateCounts,
   expectDefaultHarnessTemplatesVisible,
   expectDeletedSelectedHarnessFallsBackAfterReload,
@@ -14,6 +15,7 @@ import {
   fillNewHarnessNameAndBody,
   harnessTemplateCountByName,
   launchWithUserData,
+  openHarnessManagement,
   setClipboardText,
   withHarnessManager,
   withPersistentHarnessManager,
@@ -22,6 +24,7 @@ import {
 test.describe("harness management UI flows", () => {
   test("harness management shows seeded default harness templates after app start", async () => {
     await withHarnessManager("prompter-phase12-defaults", async ({ page }) => {
+      await openHarnessManagement(page)
       await expectDefaultHarnessTemplatesVisible(page)
     })
   })
@@ -34,6 +37,7 @@ test.describe("harness management UI flows", () => {
 
       await launchWithUserData(userData, async ({ page }) => {
         await expectDefaultHarnessTemplateCounts(page)
+        await openHarnessManagement(page)
         for (const templateName of defaultHarnessTemplateNames) {
           await expect(page.getByRole("button", { name: new RegExp(templateName) })).toBeVisible()
         }
@@ -46,6 +50,7 @@ test.describe("harness management UI flows", () => {
       const editedBody = "# Edited Default\n\nKeep {{originalInput}} exactly."
 
       await launchWithUserData(userData, async ({ page }) => {
+        await openHarnessManagement(page)
         await page.getByRole("button", { name: /Feature Implementation/ }).click()
         await page.getByRole("textbox", { name: "Template body" }).fill(editedBody)
         await page.getByRole("button", { name: "Save Harness" }).click()
@@ -53,6 +58,7 @@ test.describe("harness management UI flows", () => {
       })
 
       await launchWithUserData(userData, async ({ page }) => {
+        await openHarnessManagement(page)
         await page.getByRole("button", { name: /Feature Implementation/ }).click()
         await expect(page.getByRole("textbox", { name: "Template body" })).toHaveValue(editedBody)
         expect(await harnessTemplateCountByName(page, "Feature Implementation")).toBe(1)
@@ -66,6 +72,7 @@ test.describe("harness management UI flows", () => {
     await withHarnessManager("prompter-phase12-crud", async ({ page }) => {
       const originalBody = "Exact {{originalInput}} body\n\nKeep trailing space: "
 
+      await openHarnessManagement(page)
       await createHarnessTemplateViaUi(page, {
         name: "Phase 12 Harness",
         scenario: "feature",
@@ -105,6 +112,7 @@ test.describe("harness management UI flows", () => {
 
   test("harness management filters by name, scenario, and target agent", async () => {
     await withHarnessManager("prompter-phase12-filters", async ({ page }) => {
+      await openHarnessManagement(page)
       await page.getByRole("textbox", { name: "Search harnesses" }).fill("Bug")
       await expect(page.getByRole("button", { name: /Bug Fix/ })).toBeVisible()
       await expect(page.getByRole("button", { name: /Feature Implementation/ })).toHaveCount(0)
@@ -124,12 +132,14 @@ test.describe("harness management UI flows", () => {
   test("harness management deleting a seeded default allows it to reappear after restart", async () => {
     await withPersistentHarnessManager("prompter-phase12-seeded-return", async (userData) => {
       await launchWithUserData(userData, async ({ page }) => {
+        await openHarnessManagement(page)
         await page.getByRole("button", { name: /Documentation/ }).click()
         await confirmSelectedHarnessDelete(page)
         await expectHarnessAbsent(page, "Documentation")
       })
 
       await launchWithUserData(userData, async ({ page }) => {
+        await openHarnessManagement(page)
         await expect(page.getByRole("button", { name: /Documentation/ })).toBeVisible()
         expect(await harnessTemplateCountByName(page, "Documentation")).toBe(1)
       })
@@ -138,6 +148,7 @@ test.describe("harness management UI flows", () => {
 
   test("harness management blocks invalid JSON before saving a harness template", async () => {
     await withHarnessManager("prompter-phase12-invalid-json", async ({ page }) => {
+      await openHarnessManagement(page)
       await fillNewHarnessNameAndBody(page, "Invalid JSON Harness", "Body {{originalInput}}")
       await page.getByRole("textbox", { name: "Required fields JSON" }).fill("not-json")
       await page.getByRole("button", { name: "Save Harness" }).click()
@@ -149,6 +160,7 @@ test.describe("harness management UI flows", () => {
 
   test("harness management blocks invalid clarification policy JSON before saving", async () => {
     await withHarnessManager("prompter-phase12-invalid-clarification", async ({ page }) => {
+      await openHarnessManagement(page)
       await fillNewHarnessNameAndBody(page, "Invalid Policy Harness", "Body {{originalInput}}")
       await page.getByRole("textbox", { name: "Clarification policy JSON" }).fill("not-json")
       await page.getByRole("button", { name: "Save Harness" }).click()
@@ -160,6 +172,7 @@ test.describe("harness management UI flows", () => {
 
   test("harness management blocks blank templateBody before IPC save", async () => {
     await withHarnessManager("prompter-phase12-blank-body", async ({ page }) => {
+      await openHarnessManagement(page)
       await fillNewHarnessNameAndBody(page, "Blank Body Harness", " \n\t ")
       await page.getByRole("button", { name: "Save Harness" }).click()
 
@@ -175,6 +188,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
       const originalInput = "Keep this exact request before and after harness selection."
 
       await page.getByRole("textbox", { name: "Original request" }).fill(originalInput)
+      await expandCompilerOptions(page)
       await page.getByRole("combobox", { exact: true, name: "Compile mode" }).selectOption("bugfix")
       await page
         .getByRole("combobox", { exact: true, name: "Compile runner" })
@@ -210,6 +224,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
       await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
       await expect(preview).toHaveValue(/# Objective/)
 
+      await expandCompilerOptions(page)
       await page
         .getByRole("combobox", { name: "Harness template" })
         .selectOption({ label: "Feature Implementation" })
@@ -222,6 +237,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
   test("harness selector does not auto-run analyze, compile, or save", async () => {
     await withHarnessManager("prompter-phase12-selector-no-auto", async ({ page }) => {
       await page.getByRole("textbox", { name: "Original request" }).fill("Select only, do not run.")
+      await expandCompilerOptions(page)
       await page
         .getByRole("combobox", { name: "Harness template" })
         .selectOption({ label: "Feature Implementation" })
@@ -249,6 +265,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
         exactHarnessQuickCaptureText,
       )
 
+      await expandCompilerOptions(page)
       await page
         .getByRole("combobox", { name: "Harness template" })
         .selectOption({ label: "Feature Implementation" })

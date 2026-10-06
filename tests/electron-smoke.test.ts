@@ -7,8 +7,8 @@ import { type ElectronApplication, _electron as electron, expect, test } from "@
 const requireElectron = createRequire(import.meta.url)
 const electronExecutable: unknown = requireElectron("electron")
 const desktopSmokeViewports = [
-  { width: 1280, height: 800 },
-  { width: 900, height: 720 },
+  { width: 1180, height: 760 },
+  { width: 1024, height: 720 },
 ] as const
 
 if (typeof electronExecutable !== "string") {
@@ -56,22 +56,63 @@ test("opens the main window and resolves the preload ping bridge", async ({
     await access(join(userDataDirectory, "prompter.sqlite"))
 
     await expect(page.locator('[data-testid="app-shell"]')).toBeVisible()
-    await expect(page.locator('[data-testid="ping-result"]')).toHaveText("pong")
+    expect(await page.evaluate(() => window.prompter.ping())).toBe("pong")
     await expect(page.locator('[data-testid="left-sidebar"]')).toBeVisible()
     await expect(page.locator('[data-testid="prompt-library"]')).toBeVisible()
     await expect(page.locator('[data-testid="prompt-compiler"]')).toBeVisible()
 
+    await expect(page.locator(".prompter-window")).toHaveCSS("-webkit-app-region", "none")
+    await expect(page.locator(".prompter-window-chrome")).toHaveCSS("-webkit-app-region", "drag")
+    await expect(page.locator(".prompter-window-content")).toHaveCSS(
+      "-webkit-app-region",
+      "no-drag",
+    )
+    await expect(page.locator(".prompter-window-traffic-light-inset")).toHaveCSS(
+      "-webkit-app-region",
+      "no-drag",
+    )
+
+    for (const theme of ["light", "dark"] as const) {
+      await page.evaluate(async (appTheme) => {
+        await window.prompter.settings.updateDefaults({ appTheme })
+      }, theme)
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
+      expect(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe(theme)
+      await page.reload()
+      await expect(page.getByTestId("app-shell")).toBeVisible()
+      await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
+    }
+    await page.evaluate(async () => {
+      await window.prompter.settings.updateDefaults({ appTheme: "system" })
+    })
+    const effectiveTheme = await app.evaluate(({ nativeTheme }) =>
+      nativeTheme.shouldUseDarkColors ? "dark" : "light",
+    )
+    await expect(page.locator("html")).toHaveAttribute("data-theme", effectiveTheme)
+
     await expect(page.getByText("No projects yet")).toBeVisible()
-    await expect(page.getByText("No tags yet")).toBeVisible()
-    await expect(page.getByRole("button", { name: /Feature Implementation/ })).toBeVisible()
-    await expect(page.getByRole("button", { name: /Bug Fix/ })).toBeVisible()
-    await expect(page.getByText("Select a project to view prompts")).toBeVisible()
+    await expect(
+      page.getByTestId("left-sidebar").getByRole("button", { name: "컨텍스트 관리" }),
+    ).toBeVisible()
+    await expect(
+      page.getByTestId("left-sidebar").getByRole("button", { name: "템플릿 관리" }),
+    ).toBeVisible()
+    await expect(
+      page.getByTestId("left-sidebar").getByRole("button", { name: "하네스 관리" }),
+    ).toBeVisible()
+    await expect(
+      page.getByRole("heading", { name: "Select a project to view prompts", exact: true }),
+    ).toBeVisible()
     await expect(page.getByText("Select a project first")).toBeVisible()
     await expect(page.getByRole("button", { name: "New Project" })).toBeVisible()
-    await expect(page.getByRole("textbox", { name: "Search prompt templates" })).toHaveAttribute(
-      "placeholder",
-      "Search templates",
-    )
+    await expect(page.getByTestId("settings-workspace")).toBeHidden()
+    const additionalOptions = page
+      .getByTestId("prompt-compiler")
+      .locator("summary")
+      .filter({ hasText: "추가 옵션" })
+    await additionalOptions.click()
+    await expect(page.getByRole("combobox", { name: "Compile mode" })).toBeVisible()
+    await expect(page.getByRole("combobox", { name: "Compile runner" })).toBeVisible()
     await expect(
       page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }),
     ).toBeDisabled()
@@ -190,13 +231,33 @@ test("opens the main window and resolves the preload ping bridge", async ({
       await expect(page.locator('[data-testid="prompt-library"]')).toBeVisible()
       await expect(page.locator('[data-testid="prompt-compiler"]')).toBeVisible()
       await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible()
-      await expect(page.getByRole("heading", { name: "Tags" })).toBeVisible()
-      await expect(page.getByRole("heading", { name: "Harnesses" })).toBeVisible()
       await expect(page.getByRole("heading", { name: "Prompt Library" })).toBeVisible()
-      await expect(page.getByRole("heading", { name: "Prompt Compiler" })).toBeVisible()
-      await expect(
-        page.getByTestId("prompt-library").getByRole("button", { name: "New Prompt" }),
-      ).toHaveCSS("white-space", "nowrap")
+      await expect(page.getByRole("heading", { name: "프롬프트 상세" })).toBeVisible()
+      await expect(page.getByRole("heading", { name: "프롬프트 컴파일러" })).toBeVisible()
+      const geometry = await page.evaluate(() => {
+        const shell = document.querySelector<HTMLElement>('[data-testid="app-shell"]')
+        const panels = ["left-sidebar", "prompt-library", "prompt-compiler"].map((id) => {
+          const panel = document.querySelector<HTMLElement>(`[data-testid="${id}"]`)
+          if (panel === null) throw new Error(`Missing panel ${id}`)
+          const bounds = panel.getBoundingClientRect()
+          return { left: bounds.left, right: bounds.right, width: bounds.width }
+        })
+        if (shell === null) throw new Error("Missing shell")
+        return {
+          panels,
+          scrollWidth: shell.scrollWidth,
+          clientWidth: shell.clientWidth,
+          viewportWidth: window.innerWidth,
+        }
+      })
+      expect(geometry.scrollWidth).toBeLessThanOrEqual(geometry.clientWidth + 1)
+      for (const panel of geometry.panels) {
+        expect(panel.width).toBeGreaterThan(0)
+        expect(panel.left).toBeGreaterThanOrEqual(0)
+        expect(panel.right).toBeLessThanOrEqual(geometry.viewportWidth + 1)
+      }
+      expect(geometry.panels[0]?.right).toBeLessThanOrEqual(geometry.panels[1]?.left ?? 0)
+      expect(geometry.panels[1]?.right).toBeLessThanOrEqual(geometry.panels[2]?.left ?? 0)
     }
     expect(consoleErrors).toEqual([])
     expect(pageErrors).toEqual([])

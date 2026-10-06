@@ -28,7 +28,7 @@ import { expectTagDistributionRowsContained } from "./phase18-insights-visual-ge
 
 const viewports = [
   { width: 1280, height: 800 },
-  { width: 900, height: 720 },
+  { width: 1024, height: 720 },
 ] as const
 const focusableSelector = [
   "button:not([disabled])",
@@ -98,6 +98,9 @@ test("mixed-CJK Insights visual evidence preserves keyboard focus and unavailabl
       .getByTestId("left-sidebar")
       .getByRole("button", { name: new RegExp(visualProjectAName) })
       .click()
+    const compilerPanel = run.page.getByTestId("prompt-compiler")
+    await expect(compilerPanel.getByRole("textbox", { name: "Compiler title" })).toHaveCount(0)
+    await compilerPanel.locator("summary").filter({ hasText: "추가 옵션" }).click()
     const compilerTitle = run.page.getByRole("textbox", { name: "Compiler title" })
     const originalRequest = run.page.getByRole("textbox", { name: "Original request" })
     const profileSelector = run.page.getByRole("combobox", { name: "Project context profile" })
@@ -140,9 +143,7 @@ test("mixed-CJK Insights visual evidence preserves keyboard focus and unavailabl
       await run.page.setViewportSize(viewport)
       const layout = await readInsightsLayout(run.page)
       expect(layout.sidebarScrollWidth).toBeLessThanOrEqual(layout.sidebarClientWidth)
-      if (viewport.width === 900) {
-        expect(layout.shellScrollWidth).toBeGreaterThan(layout.shellClientWidth)
-      }
+      expect(layout.shellScrollWidth).toBeLessThanOrEqual(layout.shellClientWidth)
       for (const position of ["top", "bottom"] as const) {
         await scrollInsightsSurfaces(run.page, position)
         await attachPng(
@@ -191,6 +192,16 @@ test("mixed-CJK Insights visual evidence preserves keyboard focus and unavailabl
     await expect(projectBContextAction).toBeVisible()
     await projectBContextAction.click()
     await expect(run.page.locator('[data-insights-target="project-context"]')).toBeFocused()
+    const contextWorkspace = run.page.getByTestId("context-workspace")
+    await expect(contextWorkspace).toBeVisible()
+    await expect(run.page.getByTestId("prompt-library")).toBeHidden()
+    await expect(compilerPanel).toBeHidden()
+    await expect(
+      compilerPanel.getByRole("combobox", { name: "Project context profile", includeHidden: true }),
+    ).toHaveValue(seed.profileAId)
+    await contextWorkspace.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
+    await expect(contextWorkspace).toBeHidden()
+    await expect(compilerPanel).toBeVisible()
     await expect(profileSelector).toHaveValue(seed.profileAId)
     await expect(profileSelector.locator("option:checked")).toHaveText(
       "Unavailable Context Profile",

@@ -68,7 +68,7 @@ export function PromptLibraryPanel({
           </h1>
           <p className="mt-1 text-[14px] text-muted">
             {selectedProject === null
-              ? "Create or select a project to load DB-backed prompts."
+              ? "Create or select a project to view prompts."
               : `Prompts for ${selectedProject.name}`}
           </p>
         </div>
@@ -92,21 +92,18 @@ export function PromptLibraryPanel({
       )}
 
       {selectedProject !== null && (
-        <>
-          <PromptLibraryFilters
-            query={library.searchQuery}
-            scenario={library.scenarioFilter}
-            selectedTagIds={library.selectedTagIds}
-            tagCounts={library.tagCounts}
-            targetAgent={library.targetAgentFilter}
-            onClear={library.clearFilters}
-            onQueryChange={library.setSearchQuery}
-            onScenarioChange={library.setScenarioFilter}
-            onTagToggle={library.toggleTagFilter}
-            onTargetAgentChange={library.setTargetAgentFilter}
-          />
-          <PromptTagAttachmentForm selectedAsset={selectedAsset} onTagsChanged={onTagsChanged} />
-        </>
+        <PromptLibraryFilters
+          query={library.searchQuery}
+          scenario={library.scenarioFilter}
+          selectedTagIds={library.selectedTagIds}
+          tagCounts={library.tagCounts}
+          targetAgent={library.targetAgentFilter}
+          onClear={library.clearFilters}
+          onQueryChange={library.setSearchQuery}
+          onScenarioChange={library.setScenarioFilter}
+          onTagToggle={library.toggleTagFilter}
+          onTargetAgentChange={library.setTargetAgentFilter}
+        />
       )}
 
       <div className="mt-4 flex flex-1 flex-col gap-3">
@@ -145,7 +142,7 @@ export function PromptLibraryPanel({
             <EmptyState
               label="Library state"
               title="No prompts yet"
-              description="Create a prompt to store its first asset version in SQLite."
+              description="Create a prompt to save its first version."
             />
           )}
         {selectedProject !== null &&
@@ -180,6 +177,9 @@ export function PromptLibraryPanel({
           />
         ))}
       </div>
+      {selectedProject !== null && (
+        <PromptTagAttachmentForm selectedAsset={selectedAsset} onTagsChanged={onTagsChanged} />
+      )}
     </Panel>
   )
 }

@@ -76,6 +76,7 @@ export async function runSettingsScenario(testInfo: TestInfo): Promise<void> {
   try {
     const firstRun = await launchPrompter(userDataDirectory)
 
+    await clickApplicationMenuItem(firstRun.app, "Settings...")
     await expect(firstRun.page.getByRole("heading", { name: "Settings" })).toBeVisible()
     await expect(firstRun.page.getByText("OpenAI key not stored")).toBeVisible()
     await expect(firstRun.page.getByRole("heading", { name: "Backup & Import" })).toBeVisible()
@@ -182,6 +183,7 @@ export async function runSettingsScenario(testInfo: TestInfo): Promise<void> {
     await closePrompter(firstRun.app)
 
     const secondRun = await launchPrompter(userDataDirectory)
+    await clickApplicationMenuItem(secondRun.app, "Settings...")
     await expect(secondRun.page.getByRole("textbox", { name: "Default model" })).toHaveValue(
       "gpt-4.1-mini",
     )

@@ -4,6 +4,8 @@ export default defineConfig({
   testDir: "./tests",
   testMatch: [
     "electron-smoke.test.ts",
+    "native-workspace-ui.test.ts",
+    "prompt-editor-electron-ui.test.ts",
     "electron-ui-db.test.ts",
     "electron-prompt-version-ui.test.ts",
     "electron-settings-ui.test.ts",

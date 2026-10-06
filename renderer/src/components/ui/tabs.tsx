@@ -24,7 +24,7 @@ export function TabsList({ className, ...props }: TabsListProps) {
     <div
       role="tablist"
       className={cn(
-        "inline-flex rounded-control border border-border bg-panel-muted p-1",
+        "inline-flex flex-wrap gap-1 rounded-control border border-border bg-panel-muted p-1",
         className,
       )}
       {...props}
@@ -52,8 +52,8 @@ export function TabsTrigger({
       data-value={value}
       type={type}
       className={cn(
-        "h-7 rounded-control px-3 text-[12px] font-medium text-muted transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45",
-        active && "bg-accent/12 text-foreground",
+        "min-h-7 rounded-control border border-transparent px-3 text-[12px] font-medium text-muted transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        active && "border-accent/60 bg-tint text-foreground",
         !active && "hover:bg-panel-elevated hover:text-muted-strong",
         className,
       )}

@@ -125,7 +125,7 @@ export function AppLockSettingsPanelView({ controller }: AppLockSettingsPanelVie
 
         <div className="space-y-2 border-t border-border-subtle pt-4 text-[12px] leading-5 text-muted">
           <p>
-            App lock protects the Prompter UI and session actions. It does not encrypt the SQLite
+            App lock protects the Prompter UI and session actions. It does not encrypt the local
             database or protect against OS access, malware, or screen capture.
           </p>
           <p>

@@ -28,8 +28,8 @@ const panelHeadings = [
   "Maintenance snapshot",
 ] as const
 const viewports = [
-  { width: 1280, height: 800 },
-  { width: 900, height: 720 },
+  { width: 1180, height: 760 },
+  { width: 1024, height: 720 },
 ] as const
 
 async function clickApplicationMenuItem(app: ElectronApplication, label: string): Promise<void> {
@@ -56,12 +56,12 @@ async function openInsights(page: Page): Promise<void> {
 }
 
 async function expectDraftPreserved(page: Page): Promise<void> {
-  await expect(page.getByRole("textbox", { name: "Compiler title" })).toHaveValue(
-    "Phase 18 preserved draft",
-  )
-  await expect(page.getByRole("textbox", { name: "Original request" })).toHaveValue(
-    "Keep this compiler draft through every Insights navigation.",
-  )
+  await expect(
+    page.getByRole("textbox", { name: "Compiler title", includeHidden: true }),
+  ).toHaveValue("Phase 18 preserved draft")
+  await expect(
+    page.getByRole("textbox", { name: "Original request", includeHidden: true }),
+  ).toHaveValue("Keep this compiler draft through every Insights navigation.")
 }
 
 test("populated Insights stays read-only while filters and navigation reach exact records", async ({
@@ -90,10 +90,20 @@ test("populated Insights stays read-only while filters and navigation reach exac
       templateTotal: 102,
       versionQualityScore: 25,
     })
+    const compilerPanel = run.page.getByTestId("prompt-compiler")
+    const additionalOptions = compilerPanel.locator("summary").filter({ hasText: "추가 옵션" })
+    await expect(compilerPanel.getByRole("textbox", { name: "Compiler title" })).toHaveCount(0)
+    await additionalOptions.click()
     await run.page.getByRole("textbox", { name: "Compiler title" }).fill("Phase 18 preserved draft")
     await run.page
       .getByRole("textbox", { name: "Original request" })
       .fill("Keep this compiler draft through every Insights navigation.")
+    await additionalOptions.click()
+    await expect(compilerPanel.getByRole("textbox", { name: "Compiler title" })).toHaveCount(0)
+    await expectDraftPreserved(run.page)
+    await additionalOptions.click()
+    await expect(run.page.getByRole("textbox", { name: "Compiler title" })).toBeVisible()
+    await expectDraftPreserved(run.page)
 
     // When: the populated dashboard is opened and every dashboard-local filter is exercised.
     await openInsights(run.page)
@@ -148,18 +158,16 @@ test("populated Insights stays read-only while filters and navigation reach exac
       await run.page.setViewportSize(viewport)
       const layout = await readInsightsLayout(run.page)
       expect(layout.documentHeight).toBeLessThanOrEqual(layout.viewportHeight + 2)
-      expect(layout.gridHeight).toBe(layout.viewportHeight - 48)
+      expect(layout.gridHeight).toBe(layout.viewportHeight - layout.chromeHeight)
       expect(Math.abs(layout.sidebarHeight - layout.gridHeight)).toBeLessThanOrEqual(2)
-      expect(layout.sidebarScrollHeight).toBeGreaterThan(layout.sidebarClientHeight)
+      expect(layout.sidebarScrollHeight).toBeLessThanOrEqual(layout.sidebarClientHeight)
       expect(layout.workspaceHeight).toBe(layout.gridHeight)
       expect(layout.workspaceWidth).toBeGreaterThan(780)
       expect(Math.abs(layout.dashboardClientHeight - layout.workspaceHeight)).toBeLessThanOrEqual(2)
       expect(layout.dashboardScrollHeight).toBeGreaterThan(layout.dashboardClientHeight)
       expect(layout.dashboardScrollWidth).toBeLessThanOrEqual(layout.dashboardClientWidth + 1)
-      if (viewport.width === 900) {
-        expect(layout.shellScrollWidth).toBeGreaterThan(layout.shellClientWidth)
-        expect(layout.gridWidth).toBeGreaterThanOrEqual(1040)
-      }
+      expect(layout.shellScrollWidth).toBeLessThanOrEqual(layout.shellClientWidth + 1)
+      expect(layout.gridWidth).toBeLessThanOrEqual(layout.viewportWidth)
       const layoutName = `phase18-layout-${viewport.width}x${viewport.height}.json`
       const layoutPath = testInfo.outputPath(layoutName)
       await writeFile(layoutPath, JSON.stringify(layout, null, 2), "utf8")
@@ -207,9 +215,17 @@ test("populated Insights stays read-only while filters and navigation reach exac
       .getByRole("button", { name: new RegExp(exactTemplateName) })
       .click()
     await expect(run.page.locator('[data-insights-target="prompt-templates"]')).toBeFocused()
+    const templatesWorkspace = run.page.getByTestId("templates-workspace")
+    await expect(templatesWorkspace).toBeVisible()
+    await expect(run.page.getByTestId("prompt-library")).toBeHidden()
+    await expect(compilerPanel).toBeHidden()
     await expect(run.page.getByRole("textbox", { name: "Prompt template name" })).toHaveValue(
       exactTemplateName,
     )
+    await expectDraftPreserved(run.page)
+    await templatesWorkspace.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
+    await expect(templatesWorkspace).toBeHidden()
+    await expect(compilerPanel).toBeVisible()
     await expectDraftPreserved(run.page)
 
     await openInsights(run.page)
@@ -218,13 +234,36 @@ test("populated Insights stays read-only while filters and navigation reach exac
       .getByRole("button", { name: new RegExp(insightsProjectName) })
       .click()
     await expect(run.page.locator('[data-insights-target="project-context"]')).toBeFocused()
+    const contextWorkspace = run.page.getByTestId("context-workspace")
+    await expect(contextWorkspace).toBeVisible()
+    await expect(run.page.getByTestId("prompt-library")).toBeHidden()
+    await expect(compilerPanel).toBeHidden()
+    await expectDraftPreserved(run.page)
+    await contextWorkspace.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
+    await expect(contextWorkspace).toBeHidden()
+    await expect(compilerPanel).toBeVisible()
     await expectDraftPreserved(run.page)
 
     await openInsights(run.page)
     await run.page.getByRole("button", { name: "Open Maintenance" }).click()
     await expect(run.page.locator('[data-insights-target="settings-maintenance"]')).toBeFocused()
+    const settingsWorkspace = run.page.getByTestId("settings-workspace")
+    await expect(settingsWorkspace).toBeVisible()
+    await expect(compilerPanel).toBeHidden()
     await expect(run.page.getByText("Run a scan to populate finding counts")).toBeVisible()
     await expectDraftPreserved(run.page)
+    await settingsWorkspace.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
+    await expect(settingsWorkspace).toBeHidden()
+    await expectDraftPreserved(run.page)
+
+    await run.page.locator('[data-menu-action-target="open-settings"]').click()
+    await expect(settingsWorkspace).toBeVisible()
+    await expectDraftPreserved(run.page)
+    await settingsWorkspace.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
+    await clickApplicationMenuItem(run.app, "Settings...")
+    await expect(settingsWorkspace).toBeVisible()
+    await expectDraftPreserved(run.page)
+    await settingsWorkspace.getByRole("button", { name: "라이브러리로 돌아가기" }).click()
 
     await clickApplicationMenuItem(run.app, "Library Insights")
     await expect(run.page.getByRole("heading", { name: "Insights Dashboard" })).toBeVisible()

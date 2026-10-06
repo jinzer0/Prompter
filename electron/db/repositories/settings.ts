@@ -2,7 +2,6 @@ import { desc, eq } from "drizzle-orm"
 
 import { APP_LOCK_METADATA_SETTING_KEY } from "../../app-lock/app-lock-metadata.js"
 import {
-  appThemeSchema,
   settingKeyIsPublic,
   settingsDefaultsSchema,
   updateDefaultsInputSchema,
@@ -40,6 +39,15 @@ const defaultSettings: SettingsDefaults = {
   compilerDefaultLanguage: "ko",
 }
 
+const defaultSettingSchemas = {
+  default_model: settingsDefaultsSchema.shape.defaultModel,
+  default_target_agent: settingsDefaultsSchema.shape.defaultTargetAgent,
+  default_project_id: settingsDefaultsSchema.shape.defaultProjectId,
+  default_scenario: settingsDefaultsSchema.shape.defaultScenario,
+  app_theme: settingsDefaultsSchema.shape.appTheme,
+  compiler_default_language: settingsDefaultsSchema.shape.compilerDefaultLanguage,
+}
+
 const privacySettingKeys = {
   warnBeforeLLM: "privacy_warn_before_llm",
   warnBeforeExport: "privacy_warn_before_export",
@@ -71,18 +79,24 @@ function defaultsFromSettings(settings: readonly Setting[]): SettingsDefaults {
   const defaultProjectId = settingValue(settings, "default_project_id")
 
   return settingsDefaultsSchema.parse({
-    defaultModel: settingValue(settings, "default_model") ?? defaultSettings.defaultModel,
-    defaultTargetAgent:
-      settingValue(settings, "default_target_agent") ?? defaultSettings.defaultTargetAgent,
-    defaultProjectId:
-      defaultProjectId === null || defaultProjectId.length === 0
-        ? defaultSettings.defaultProjectId
-        : defaultProjectId,
-    defaultScenario: settingValue(settings, "default_scenario") ?? defaultSettings.defaultScenario,
-    appTheme: settingValue(settings, "app_theme") ?? defaultSettings.appTheme,
-    compilerDefaultLanguage:
-      settingValue(settings, "compiler_default_language") ??
-      defaultSettings.compilerDefaultLanguage,
+    defaultModel: defaultSettingSchemas.default_model
+      .catch(defaultSettings.defaultModel)
+      .parse(settingValue(settings, "default_model")),
+    defaultTargetAgent: defaultSettingSchemas.default_target_agent
+      .catch(defaultSettings.defaultTargetAgent)
+      .parse(settingValue(settings, "default_target_agent")),
+    defaultProjectId: defaultSettingSchemas.default_project_id
+      .catch(defaultSettings.defaultProjectId)
+      .parse(defaultProjectId === "" ? null : defaultProjectId),
+    defaultScenario: defaultSettingSchemas.default_scenario
+      .catch(defaultSettings.defaultScenario)
+      .parse(settingValue(settings, "default_scenario")),
+    appTheme: defaultSettingSchemas.app_theme
+      .catch(defaultSettings.appTheme)
+      .parse(settingValue(settings, "app_theme")),
+    compilerDefaultLanguage: defaultSettingSchemas.compiler_default_language
+      .catch(defaultSettings.compilerDefaultLanguage)
+      .parse(settingValue(settings, "compiler_default_language")),
   })
 }
 
@@ -117,8 +131,10 @@ export function createSettingsRepository(db: AppDatabase): SettingsRepository {
     setSetting(key, value) {
       const updatedAt = createTimestamp()
       const publicKey = publicSettingKey(key)
-      if (publicKey === "app_theme") {
-        appThemeSchema.parse(value)
+      if (Object.hasOwn(defaultSettingSchemas, publicKey)) {
+        defaultSettingSchemas[publicKey as keyof typeof defaultSettingSchemas].parse(
+          publicKey === "default_project_id" && value === "" ? null : value,
+        )
       }
 
       return requireRow(

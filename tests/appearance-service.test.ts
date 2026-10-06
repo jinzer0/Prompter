@@ -287,6 +287,99 @@ describe("appearance service", () => {
 })
 
 describe("appearance settings persistence", () => {
+  it.each([
+    ["default_model", " ", "defaultModel", "gpt-4.1"],
+    ["default_target_agent", "invalid-agent", "defaultTargetAgent", "codex"],
+    ["default_project_id", "not-a-uuid", "defaultProjectId", null],
+    ["default_scenario", "invalid-scenario", "defaultScenario", "feature"],
+    ["app_theme", "sepia", "appTheme", "system"],
+    ["compiler_default_language", " ", "compilerDefaultLanguage", "ko"],
+  ] as const)("recovers malformed %s without changing stored rows", async (key, value, field, fallback) => {
+    const database = await createBackupImportTestDatabase()
+    const settings = createSettingsRepository(database.db)
+    const validDefaults: SettingsDefaults = {
+      defaultModel: "gpt-4.1-mini",
+      defaultTargetAgent: "claude_code",
+      defaultProjectId: "b5bc220f-2d58-4b79-837b-104963b2a67c",
+      defaultScenario: "bugfix",
+      appTheme: "dark",
+      compilerDefaultLanguage: "en",
+    }
+    const persistedDefaults = [
+      ["default_model", validDefaults.defaultModel],
+      ["default_target_agent", validDefaults.defaultTargetAgent],
+      ["default_project_id", validDefaults.defaultProjectId],
+      ["default_scenario", validDefaults.defaultScenario],
+      ["app_theme", validDefaults.appTheme],
+      ["compiler_default_language", validDefaults.compilerDefaultLanguage],
+    ] as const
+    const insert = database.sqlite.prepare(
+      "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)",
+    )
+    for (const [persistedKey, persistedValue] of persistedDefaults) {
+      insert.run(persistedKey, persistedKey === key ? value : persistedValue, 1)
+    }
+    const rowsBefore = database.sqlite.prepare("SELECT * FROM settings ORDER BY key").all()
+    const nativeTheme = new FakeNativeTheme(false)
+    const service = createAppearanceService({ nativeTheme, settings })
+
+    expect(settings.getDefaults()).toEqual({ ...validDefaults, [field]: fallback })
+    const preference = field === "appTheme" ? "system" : "dark"
+    expect(nativeTheme.themeSource).toBe(preference)
+    expect(service.getState()).toEqual({
+      preference,
+      effectiveTheme: preference === "system" ? "light" : "dark",
+    })
+    expect(database.sqlite.prepare("SELECT * FROM settings ORDER BY key").all()).toEqual(rowsBefore)
+    service.dispose()
+  })
+
+  it.each([
+    ["default_model", "gpt-4.1-mini", " "],
+    ["default_target_agent", "claude_code", "invalid-agent"],
+    ["default_project_id", "b5bc220f-2d58-4b79-837b-104963b2a67c", "not-a-uuid"],
+    ["default_scenario", "bugfix", "invalid-scenario"],
+    ["app_theme", "dark", "sepia"],
+    ["compiler_default_language", "en", " "],
+  ] as const)("rejects invalid public %s writes without writing", async (key, valid, invalid) => {
+    const database = await createBackupImportTestDatabase()
+    const settings = createSettingsRepository(database.db)
+    const rowsBefore = database.sqlite.prepare("SELECT * FROM settings ORDER BY key").all()
+
+    expect(() => settings.setSetting(key, invalid)).toThrow()
+    expect(database.sqlite.prepare("SELECT * FROM settings ORDER BY key").all()).toEqual(rowsBefore)
+    settings.setSetting(key, valid)
+    const saved = settings.getSetting(key)
+    expect(() => settings.setSetting(key, invalid)).toThrow()
+    expect(settings.getSetting(key)).toEqual(saved)
+  })
+
+  it("clears the nullable project default with the public empty-string representation", async () => {
+    const database = await createBackupImportTestDatabase()
+    const settings = createSettingsRepository(database.db)
+    settings.setSetting("default_project_id", "b5bc220f-2d58-4b79-837b-104963b2a67c")
+    settings.setSetting("default_project_id", "")
+
+    expect(settings.getDefaults().defaultProjectId).toBeNull()
+    expect(settings.getSetting("default_project_id")?.value).toBe("")
+    settings.updateDefaults({ defaultProjectId: "b5bc220f-2d58-4b79-837b-104963b2a67c" })
+    expect(settings.updateDefaults({ defaultProjectId: null }).defaultProjectId).toBeNull()
+    expect(settings.getSetting("default_project_id")?.value).toBe("")
+  })
+
+  it("propagates database read failures during appearance startup", async () => {
+    const database = await createBackupImportTestDatabase()
+    const settings = createSettingsRepository(database.db)
+    const nativeTheme = new FakeNativeTheme(false)
+    database.sqlite.exec("DROP TABLE settings")
+
+    expect(() => settings.getDefaults()).toThrow("no such table: settings")
+    expect(() => createAppearanceService({ nativeTheme, settings })).toThrow(
+      "no such table: settings",
+    )
+    expect(nativeTheme.listeners.size).toBe(0)
+  })
+
   it("persists both preference write paths across database reopen", async () => {
     const database = await createBackupImportTestDatabase()
     const first = createAppearanceService({
@@ -345,7 +438,7 @@ describe("appearance settings persistence", () => {
     expect(reopened.services.getDefaults()).toEqual(before)
   })
 
-  it("rolls back the preference if reading the saved defaults fails validation", async () => {
+  it("rolls back the preference if reading the saved defaults fails", async () => {
     const database = await createBackupImportTestDatabase()
     const settings = createSettingsRepository(database.db)
     settings.setSetting("app_theme", "light")
@@ -353,11 +446,11 @@ describe("appearance settings persistence", () => {
     const service = createAppearanceService({ nativeTheme, settings })
     const changed = vi.fn()
     service.subscribe(changed)
-    database.sqlite
-      .prepare("INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)")
-      .run("default_target_agent", "invalid-agent", 1)
+    vi.spyOn(settings, "getDefaults").mockImplementationOnce(() => {
+      throw new Error("defaults read failed")
+    })
 
-    expect(() => service.updateDefaults({ appTheme: "dark" })).toThrow()
+    expect(() => service.updateDefaults({ appTheme: "dark" })).toThrow("defaults read failed")
     expect(settings.getSetting("app_theme")?.value).toBe("light")
     expect(nativeTheme.themeSource).toBe("light")
     expect(service.getState()).toEqual({ preference: "light", effectiveTheme: "light" })

@@ -43,7 +43,7 @@ GitHub Issue: [#31](https://github.com/jinzer0/Prompter/issues/31)
 | 행동 계약·keepers | `docs/ux/` | `EXPERIENCE.md`, `mockups/` | OK — 단일 계약, workspace 중복 최종본 제거 |
 | 사용자 안내·QA | 기존 README·QA | `README.md`, `docs/qa-checklist.md` | OK — 기존 내용 중 직접 영향 부분만 갱신 |
 | 단계 보고 | `mydocs/working/` | `task_m012_31_stage1.md`~`stage5.md` | OK — 단계별 근거/미실행 구분 |
-| 최종 보고 | `mydocs/report/` | 이 문서 | OK — 승인 대기, 출시 선언 아님 |
+| 최종 보고 | `mydocs/report/` | 이 문서 | OK — 승인 완료, 출시 선언 아님 |
 | UX runtime evidence | 승인된 BMAD workspace | `.working/` JSON·scoped PNG·memlog | OK — 진실 원천 계약을 복제하지 않음 |
 
 ## 변경 전·후 정량 비교
@@ -56,7 +56,7 @@ GitHub Issue: [#31](https://github.com/jinzer0/Prompter/issues/31)
 | 직접 저장 선행 조건 | compiler 출력 중심 | 선택한 body 편집, compiler 불필요 |
 | 설정 UI | 좁은 sidebar에 혼재 | sidebar 유지한 넓은 별도 workspace |
 | Stage 5 화면 근거 | 해당 없음 | paired Library/Settings 12개 + unsaved dialog 2개 |
-| 최종 자동 검증 | 단계마다 증가 | Vitest 163파일/1167개, Electron 61개 |
+| 최종 자동 검증 | 단계마다 증가 | 리뷰 대응 후 Vitest 163파일/1181개, Electron 63개 |
 
 1024px 비교의 높이는 초기 768px와 현재 최소 720px로 다르다. 같은 폭의 가로 넘침 비교이며
 세로 총 길이 감소나 모든 화면의 접근성 점수 향상을 추정하지 않는다.
@@ -95,7 +95,7 @@ GitHub Issue: [#31](https://github.com/jinzer0/Prompter/issues/31)
 - 최초 표시 모든 프레임의 무flash, 전체 접근성 인증, OS 강제 종료·crash·강제 reload의 초안 복구는 보장하지 않는다.
 - native 컴파일 경고·Vite bundle 크기 경고·Biome deprecated 정보는 기존 상태로 남아 있다.
 - Stage 3의 하네스 공백 입력 1회 이상 동작 원인은 당시 미확정으로 기록하고 이후 회귀 통과와 구분한다.
-- 새 제품 기능·자동 유지보수·무관한 운영 이슈를 추가하지 않는다. 후속은 최종 보고 검토와 별도 게시 승인이다.
+- 새 제품 기능·자동 유지보수·무관한 운영 이슈를 추가하지 않는다. 후속은 PR 검토와 별도 merge 승인이다.
 
 ## 작업지시자 승인과 게시 경계
 
@@ -105,3 +105,25 @@ GitHub Issue: [#31](https://github.com/jinzer0/Prompter/issues/31)
 - 사용자 BMAD 설치·로컬 workspace·memlog·PID/임시 경로·runtime JSON·build 산출물은 게시에서 제외한다. 로컬 근거와 공개 보고를 구분한다.
 - merge·Issue close·배포 승인은 포함하지 않는다.
 - 통합 커밋 `658374e`를 원격 `publish/task31`로 push하고 `master` 대상 Open PR #32를 생성했다. 게시 직후 원격 Check 목록은 비어 있어 CI 통과를 주장하지 않는다.
+
+## PR #32 Codex 리뷰 대응
+
+작업지시자의 “codex 리뷰 대응 수정 진행해”에 따라 다음 두 P2를 수정했다.
+Stage 1–5의 과거 검증 수치는 유지하며 아래 결과가 최신 코드 검증이다.
+
+- [저장과 재시도 분리](https://github.com/jinzer0/Prompter/pull/32#discussion_r4191570773):
+  과거 저장의 갱신 실패가 새 저장을 대체하지 않도록 committed refresh를 독립 큐로 관리한다.
+  각 항목은 당시 asset/tag snapshot을 유지하고, 성공한 항목만 제거한다.
+  전용 재시도는 큐의 후속 작업만 실행하며 새 버전을 쓰지 않는다. binding·동시 제출 차단은 유지한다.
+  실제 Electron에서 갱신 두 번 실패 뒤 같은 asset의 새 출력/다른 asset 저장을 각각 수행하고,
+  두 저장이 실제 DB에 반영되며 재시도 두 건이 버전 수를 늘리지 않는지 검증했다.
+- [잘못된 저장 기본값의 시작 장애](https://github.com/jinzer0/Prompter/pull/32#discussion_r4191570776):
+  repository에서 기존 6개 필드 schema로 각각 검증하고 잘못된 필드만 기존 기본값으로 읽는다.
+  유효한 다른 값과 raw row는 유지하며 조회가 DB를 수정하지 않는다. 실제 DB 읽기 실패는 숨기지 않는다.
+  새 public default 쓰기는 기존 schema로 엄격 검증하여 재발을 막는다. nullable 프로젝트의 빈 문자열 표현과
+  설정 transaction·secret/app-lock 보호는 유지한다. migration·새 저장소·catch-all 시작 우회는 추가하지 않았다.
+- 변경: `use-compiler-persistence-actions.ts`, `settings.ts`, 기존 appearance/editor Electron 테스트,
+  이 보고서와 오늘할일. 기존 테스트의 데이터 파손 rollback은 실제 읽기 실패 주입으로 의미를 보존했다.
+- 검증: `npm test` **163파일/1181개**, `npm run test:smoke` **63개** 통과.
+  `npm run typecheck`, `npm run lint`, `npm run build`, `git diff --check` 통과.
+  기존 native/Vite/Biome 경고는 유지했다. 새 OS 손동작/원격 CI 인증을 주장하지 않는다.

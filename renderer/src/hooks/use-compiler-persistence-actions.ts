@@ -77,7 +77,9 @@ export function useCompilerPersistenceActions({
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingNextVersion, setIsSavingNextVersion] = useState(false)
   const savingNextVersion = useRef(false)
-  const [pendingSavedRefresh, setPendingSavedRefresh] = useState<(() => Promise<void>) | null>(null)
+  const [pendingSavedRefreshes, setPendingSavedRefreshes] = useState<
+    readonly (() => Promise<void>)[]
+  >([])
   const saveDisabledReasons = promptSaveDisabledReasons({
     compiled,
     editablePrompt,
@@ -148,10 +150,6 @@ export function useCompilerPersistenceActions({
 
   async function saveNextVersion(): Promise<void> {
     if (savingNextVersion.current) return
-    if (pendingSavedRefresh !== null) {
-      await retrySavedRefresh()
-      return
-    }
     const guardResult = await executeGuardedCompilerPersistence(
       { action: "save_next_version", binding, currentProjectId: selectedProject?.id ?? null },
       () => undefined,
@@ -171,6 +169,7 @@ export function useCompilerPersistenceActions({
       return
     }
 
+    if (savingNextVersion.current) return
     savingNextVersion.current = true
     setIsSavingNextVersion(true)
     setMessage(null)
@@ -185,11 +184,11 @@ export function useCompilerPersistenceActions({
         await window.prompter.search.rebuildIndex()
         await suggestedTags.attachSelectedSuggestedTags(selectedAsset.id)
       }
-      setPendingSavedRefresh(() => refresh)
+      setPendingSavedRefreshes((pending) => [...pending, refresh])
       onSavedNextVersion()
       try {
         await refresh()
-        setPendingSavedRefresh(null)
+        setPendingSavedRefreshes((pending) => pending.filter((item) => item !== refresh))
         setMessage("Saved as a new version.")
       } catch {
         setMessage(
@@ -205,12 +204,14 @@ export function useCompilerPersistenceActions({
   }
 
   async function retrySavedRefresh(): Promise<void> {
-    if (pendingSavedRefresh === null || savingNextVersion.current) return
+    if (pendingSavedRefreshes.length === 0 || savingNextVersion.current) return
     savingNextVersion.current = true
     setIsSavingNextVersion(true)
     try {
-      await pendingSavedRefresh()
-      setPendingSavedRefresh(null)
+      for (const refresh of pendingSavedRefreshes) {
+        await refresh()
+        setPendingSavedRefreshes((pending) => pending.filter((item) => item !== refresh))
+      }
       setMessage("저장 후 목록·태그 갱신을 완료했습니다.")
     } catch {
       setMessage("버전은 저장됐지만 목록·태그 갱신을 완료하지 못했습니다. 다시 갱신해 주세요.")
@@ -238,7 +239,7 @@ export function useCompilerPersistenceActions({
     copyPrompt,
     isSaving,
     isSavingNextVersion,
-    hasPendingSavedRefresh: pendingSavedRefresh !== null,
+    hasPendingSavedRefresh: pendingSavedRefreshes.length > 0,
     retrySavedRefresh,
     saveDisabledReasons,
     saveNextVersion,

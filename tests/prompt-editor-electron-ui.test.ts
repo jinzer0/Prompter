@@ -431,6 +431,88 @@ test("injected bridge save failure retains selection and draft; restored bridge 
   })
 })
 
+for (const destination of ["same prompt", "other prompt"] as const) {
+  test(`compiler saves ${destination} output while earlier refreshes remain pending`, async () => {
+    await withEditorFixture(async ({ app, page }) => {
+      const { assetId } = await seedEditor(page)
+      await interceptEditorIpc(app)
+      await app.evaluate(({ ipcMain }, channel) => {
+        const handlers = Reflect.get(ipcMain, "_invokeHandlers")
+        if (!(handlers instanceof Map)) throw new Error("Expected Electron IPC handlers")
+        const original = handlers.get(channel)
+        if (typeof original !== "function") throw new Error("Missing rebuild handler")
+        Reflect.set(globalThis, "__compilerRefreshHandler", original)
+        Reflect.set(globalThis, "__compilerRefreshCalls", 0)
+        ipcMain.removeHandler(channel)
+        ipcMain.handle(channel, (event, ...args) => {
+          const calls = Number(Reflect.get(globalThis, "__compilerRefreshCalls")) + 1
+          Reflect.set(globalThis, "__compilerRefreshCalls", calls)
+          if (calls <= 2) throw new Error("Injected post-save refresh failure")
+          return original(event, ...args)
+        })
+      }, PERSISTENCE_CHANNELS.rebuildSearchIndex)
+      try {
+        const compiler = page.getByTestId("prompt-compiler")
+        const compileAndSave = async (text: string) => {
+          await compiler.getByRole("textbox", { name: "Original request" }).fill(text)
+          await compiler.getByRole("button", { name: "프롬프트 컴파일", exact: true }).click()
+          const preview = compiler.getByRole("textbox", { name: "Generated prompt preview" })
+          await expect(preview).toContainText(text)
+          await preview.fill(`# Objective\n${text}`)
+          await compiler.getByRole("button", { name: "Save as new version", exact: true }).click()
+          await expect(compiler.getByText(/버전은 저장됐지만 목록·태그 갱신/)).toBeVisible()
+        }
+        await compileAndSave("First committed output")
+        expect((await storedPrompt(page, assetId)).versions).toHaveLength(3)
+        let targetId = assetId
+        if (destination === "other prompt") {
+          await page
+            .getByTestId("prompt-library")
+            .getByRole("button", { name: new RegExp(otherPromptName) })
+            .click()
+          targetId = await page.evaluate(async () => {
+            const projects = await window.prompter.projects.list()
+            const project = projects.find((item) => item.name === "Editor fixture project")
+            if (!project) throw new Error("Missing fixture project")
+            const assets = await window.prompter.prompts.listAssets({ projectId: project.id })
+            const target = assets.find((item) => item.title === "Other editor prompt")
+            if (!target) throw new Error("Missing target prompt")
+            return target.id
+          })
+        }
+        await compileAndSave("Second committed output")
+        const saved = await storedPrompt(page, targetId)
+        expect(saved.current?.compiledPrompt).toBe("# Objective\nSecond committed output")
+        expect(saved.versions).toHaveLength(destination === "same prompt" ? 4 : 2)
+        const retry = compiler.getByRole("button", {
+          name: "저장 후 목록·태그 갱신 재시도",
+          exact: true,
+        })
+        await expect(retry).toBeVisible()
+        await retry.click()
+        await expect(retry).toHaveCount(0)
+        expect(await storedPrompt(page, targetId)).toEqual(saved)
+        expect(
+          (await editorIpcCalls(app)).filter(
+            (channel) => channel === PERSISTENCE_CHANNELS.createNextPromptVersion,
+          ),
+        ).toHaveLength(2)
+        expect(await app.evaluate(() => Reflect.get(globalThis, "__compilerRefreshCalls"))).toBe(4)
+      } finally {
+        await app.evaluate(({ ipcMain }, channel) => {
+          const original = Reflect.get(globalThis, "__compilerRefreshHandler")
+          if (typeof original !== "function") throw new Error("Missing original rebuild handler")
+          ipcMain.removeHandler(channel)
+          ipcMain.handle(channel, original)
+          Reflect.deleteProperty(globalThis, "__compilerRefreshHandler")
+          Reflect.deleteProperty(globalThis, "__compilerRefreshCalls")
+        }, PERSISTENCE_CHANNELS.rebuildSearchIndex)
+        await restoreEditorIpc(app)
+      }
+    })
+  })
+}
+
 test("native BrowserWindow.close cancellation retains a live dirty editor; save closes and persists", async () => {
   await withEditorFixture(async ({ app, page, relaunch }) => {
     const { assetId } = await seedEditor(page)

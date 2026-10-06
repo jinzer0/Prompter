@@ -8,6 +8,7 @@ import {
   type PrivacyCenterViewProps,
 } from "../renderer/src/components/privacy/privacy-center"
 import {
+  navigateToPrivacyFinding,
   type PrivacyNavigationReader,
   resolvePrivacyFindingNavigation,
 } from "../renderer/src/lib/privacy-navigation"
@@ -100,6 +101,54 @@ function privacyCenterProps(
 }
 
 describe("Phase 19 Privacy Center", () => {
+  it("reveals Settings before focusing an unavailable finding destination", async () => {
+    const events: string[] = []
+    const frames: FrameRequestCallback[] = []
+    const navigate = vi.fn()
+    const getAsset = vi.fn()
+    const getVersion = vi.fn()
+    const getReview = vi.fn()
+    vi.stubGlobal("window", {
+      prompter: {
+        prompts: { getAsset, getVersion },
+        promptQuality: { getReview },
+      },
+    })
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+      frames.push(callback),
+    )
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => {
+        expect(selector).toBe('[data-insights-target="settings"]')
+        expect(events).toEqual(["settings"])
+        return {
+          focus: () => events.push("focus"),
+          scrollIntoView: () => events.push("scroll"),
+        }
+      },
+    })
+    try {
+      await navigateToPrivacyFinding(
+        { entityType: "tag", field: "name" },
+        {
+          navigate,
+          openSettings: () => events.push("settings"),
+          projectIds: [],
+        },
+      )
+      expect(events).toEqual(["settings"])
+      expect(frames).toHaveLength(1)
+      frames[0]?.(0)
+      expect(events).toEqual(["settings", "focus", "scroll"])
+      expect(navigate).not.toHaveBeenCalled()
+      expect(getAsset).not.toHaveBeenCalled()
+      expect(getVersion).not.toHaveBeenCalled()
+      expect(getReview).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("renders limits and safe storage guidance without scanning on render", () => {
     // Given: privacy settings disable the discoverable manual library scan action.
     const props = privacyCenterProps({ kind: "idle" })

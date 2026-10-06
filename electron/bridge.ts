@@ -2,6 +2,7 @@ import type { z } from "zod"
 
 import {
   APP_LOCK_CHANNELS,
+  appearanceStateSchema,
   type IpcChannel,
   PERSISTENCE_CHANNELS,
   PING_CHANNEL,
@@ -9,6 +10,8 @@ import {
   type PingResponse,
   payloadSchemas,
   responseSchemas,
+  WINDOW_CLOSE_CHANNELS,
+  windowCloseRequestSchema,
 } from "./ipc-contract.js"
 import type { ElectronBridge, MenuAction } from "./ipc-types.js"
 
@@ -37,7 +40,7 @@ function createBridgeRequest(invoke: InvokeIpc): BridgeRequest {
 export function createElectronBridge(
   invoke: InvokeIpc,
   subscribeMenuAction: SubscribeMenuAction = () => () => undefined,
-): ElectronBridge {
+): Omit<ElectronBridge, "appearance" | "windowClose"> {
   const request = createBridgeRequest(invoke)
   const ch = PERSISTENCE_CHANNELS
   const payload = payloadSchemas
@@ -716,5 +719,47 @@ export function createElectronBridge(
           input,
         ),
     },
+  }
+}
+
+export function createAppearanceBridge(
+  readState: () => unknown,
+  subscribe: (callback: (state: unknown) => void) => () => void,
+): ElectronBridge["appearance"] {
+  return {
+    getState: () => appearanceStateSchema.parse(readState()),
+    onChanged: (callback) =>
+      subscribe((state) => {
+        const parsed = appearanceStateSchema.safeParse(state)
+        if (parsed.success) callback(parsed.data)
+      }),
+  }
+}
+
+export function createWindowCloseBridge(
+  invoke: InvokeIpc,
+  subscribe: (callback: (request: unknown) => void) => () => void,
+): ElectronBridge["windowClose"] {
+  const request = createBridgeRequest(invoke)
+  return {
+    updateState: (input) =>
+      request(
+        WINDOW_CLOSE_CHANNELS.updateState,
+        payloadSchemas.windowCloseUpdateState,
+        responseSchemas.windowCloseUpdateState,
+        input,
+      ),
+    confirm: (input) =>
+      request(
+        WINDOW_CLOSE_CHANNELS.confirm,
+        payloadSchemas.windowCloseConfirm,
+        responseSchemas.windowCloseConfirm,
+        input,
+      ),
+    onRequested: (callback) =>
+      subscribe((input) => {
+        const parsed = windowCloseRequestSchema.safeParse(input)
+        if (parsed.success) callback(parsed.data)
+      }),
   }
 }

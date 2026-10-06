@@ -124,18 +124,21 @@ Follow `biome.json`:
 
 # UI and Design Rules
 
-Follow `DESIGN.md` and the existing renderer shell:
+`DESIGN.md`의 시각 계약과 `docs/ux/EXPERIENCE.md`의 행동 계약을 따른다.
+두 문서는 #31의 승인된 목표 설계이며, 제품 코드 적용은 별도 단계 승인 후 진행한다.
 
-- Preserve the compact dark native command-center feel.
-- Follow the existing three-panel layout: left sidebar, prompt library, and prompt compiler.
-- Library remains the canonical three-panel workspace. Insights may intentionally keep the left
-  sidebar visible while replacing the Library and Compiler columns with its dashboard workspace.
+- 조밀한 macOS 네이티브 작업 공간을 유지하고 라이트·다크를 동등하게 지원한다.
+  기본은 시스템 테마 추종이며 기존 `app_theme` 설정을 재사용한다.
+- Library는 사이드바·프롬프트 목록·오른쪽 편집/컴파일 영역의 3패널을 유지한다.
+  오른쪽 상단은 선택한 본문·복사·새 버전 저장, 하단은 보조 컴파일러다.
+- Insights·Privacy Center는 사이드바를 유지하는 기존 작업 공간 예외이며 Settings는
+  별도 설정 화면이다. Library 복귀 시 선택·편집·컴파일 상태를 보존한다.
 - Use existing design tokens and CSS variables from `renderer/src/styles.css`.
 - Do not introduce new visual colors unless `DESIGN.md` is updated.
 - Preserve visible focus states and keyboard accessibility.
 - Prefer local component wrappers over raw one-off controls when matching existing UI patterns.
-- Keep required desktop Library panels visible outside the Insights workspace swap; do not collapse
-  required panels casually.
+- Library의 필수 패널은 접거나 숨기지 않는다. 기본 창 1180×760·최소 1024×720에서
+  shell 가로 스크롤 없이 접근 가능하도록 구현하고 실제 macOS 프레임에서 검증한다.
 
 # Testing Guidance by Change Type
 

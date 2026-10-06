@@ -1,8 +1,35 @@
 import { describe, expect, it } from "vitest"
 
 import { secureMainWindowNavigation } from "../electron/main-window-security.js"
+import { createWindowOptions, windowBackground } from "../electron/window-options.js"
 
 describe("main window navigation security", () => {
+  it.each([
+    "light",
+    "dark",
+  ] as const)("opens a secure native %s window at approved sizes", (theme) => {
+    const options = createWindowOptions("/app/preload.cjs", theme)
+
+    expect(options).toMatchObject({
+      width: 1180,
+      height: 760,
+      minWidth: 1024,
+      minHeight: 720,
+      show: false,
+      titleBarStyle: "hiddenInset",
+      backgroundColor: windowBackground(theme),
+      webPreferences: {
+        preload: "/app/preload.cjs",
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    })
+    expect(options.backgroundColor).toBe(theme === "dark" ? "#08090a" : "#f7f8f8")
+    expect(options.frame).not.toBe(false)
+    expect(options.webPreferences?.webSecurity).not.toBe(false)
+  })
+
   it("prevents unexpected navigation and denies every new window", () => {
     const registered = {
       navigationListener: null as

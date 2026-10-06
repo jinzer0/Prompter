@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react"
+import { flushSync } from "react-dom"
 
-import type { BackupImportResult, PingResponse } from "../../../../electron/ipc-types"
+import type { BackupImportResult } from "../../../../electron/ipc-types"
 import { useInsightsWorkspaceNavigation } from "../../hooks/use-insights-workspace-navigation"
 import { useProjectPrompts, useProjects } from "../../hooks/use-prompter-library"
+import { OPEN_LIBRARY_EVENT, OPEN_SETTINGS_EVENT } from "../../lib/menu-actions"
 import { navigateToPrivacyFinding } from "../../lib/privacy-navigation"
 import type { CompilerMemory } from "../../lib/prompt-compiler/compiler-memory"
 import { HarnessTemplateManager } from "../harness-template-manager"
@@ -11,13 +13,13 @@ import { PrivacyCenter } from "../privacy/privacy-center"
 import { ProjectContextProfileManager } from "../project-context-profile-manager"
 import { ProjectSidebarSection } from "../project-sidebar-section"
 import { PromptCompilerPanel } from "../prompt-compiler-panel"
+import { usePromptEditorContext } from "../prompt-editor-provider"
 import { PromptLibraryPanel } from "../prompt-library-panel"
 import { PromptTemplateManager } from "../prompt-template-manager"
-import { SettingsPanel } from "../settings-panel"
-import { SidebarSection, sidebarSections } from "./sidebar-section"
+import { SettingsWorkspace } from "../settings-workspace"
+import { Button } from "../ui/button"
+import { SidebarItem } from "./sidebar-item"
 import { WorkspaceViewNavigation } from "./workspace-view-navigation"
-
-type PingState = PingResponse | "pending"
 
 type HarnessTemplateChange = {
   readonly deletedTemplateId?: string
@@ -34,7 +36,8 @@ type AppShellProps = {
 }
 
 export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps) {
-  const [pingResult, setPingResult] = useState<PingState>("pending")
+  const editor = usePromptEditorContext()
+  const [restoredSelection] = useState(() => editor.store.getSnapshot().selection)
   const [tagRefreshSignal, setTagRefreshSignal] = useState(0)
   const [harnessTemplateRefreshSignal, setHarnessTemplateRefreshSignal] = useState(0)
   const [promptTemplateRefreshSignal, setPromptTemplateRefreshSignal] = useState(0)
@@ -47,8 +50,17 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
   const [deletedProjectContextProfileIds, setDeletedProjectContextProfileIds] = useState<
     readonly string[]
   >([])
-  const projectLibrary = useProjects()
-  const promptLibrary = useProjectPrompts(projectLibrary.selectedProject?.id ?? null)
+  const projectLibrary = useProjects(restoredSelection?.project.id ?? null)
+  const promptLibrary = useProjectPrompts(
+    projectLibrary.selectedProject?.id ?? null,
+    restoredSelection === null
+      ? null
+      : {
+          projectId: restoredSelection.project.id,
+          assetId: restoredSelection.asset.id,
+          versionId: restoredSelection.version.id,
+        },
+  )
   const insightsNavigation = useInsightsWorkspaceNavigation({
     selectAsset: promptLibrary.selectAsset,
     selectProject: projectLibrary.selectProject,
@@ -66,6 +78,127 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
 
   const refreshPromptTags = () => setTagRefreshSignal((current) => current + 1)
   const refreshPromptTemplates = () => setPromptTemplateRefreshSignal((current) => current + 1)
+
+  useEffect(
+    () =>
+      editor.registerRefresh(async (result) => {
+        const selection = editor.store.getSnapshot().selection
+        const select =
+          selection?.asset.id === result.asset.id && selection.version.id === result.version.id
+        await promptLibrary.refreshPersistedPrompt(result, select)
+        await window.prompter.search.rebuildIndex()
+        setTagRefreshSignal((current) => current + 1)
+      }),
+    [editor.registerRefresh, editor.store, promptLibrary.refreshPersistedPrompt],
+  )
+
+  useEffect(() => {
+    if (insightsNavigation.isNavigationPending) return
+    const project = projectLibrary.selectedProject
+    const asset = promptLibrary.selectedAsset
+    const version = promptLibrary.selectedVersion
+    if (
+      project === null ||
+      asset === null ||
+      version === null ||
+      promptLibrary.versionStatus !== "ready"
+    )
+      return
+    const current = editor.snapshot.selection
+    if (current?.asset.id === asset.id && current.version.id === version.id) return
+    if (
+      current?.asset.id === asset.id &&
+      editor.snapshot.lastSaved?.version.id === current.version.id &&
+      current.version.id !== version.id
+    )
+      return
+    editor.store.select({ project, asset, version })
+  }, [
+    editor.store,
+    editor.snapshot.selection,
+    editor.snapshot.lastSaved,
+    insightsNavigation.isNavigationPending,
+    projectLibrary.selectedProject,
+    promptLibrary.selectedAsset,
+    promptLibrary.selectedVersion,
+    promptLibrary.versionStatus,
+  ])
+
+  function selectProject(id: string): void {
+    if (projectLibrary.selectedProject?.id === id) {
+      insightsNavigation.openLibrary()
+      return
+    }
+    void editor.requestTransition(() => {
+      editor.store.select(null)
+      insightsNavigation.openLibrary()
+      projectLibrary.selectProject(id)
+    })
+  }
+
+  function selectAsset(id: string): void {
+    if (
+      promptLibrary.selectedAsset?.id === id &&
+      promptLibrary.selectedVersion?.id === promptLibrary.currentVersion?.id
+    )
+      return
+    void editor.requestTransition(() => {
+      editor.store.select(null)
+      promptLibrary.selectAsset(id)
+    })
+  }
+
+  function selectVersion(id: string): void {
+    if (promptLibrary.selectedVersion?.id === id) return
+    void editor.requestTransition(() => {
+      editor.store.select(null)
+      promptLibrary.selectVersion(id)
+    })
+  }
+
+  const navigate: typeof insightsNavigation.navigate = (intent) => {
+    const changesSelection =
+      ("projectId" in intent && intent.projectId !== projectLibrary.selectedProject?.id) ||
+      ("promptAssetId" in intent && intent.promptAssetId !== promptLibrary.selectedAsset?.id) ||
+      ("promptVersionId" in intent &&
+        intent.promptVersionId !== null &&
+        intent.promptVersionId !== promptLibrary.selectedVersion?.id)
+    if (!changesSelection) {
+      insightsNavigation.navigate(intent)
+      return
+    }
+    void editor.requestTransition(() => {
+      editor.store.select(null)
+      insightsNavigation.navigate(intent)
+    })
+  }
+
+  async function guardedCreation<T extends object>(action: () => Promise<T>): Promise<T> {
+    let result: T | undefined
+    const proceeded = await editor.requestTransition(async () => {
+      result = await action()
+    })
+    if (!proceeded || result === undefined)
+      throw new Error("작업을 취소했습니다. 기존 편집 내용은 유지됩니다.")
+    return result
+  }
+
+  const createPrompt: typeof promptLibrary.createPrompt = (input) =>
+    guardedCreation(() => promptLibrary.createPrompt(input))
+  const createDerivedAsset: typeof promptLibrary.createDerivedAsset = (input) =>
+    guardedCreation(() => promptLibrary.createDerivedAsset(input))
+  const createNextVersion: typeof promptLibrary.createNextVersion = (input) =>
+    guardedCreation(async () => {
+      const version = await promptLibrary.createNextVersion(input)
+      editor.store.select(null)
+      return version
+    })
+  const createProject: typeof projectLibrary.createProject = (input) =>
+    guardedCreation(async () => {
+      const project = await projectLibrary.createProject(input)
+      editor.store.select(null)
+      return project
+    })
 
   function recordHarnessTemplateChange(change: HarnessTemplateChange = {}): void {
     const deletedTemplateId = change.deletedTemplateId
@@ -105,40 +238,38 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
   }
 
   useEffect(() => {
-    let isActive = true
-
-    async function loadPing(): Promise<void> {
-      const response = await window.prompter.ping()
-
-      if (isActive) {
-        setPingResult(response)
-      }
-    }
-
-    void loadPing()
-
+    const openSettings = () => flushSync(() => insightsNavigation.openSettings())
+    const openLibrary = () => flushSync(() => insightsNavigation.openLibrary())
+    window.addEventListener(OPEN_SETTINGS_EVENT, openSettings)
+    window.addEventListener(OPEN_LIBRARY_EVENT, openLibrary)
     return () => {
-      isActive = false
+      window.removeEventListener(OPEN_SETTINGS_EVENT, openSettings)
+      window.removeEventListener(OPEN_LIBRARY_EVENT, openLibrary)
     }
-  }, [])
+  }, [insightsNavigation.openSettings, insightsNavigation.openLibrary])
 
   return (
     <main
       data-testid="app-shell"
-      aria-label="Prompter shell"
-      className="h-[100dvh] overflow-x-auto overflow-y-hidden bg-shell p-6 text-foreground"
+      aria-label="Prompter"
+      className="h-full min-h-0 min-w-0 bg-shell text-foreground"
     >
-      <div className="prompter-shell-grid grid h-[calc(100dvh-48px)] min-h-0 min-w-[var(--layout-shell-min)] gap-4">
+      <div className="prompter-shell-grid grid h-full min-h-0 min-w-0">
         <aside
           data-testid="left-sidebar"
-          aria-label="Projects, tags, and harnesses"
-          className="flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-panel border border-border-subtle bg-panel p-4 shadow-panel [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-label="프로젝트 및 작업 공간 탐색"
+          className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border-subtle bg-panel-elevated p-4"
         >
-          <div className="border-b border-border-subtle pb-4">
+          <div className="shrink-0 border-b border-border-subtle pb-4">
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
               Prompter
             </p>
-            <p className="mt-2 text-[14px] leading-5 text-muted-strong">Prompt workspace shell</p>
+            <SidebarItem
+              onClick={insightsNavigation.openLibrary}
+              aria-current={insightsNavigation.workspaceView === "library" ? "page" : undefined}
+            >
+              Library
+            </SidebarItem>
             <WorkspaceViewNavigation
               onOpenInsights={insightsNavigation.openInsights}
               onOpenPrivacy={insightsNavigation.openPrivacy}
@@ -146,69 +277,61 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
             />
           </div>
 
-          <div className="mt-5 flex min-w-0 flex-1 flex-col gap-5">
+          <div className="mt-5 flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto">
             <ProjectSidebarSection
-              createProject={projectLibrary.createProject}
+              createProject={createProject}
               error={projectLibrary.projectError}
               projects={projectLibrary.projects}
-              selectProject={projectLibrary.selectProject}
+              selectProject={selectProject}
               selectedProject={projectLibrary.selectedProject}
               status={projectLibrary.projectStatus}
             />
-            <ProjectContextProfileManager
-              selectionRequest={insightsNavigation.contextProfileRequest}
-              selectedProject={projectLibrary.selectedProject}
-              onProfilesChanged={recordProjectContextProfileChange}
-            />
-            <PromptTemplateManager
-              refreshSignal={promptTemplateRefreshSignal}
-              selectionRequest={insightsNavigation.promptTemplateRequest}
-              onTemplatesChanged={refreshPromptTemplates}
-            />
-            {sidebarSections.map((section) =>
-              section.title === "Harnesses" ? (
-                <HarnessTemplateManager
-                  key={section.title}
-                  selectionRequest={insightsNavigation.harnessTemplateRequest}
-                  onTemplatesChanged={recordHarnessTemplateChange}
-                />
-              ) : (
-                <SidebarSection
-                  key={section.title}
-                  title={section.title}
-                  emptyTitle={section.emptyTitle}
-                  emptyDescription={section.emptyDescription}
-                  items={section.items}
-                />
-              ),
-            )}
-            <SettingsPanel
-              appLockBridge={window.prompter.appLock}
-              projects={projectLibrary.projects}
-              refreshSignal={settingsRefreshSignal}
-              selectedPromptAssetId={promptLibrary.selectedAsset?.id ?? null}
-              selectedProjectId={projectLibrary.selectedProject?.id ?? null}
-              onBackupImportComplete={refreshAfterBackupImport}
-              onViewImportedProject={projectLibrary.selectProject}
-              onAppLockStateChange={onAppLockStateChange}
-            />
+            <nav aria-label="관리">
+              <SidebarItem
+                onClick={() => insightsNavigation.openManager("context")}
+                aria-current={insightsNavigation.workspaceView === "context" ? "page" : undefined}
+              >
+                컨텍스트 관리
+              </SidebarItem>
+              <SidebarItem
+                onClick={() => insightsNavigation.openManager("templates")}
+                aria-current={insightsNavigation.workspaceView === "templates" ? "page" : undefined}
+              >
+                템플릿 관리
+              </SidebarItem>
+              <SidebarItem
+                onClick={() => insightsNavigation.openManager("harnesses")}
+                aria-current={insightsNavigation.workspaceView === "harnesses" ? "page" : undefined}
+              >
+                하네스 관리
+              </SidebarItem>
+            </nav>
           </div>
 
-          <div className="mt-5 rounded-card border border-border bg-panel-muted p-3 text-[12px] text-muted">
-            Bridge status:{" "}
-            <output data-testid="ping-result" className="font-mono text-success">
-              {pingResult}
-            </output>
+          <div className="mt-5 shrink-0 border-t border-border-subtle pt-3">
+            <SidebarItem
+              data-menu-action-target="open-settings"
+              onClick={insightsNavigation.openSettings}
+              aria-current={insightsNavigation.workspaceView === "settings" ? "page" : undefined}
+            >
+              설정…
+            </SidebarItem>
           </div>
         </aside>
 
-        <div className={insightsNavigation.workspaceView === "library" ? "contents" : "hidden"}>
+        <div
+          className={
+            insightsNavigation.workspaceView === "library"
+              ? "prompter-library-panels contents"
+              : "prompter-library-panels hidden"
+          }
+        >
           <PromptLibraryPanel
             assets={promptLibrary.assets}
             currentVersionSummaries={promptLibrary.currentVersionSummaries}
-            createPrompt={promptLibrary.createPrompt}
+            createPrompt={createPrompt}
             error={promptLibrary.assetError}
-            selectAsset={promptLibrary.selectAsset}
+            selectAsset={selectAsset}
             selectedAsset={promptLibrary.selectedAsset}
             selectedProject={projectLibrary.selectedProject}
             status={promptLibrary.assetStatus}
@@ -220,10 +343,9 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
             compilerMemory={compilerMemory}
             assets={promptLibrary.assets}
             compareVersions={promptLibrary.compareVersions}
-            createDerivedAsset={promptLibrary.createDerivedAsset}
-            createNextVersion={promptLibrary.createNextVersion}
-            createPrompt={promptLibrary.createPrompt}
-            duplicateAsset={promptLibrary.duplicateAsset}
+            createDerivedAsset={createDerivedAsset}
+            createNextVersion={createNextVersion}
+            createPrompt={createPrompt}
             changedProjectContextProfileId={changedProjectContextProfileId}
             compilerStatePreservationRequest={insightsNavigation.statePreservationRequest}
             currentVersion={promptLibrary.currentVersion}
@@ -236,32 +358,93 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
             selectedAsset={promptLibrary.selectedAsset}
             selectedVersion={promptLibrary.selectedVersion}
             selectedProject={projectLibrary.selectedProject}
-            selectAsset={promptLibrary.selectAsset}
-            selectVersion={promptLibrary.selectVersion}
+            selectAsset={selectAsset}
+            selectVersion={selectVersion}
             setCurrentVersion={promptLibrary.setCurrentVersion}
             status={promptLibrary.versionStatus}
             versions={promptLibrary.versions}
+            onOpenManager={insightsNavigation.openManager}
             onPromptTemplatesChanged={refreshPromptTemplates}
             onTagsChanged={refreshPromptTags}
           />
         </div>
+        <SettingsWorkspace
+          active={insightsNavigation.workspaceView === "settings"}
+          onBackToLibrary={insightsNavigation.openLibrary}
+          onOpenPrivacy={insightsNavigation.openPrivacy}
+          appLockBridge={window.prompter.appLock}
+          projects={projectLibrary.projects}
+          refreshSignal={settingsRefreshSignal}
+          selectedPromptAssetId={promptLibrary.selectedAsset?.id ?? null}
+          selectedProjectId={projectLibrary.selectedProject?.id ?? null}
+          onBackupImportComplete={refreshAfterBackupImport}
+          onViewImportedProject={(id) => navigate({ kind: "project", projectId: id })}
+          onAppLockStateChange={onAppLockStateChange}
+        />
+        <section
+          hidden={insightsNavigation.workspaceView !== "context"}
+          data-testid="context-workspace"
+          className="col-span-2 min-h-0 min-w-0 overflow-y-auto bg-panel p-4"
+        >
+          <Button variant="secondary" onClick={insightsNavigation.openLibrary}>
+            라이브러리로 돌아가기
+          </Button>
+          <ProjectContextProfileManager
+            selectionRequest={insightsNavigation.contextProfileRequest}
+            selectedProject={projectLibrary.selectedProject}
+            onProfilesChanged={recordProjectContextProfileChange}
+          />
+        </section>
+        <section
+          hidden={insightsNavigation.workspaceView !== "templates"}
+          data-testid="templates-workspace"
+          className="col-span-2 min-h-0 min-w-0 overflow-y-auto bg-panel p-4"
+        >
+          <Button variant="secondary" onClick={insightsNavigation.openLibrary}>
+            라이브러리로 돌아가기
+          </Button>
+          <PromptTemplateManager
+            refreshSignal={promptTemplateRefreshSignal}
+            selectionRequest={insightsNavigation.promptTemplateRequest}
+            onTemplatesChanged={refreshPromptTemplates}
+          />
+        </section>
+        <section
+          hidden={insightsNavigation.workspaceView !== "harnesses"}
+          data-testid="harnesses-workspace"
+          className="col-span-2 min-h-0 min-w-0 overflow-y-auto bg-panel p-4"
+        >
+          <Button variant="secondary" onClick={insightsNavigation.openLibrary}>
+            라이브러리로 돌아가기
+          </Button>
+          <HarnessTemplateManager
+            selectionRequest={insightsNavigation.harnessTemplateRequest}
+            onTemplatesChanged={recordHarnessTemplateChange}
+          />
+        </section>
         {insightsNavigation.workspaceView === "insights" && (
-          <section data-testid="insights-workspace" className="col-span-2 h-full min-h-0">
+          <section
+            data-testid="insights-workspace"
+            className="prompter-workspace col-span-2 h-full min-h-0 min-w-0"
+          >
             <InsightsDashboard
               projects={projectLibrary.projects}
               onBackToLibrary={insightsNavigation.openLibrary}
-              onNavigate={insightsNavigation.navigate}
+              onNavigate={navigate}
             />
           </section>
         )}
         {insightsNavigation.workspaceView === "privacy" && (
-          <section data-testid="privacy-workspace" className="col-span-2 h-full min-h-0">
+          <section
+            data-testid="privacy-workspace"
+            className="prompter-workspace col-span-2 h-full min-h-0 min-w-0"
+          >
             <PrivacyCenter
               onBackToLibrary={insightsNavigation.openLibrary}
               onNavigate={(location) =>
                 void navigateToPrivacyFinding(location, {
-                  navigate: insightsNavigation.navigate,
-                  openLibrary: insightsNavigation.openLibrary,
+                  navigate,
+                  openSettings: insightsNavigation.openSettings,
                   projectIds: projectLibrary.projects.map((project) => project.id),
                 })
               }

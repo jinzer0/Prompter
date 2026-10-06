@@ -95,6 +95,19 @@ export async function harnessTemplateCountByName(page: Page, name: string): Prom
   }, name)
 }
 
+export async function openHarnessManagement(page: Page): Promise<void> {
+  await page
+    .getByRole("navigation", { name: "관리", exact: true })
+    .getByRole("button", { name: "하네스 관리", exact: true })
+    .click()
+  await expect(page.getByTestId("harnesses-workspace")).toBeVisible()
+}
+
+export async function expandCompilerOptions(page: Page): Promise<void> {
+  await page.getByText("추가 옵션", { exact: true }).click()
+  await expect(page.getByRole("region", { name: "컴파일러 추가 옵션" })).toBeVisible()
+}
+
 export async function createHarnessTemplateViaUi(
   page: Page,
   input: CreateHarnessTemplateUiInput,
@@ -133,6 +146,7 @@ export async function expectStaticCompileUsesSelectedHarness(
   originalInput: string,
 ): Promise<void> {
   await page.getByRole("textbox", { name: "Original request" }).fill(originalInput)
+  await expandCompilerOptions(page)
   await page
     .getByRole("combobox", { name: "Harness template" })
     .selectOption({ label: "Feature Implementation" })
@@ -152,6 +166,7 @@ export async function expectDeletedSelectedHarnessFallsBackAfterReload(
   originalInput: string,
 ): Promise<void> {
   await page.getByRole("textbox", { name: "Original request" }).fill(originalInput)
+  await expandCompilerOptions(page)
   await page
     .getByRole("combobox", { name: "Harness template" })
     .selectOption({ label: "Documentation" })
@@ -162,6 +177,7 @@ export async function expectDeletedSelectedHarnessFallsBackAfterReload(
   }, deletedHarnessId)
   await page.reload()
   await expect(page.locator('[data-testid="app-shell"]')).toBeVisible()
+  await expandCompilerOptions(page)
   await expect(page.getByRole("combobox", { name: "Harness template" })).toHaveValue("")
 
   await page.getByRole("textbox", { name: "Original request" }).fill(originalInput)
@@ -182,10 +198,18 @@ export async function expectSameSessionDeletedHarnessClearsBeforeStaticCompile(
   const preview = page.getByRole("textbox", { name: "Generated prompt preview" })
 
   await page.getByRole("textbox", { name: "Original request" }).fill(originalInput)
+  await expandCompilerOptions(page)
   await selector.selectOption({ label: "Documentation" })
+  await openHarnessManagement(page)
   await page.getByRole("button", { name: /Documentation/ }).click()
   await confirmSelectedHarnessDelete(page)
+  await page
+    .getByTestId("harnesses-workspace")
+    .getByRole("button", { name: "라이브러리로 돌아가기" })
+    .click()
 
+  await expect(page.getByRole("textbox", { name: "Original request" })).toHaveValue(originalInput)
+  await expect(selector).toBeVisible()
   await expect(selector).toHaveValue("")
   await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
   await expect(preview).toHaveValue(/# Objective/)

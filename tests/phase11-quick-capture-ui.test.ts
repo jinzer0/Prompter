@@ -5,7 +5,10 @@ import type { ElectronApplication, Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
 import { createNamedProject, launchPrompter, type RunningApp } from "./electron-playwright-helpers"
-import { exactHarnessQuickCaptureText } from "./phase12-harness-template-ui-helpers"
+import {
+  exactHarnessQuickCaptureText,
+  expandCompilerOptions,
+} from "./phase12-harness-template-ui-helpers"
 import { readProductionSource } from "./source-guardrail-helpers"
 
 type ProjectCallback = (run: RunningApp) => Promise<void>
@@ -83,6 +86,7 @@ test("quick capture preserves exact text after harness selector selection", asyn
     await clickImportButton(page)
 
     await expect(originalRequest(page)).toHaveValue(exactHarnessQuickCaptureText)
+    await expandCompilerOptions(page)
     await page
       .getByRole("combobox", { name: "Harness template" })
       .selectOption({ label: "Feature Implementation" })

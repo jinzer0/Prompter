@@ -18,7 +18,6 @@ type PromptVersionDetailProps = {
   readonly selectedAsset: PromptAsset
   readonly selectedVersion: PromptVersion
   readonly onMakeSelectedCurrent: () => Promise<void>
-  readonly onDuplicatePrompt: () => Promise<void>
   readonly onDerivePrompt: () => void
   readonly onPromptTemplateSaved: () => void
 }
@@ -64,7 +63,6 @@ export function PromptVersionDetail({
   selectedAsset,
   selectedVersion,
   onMakeSelectedCurrent,
-  onDuplicatePrompt,
   onDerivePrompt,
   onPromptTemplateSaved,
 }: PromptVersionDetailProps) {
@@ -84,28 +82,40 @@ export function PromptVersionDetail({
             현재 버전으로 지정
           </Button>
         )}
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => void onDuplicatePrompt()}
-        >
-          Duplicate Prompt
-        </Button>
         <Button type="button" size="sm" variant="secondary" onClick={onDerivePrompt}>
           Derive Draft
         </Button>
       </div>
       {currentMessage !== null && <p className="text-[12px] text-muted-strong">{currentMessage}</p>}
+      <details className="space-y-2">
+        <summary className="cursor-pointer text-[14px] font-medium">저장된 버전 본문 보기</summary>
+        <h3 id="compiled-prompt-heading" className="text-[14px] font-medium text-foreground">
+          저장된 본문
+        </h3>
+        <p className="whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 font-mono text-[14px] leading-5 text-foreground">
+          {selectedVersion.compiledPrompt}
+        </p>
+      </details>
+      <PromptExportActions
+        canSaveToFile
+        copyButtonLabel="Copy version export"
+        exportBase={exportBase}
+        formatLabel="Version export format"
+        menuActionTarget={null}
+        rawContent={selectedVersion.compiledPrompt}
+        saveButtonLabel="Save version export"
+        saveDisabledDescriptionId={null}
+        title="Version export"
+      />
       <dl className="grid gap-3">
-        <DetailRow label="title" value={selectedAsset.title} />
-        <DetailRow label="scenario" value={selectedAsset.scenario} />
-        <DetailRow label="target_agent" value={targetAgentLabel(selectedAsset.targetAgent)} />
-        <DetailRow label="version_number" value={String(selectedVersion.versionNumber)} />
-        <DetailRow label="created_at" value={formatTimestamp(selectedVersion.createdAt)} />
-        <DetailRow label="updated_at" value={formatTimestamp(selectedAsset.updatedAt)} />
+        <DetailRow label="Title" value={selectedAsset.title} />
+        <DetailRow label="Scenario" value={selectedAsset.scenario} />
+        <DetailRow label="Target agent" value={targetAgentLabel(selectedAsset.targetAgent)} />
+        <DetailRow label="Version" value={String(selectedVersion.versionNumber)} />
+        <DetailRow label="Created" value={formatTimestamp(selectedVersion.createdAt)} />
+        <DetailRow label="Updated" value={formatTimestamp(selectedAsset.updatedAt)} />
         {metadata?.qualityScore !== null && metadata?.qualityScore !== undefined && (
-          <DetailRow label="saved_version_quality_score" value={String(metadata.qualityScore)} />
+          <DetailRow label="Saved quality score" value={String(metadata.qualityScore)} />
         )}
       </dl>
       <SavedPromptQualityPanel
@@ -117,28 +127,10 @@ export function PromptVersionDetail({
         <h3 id="original-input-heading" className="font-mono text-[11px] text-muted">
           original_input
         </h3>
-        <p className="min-h-24 whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 text-[12px] leading-5 text-muted-strong">
+        <p className="min-h-24 whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 text-[14px] leading-5 text-foreground">
           {selectedVersion.originalInput}
         </p>
       </section>
-      <section className="space-y-2" aria-labelledby="compiled-prompt-heading">
-        <h3 id="compiled-prompt-heading" className="font-mono text-[11px] text-muted">
-          compiled_prompt
-        </h3>
-        <p className="whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 font-mono text-[12px] leading-5 text-muted-strong">
-          {selectedVersion.compiledPrompt}
-        </p>
-      </section>
-      <PromptExportActions
-        canSaveToFile
-        copyButtonLabel="Copy version export"
-        exportBase={exportBase}
-        formatLabel="Version export format"
-        rawContent={selectedVersion.compiledPrompt}
-        saveButtonLabel="Save version export"
-        saveDisabledDescriptionId={null}
-        title="Version export"
-      />
       <SavePromptTemplateFromVersion
         selectedAsset={selectedAsset}
         selectedVersion={selectedVersion}

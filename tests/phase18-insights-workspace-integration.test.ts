@@ -153,8 +153,8 @@ describe("phase18 insights workspace integration", () => {
     // Then: hidden library panels stay mounted and navigation never triggers actions.
     expect(navigationSource).toContain('useState<WorkspaceView>("library")')
     expect(appSource).toContain('data-testid="insights-workspace"')
-    expect(appSource).toContain(
-      'insightsNavigation.workspaceView === "library" ? "contents" : "hidden"',
+    expect(appSource).toMatch(
+      /insightsNavigation\.workspaceView === "library"\s*\?\s*"prompter-library-panels contents"\s*:\s*"prompter-library-panels hidden"/,
     )
     expect(appSource).toContain("<InsightsDashboard")
     expect(navigationSource).not.toMatch(
@@ -180,8 +180,8 @@ describe("phase18 insights workspace integration", () => {
     )
     expect(appSource).toContain('data-testid="privacy-workspace"')
     expect(workspaceNavigationSource).toContain('data-menu-action-target="privacy-center"')
-    expect(appSource).toContain(
-      'insightsNavigation.workspaceView === "library" ? "contents" : "hidden"',
+    expect(appSource).toMatch(
+      /insightsNavigation\.workspaceView === "library"\s*\?\s*"prompter-library-panels contents"\s*:\s*"prompter-library-panels hidden"/,
     )
     expect(appSource).not.toMatch(/workspaceView.*&&.*(setDraft|scanLibrary|analyze|compile)/)
   })

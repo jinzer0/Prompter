@@ -21,6 +21,11 @@ test("fresh library Insights shows the empty state without side effects", async 
   try {
     // Given: a fresh user-data database and an in-progress compiler draft.
     await access(join(userDataDirectory, "prompter.sqlite"))
+    await run.page
+      .getByTestId("prompt-compiler")
+      .locator("summary")
+      .filter({ hasText: "추가 옵션" })
+      .click()
     const compilerTitle = run.page.getByRole("textbox", {
       name: "Compiler title",
       includeHidden: true,

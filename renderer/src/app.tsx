@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 
 import { LockScreen } from "./components/app-lock/lock-screen"
+import { PromptEditorProvider } from "./components/prompt-editor-provider"
 import { AppShell } from "./components/shell/app-shell"
 import { useAppLockState } from "./hooks/use-app-lock-state"
 import { useAutoLock } from "./hooks/use-auto-lock"
@@ -28,13 +29,26 @@ export function App() {
   }, [])
 
   return (
-    <>
-      {appLock.phase.kind === "unlocked" && (
-        <AppShell compilerMemory={compilerMemory} onAppLockStateChange={appLock.refresh} />
-      )}
-      {appLock.phase.kind !== "unlocked" && (
-        <LockScreen phase={appLock.phase} onRefresh={appLock.refresh} onUnlock={appLock.unlock} />
-      )}
-    </>
+    <PromptEditorProvider isUnlocked={appLock.phase.kind === "unlocked"}>
+      <div className="prompter-window">
+        <header className="prompter-window-chrome">
+          <div className="prompter-window-traffic-light-inset" aria-hidden="true" />
+          <span className="prompter-window-title">Prompter</span>
+          <div className="prompter-window-drag-region" aria-hidden="true" />
+        </header>
+        <div className="prompter-window-content">
+          {appLock.phase.kind === "unlocked" && (
+            <AppShell compilerMemory={compilerMemory} onAppLockStateChange={appLock.refresh} />
+          )}
+          {appLock.phase.kind !== "unlocked" && (
+            <LockScreen
+              phase={appLock.phase}
+              onRefresh={appLock.refresh}
+              onUnlock={appLock.unlock}
+            />
+          )}
+        </div>
+      </div>
+    </PromptEditorProvider>
   )
 }

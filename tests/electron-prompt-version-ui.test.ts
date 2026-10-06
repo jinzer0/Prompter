@@ -37,7 +37,9 @@ async function createInitialPrompt(page: Page): Promise<void> {
 
   await expect(page.getByRole("button", { name: /Phase 6 Prompt/ })).toBeVisible()
   await expect(page.getByText("Version 1")).toBeVisible()
-  await expect(page.getByText(initialCompiledPrompt)).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
+    initialCompiledPrompt,
+  )
 }
 
 test("saves compiler output as a new version on the selected prompt without creating run UI", async ({
@@ -59,6 +61,10 @@ test("saves compiler output as a new version on the selected prompt without crea
       .fill("Revise the selected prompt without creating another PromptAsset.", {
         timeout: phase6ActionTimeoutMs,
       })
+    await run.page
+      .getByTestId("prompt-compiler")
+      .locator("summary", { hasText: "추가 옵션" })
+      .click({ timeout: phase6ActionTimeoutMs })
     await run.page
       .getByRole("combobox", { name: "Compile mode" })
       .selectOption("feature", { timeout: phase6ActionTimeoutMs })
@@ -94,7 +100,9 @@ test("saves compiler output as a new version on the selected prompt without crea
 
     await expect(run.page.getByRole("heading", { name: "Version history" })).toBeVisible()
     await expect(run.page.getByText("Version 2")).toBeVisible()
-    await expect(run.page.getByText(revisedCompiledPrompt)).toBeVisible()
+    await expect(run.page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
+      ["# Objective", revisedCompiledPrompt, "", "# Validation", "npm run test:smoke"].join("\n"),
+    )
     await expect(run.page.getByRole("combobox", { name: "Version export format" })).toBeVisible()
     await expect(run.page.getByRole("button", { name: "Save version export" })).toBeEnabled()
     await run.page
@@ -103,14 +111,19 @@ test("saves compiler output as a new version on the selected prompt without crea
     await run.page.getByRole("button", { name: "Copy version export" }).click()
     await expect(run.page.getByText("Copied Claude Code Prompt.")).toBeVisible()
     await run.page.getByRole("button", { name: /Version 1/ }).click()
-    await expect(run.page.getByText(initialCompiledPrompt)).toBeVisible()
+    await expect(run.page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
+      initialCompiledPrompt,
+    )
     await run.page.getByRole("button", { name: "현재 버전으로 지정" }).click()
 
     await run.page.getByRole("tab", { name: "Version compare" }).click()
     await expect(run.page.getByRole("combobox", { name: "Base version" })).toBeVisible()
     await expect(run.page.getByRole("combobox", { name: "Compare version" })).toBeVisible()
-    await expect(run.page.getByText(initialCompiledPrompt)).toBeVisible()
-    await expect(run.page.getByText(revisedCompiledPrompt)).toBeVisible()
+    await expect(run.page.getByRole("tabpanel").getByText(initialCompiledPrompt)).toBeVisible()
+    await expect(run.page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
+      initialCompiledPrompt,
+    )
+    await expect(run.page.getByRole("tabpanel").getByText(revisedCompiledPrompt)).toBeVisible()
     await assertNoExecutionUi(run.page)
 
     const stored = await run.page.evaluate(async () => {

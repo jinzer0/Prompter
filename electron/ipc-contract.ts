@@ -319,10 +319,46 @@ export const APP_LOCK_CHANNELS = {
   updateSettings: "prompter:app-lock:update-settings",
 } as const
 
+export const APPEARANCE_CHANNELS = {
+  getState: "prompter:appearance:get-state",
+  changed: "prompter:appearance:changed",
+} as const
+
+export const WINDOW_CLOSE_CHANNELS = {
+  requested: "prompter:window-close:requested",
+  updateState: "prompter:window-close:update-state",
+  confirm: "prompter:window-close:confirm",
+} as const
+export const windowCloseRequestSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    reason: z.enum(["window_close", "app_quit"]),
+  })
+  .strict()
+export const windowCloseStateInputSchema = z.object({ dirty: z.boolean() }).strict()
+export const windowCloseConfirmationInputSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    outcome: z.enum(["clean", "saved", "discard", "cancel"]),
+  })
+  .strict()
+export const windowCloseConfirmationResultSchema = z
+  .object({
+    status: z.enum(["accepted", "cancelled", "stale", "locked"]),
+  })
+  .strict()
+
 export type PingResponse = typeof PING_RESPONSE
 export type PersistenceChannel = (typeof PERSISTENCE_CHANNELS)[keyof typeof PERSISTENCE_CHANNELS]
 export type AppLockChannel = (typeof APP_LOCK_CHANNELS)[keyof typeof APP_LOCK_CHANNELS]
-export type IpcChannel = typeof PING_CHANNEL | PersistenceChannel | AppLockChannel
+export type WindowCloseInvokeChannel =
+  | typeof WINDOW_CLOSE_CHANNELS.updateState
+  | typeof WINDOW_CLOSE_CHANNELS.confirm
+export type IpcChannel =
+  | typeof PING_CHANNEL
+  | PersistenceChannel
+  | AppLockChannel
+  | WindowCloseInvokeChannel
 
 const idSchema = z.string().uuid()
 const keySchema = z.string().trim().min(1)
@@ -340,7 +376,14 @@ const noPayloadSchema = z.undefined()
 const scenarioSchema = z.enum(SCENARIOS)
 const targetAgentSchema = z.enum(TARGET_AGENTS)
 export const promptDerivationTypeSchema = z.enum(PROMPT_DERIVATION_TYPES)
-const appThemeSchema = z.enum(APP_THEMES)
+export const appThemeSchema = z.enum(APP_THEMES)
+export const appearanceStateSchema = z
+  .object({
+    preference: appThemeSchema,
+    effectiveTheme: z.enum(["light", "dark"]),
+  })
+  .strict()
+export const appearanceRequestSchema = noPayloadSchema
 const riskLevelSchema = z.enum(RISK_LEVELS)
 const searchSortSchema = z.enum(SEARCH_SORTS)
 const sortDirectionSchema = z.enum(SORT_DIRECTIONS)
@@ -1385,7 +1428,7 @@ export const savePromptToFileInputSchema = z.union([
   directSavePromptToFileInputSchema,
 ])
 export const copyTextInputSchema = z.object({
-  text: requiredTextSchema,
+  text: requiredPreservedTextSchema,
   privacyConfirmationSessionId: idSchema.optional(),
 })
 export const clipboardReadTextResultSchema = z.object({
@@ -1542,8 +1585,8 @@ export const updatePromptAssetInputSchema = createPromptAssetInputSchema
 
 export const createPromptVersionInputSchema = z.object({
   promptAssetId: idSchema,
-  originalInput: requiredTextSchema,
-  compiledPrompt: requiredTextSchema,
+  originalInput: requiredPreservedTextSchema,
+  compiledPrompt: requiredPreservedTextSchema,
   assumptions: optionalTextSchema,
   questions: optionalTextSchema,
   answers: optionalTextSchema,
@@ -1573,6 +1616,8 @@ export const duplicatePromptAssetInputSchema = z
     sourcePromptAssetId: idSchema,
     sourcePromptVersionId: idSchema.optional(),
     copyTags: z.boolean().default(true),
+    title: nameSchema.optional(),
+    editedVersion: initialPromptVersionFieldsSchema.strict().optional(),
   })
   .strict()
 export const createDerivedPromptAssetInputSchema = z
@@ -2088,6 +2133,8 @@ export const maintenanceSnapshotSchema = z
   .strict()
 
 export const payloadSchemas = {
+  windowCloseUpdateState: windowCloseStateInputSchema,
+  windowCloseConfirm: windowCloseConfirmationInputSchema,
   createProject: createProjectInputSchema,
   listProjects: noPayloadSchema,
   getProject: idPayloadSchema,
@@ -2209,6 +2256,8 @@ export const payloadSchemas = {
 } as const
 
 export const responseSchemas = {
+  windowCloseUpdateState: z.undefined(),
+  windowCloseConfirm: windowCloseConfirmationResultSchema,
   createProject: projectSchema,
   listProjects: z.array(projectSchema),
   getProject: projectSchema.nullable(),

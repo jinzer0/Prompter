@@ -145,11 +145,11 @@ export function ProjectSidebarSection({
           <SidebarItem
             key={project.id}
             aria-current={project.id === selectedProject?.id ? "page" : undefined}
-            className="gap-1"
+            className="flex-col items-start gap-1"
             onClick={() => selectProject(project.id)}
             variant={project.id === selectedProject?.id ? "active" : "default"}
           >
-            <span className="min-w-0 flex-1 [overflow-wrap:anywhere] [word-break:keep-all]">
+            <span className="w-full min-w-0 [overflow-wrap:anywhere] [word-break:keep-all]">
               {project.name}
             </span>
             <span className="shrink-0 font-mono text-[11px] text-muted">
@@ -162,7 +162,7 @@ export function ProjectSidebarSection({
       {status === "ready" && projects.length === 0 && (
         <EmptyState
           title="No projects yet"
-          description="Create a project to start a DB-backed prompt library."
+          description="Create a project to start your prompt library."
         />
       )}
     </section>

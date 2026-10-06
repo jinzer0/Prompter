@@ -1,7 +1,11 @@
 import { desc, eq } from "drizzle-orm"
 
 import { APP_LOCK_METADATA_SETTING_KEY } from "../../app-lock/app-lock-metadata.js"
-import { settingKeyIsPublic, settingsDefaultsSchema } from "../../ipc-contract.js"
+import {
+  settingKeyIsPublic,
+  settingsDefaultsSchema,
+  updateDefaultsInputSchema,
+} from "../../ipc-contract.js"
 import type {
   PrivacySettings,
   Setting,
@@ -35,6 +39,15 @@ const defaultSettings: SettingsDefaults = {
   compilerDefaultLanguage: "ko",
 }
 
+const defaultSettingSchemas = {
+  default_model: settingsDefaultsSchema.shape.defaultModel,
+  default_target_agent: settingsDefaultsSchema.shape.defaultTargetAgent,
+  default_project_id: settingsDefaultsSchema.shape.defaultProjectId,
+  default_scenario: settingsDefaultsSchema.shape.defaultScenario,
+  app_theme: settingsDefaultsSchema.shape.appTheme,
+  compiler_default_language: settingsDefaultsSchema.shape.compilerDefaultLanguage,
+}
+
 const privacySettingKeys = {
   warnBeforeLLM: "privacy_warn_before_llm",
   warnBeforeExport: "privacy_warn_before_export",
@@ -66,18 +79,24 @@ function defaultsFromSettings(settings: readonly Setting[]): SettingsDefaults {
   const defaultProjectId = settingValue(settings, "default_project_id")
 
   return settingsDefaultsSchema.parse({
-    defaultModel: settingValue(settings, "default_model") ?? defaultSettings.defaultModel,
-    defaultTargetAgent:
-      settingValue(settings, "default_target_agent") ?? defaultSettings.defaultTargetAgent,
-    defaultProjectId:
-      defaultProjectId === null || defaultProjectId.length === 0
-        ? defaultSettings.defaultProjectId
-        : defaultProjectId,
-    defaultScenario: settingValue(settings, "default_scenario") ?? defaultSettings.defaultScenario,
-    appTheme: settingValue(settings, "app_theme") ?? defaultSettings.appTheme,
-    compilerDefaultLanguage:
-      settingValue(settings, "compiler_default_language") ??
-      defaultSettings.compilerDefaultLanguage,
+    defaultModel: defaultSettingSchemas.default_model
+      .catch(defaultSettings.defaultModel)
+      .parse(settingValue(settings, "default_model")),
+    defaultTargetAgent: defaultSettingSchemas.default_target_agent
+      .catch(defaultSettings.defaultTargetAgent)
+      .parse(settingValue(settings, "default_target_agent")),
+    defaultProjectId: defaultSettingSchemas.default_project_id
+      .catch(defaultSettings.defaultProjectId)
+      .parse(defaultProjectId === "" ? null : defaultProjectId),
+    defaultScenario: defaultSettingSchemas.default_scenario
+      .catch(defaultSettings.defaultScenario)
+      .parse(settingValue(settings, "default_scenario")),
+    appTheme: defaultSettingSchemas.app_theme
+      .catch(defaultSettings.appTheme)
+      .parse(settingValue(settings, "app_theme")),
+    compilerDefaultLanguage: defaultSettingSchemas.compiler_default_language
+      .catch(defaultSettings.compilerDefaultLanguage)
+      .parse(settingValue(settings, "compiler_default_language")),
   })
 }
 
@@ -112,6 +131,11 @@ export function createSettingsRepository(db: AppDatabase): SettingsRepository {
     setSetting(key, value) {
       const updatedAt = createTimestamp()
       const publicKey = publicSettingKey(key)
+      if (Object.hasOwn(defaultSettingSchemas, publicKey)) {
+        defaultSettingSchemas[publicKey as keyof typeof defaultSettingSchemas].parse(
+          publicKey === "default_project_id" && value === "" ? null : value,
+        )
+      }
 
       return requireRow(
         db
@@ -161,31 +185,34 @@ export function createSettingsRepository(db: AppDatabase): SettingsRepository {
       return defaultsFromSettings(db.select().from(schema.settings).all())
     },
     updateDefaults(input) {
-      if (input.defaultModel !== undefined) {
-        this.setSetting("default_model", input.defaultModel)
-      }
+      const parsed = updateDefaultsInputSchema.parse(input)
+      return db.transaction(() => {
+        if (parsed.defaultModel !== undefined) {
+          this.setSetting("default_model", parsed.defaultModel)
+        }
 
-      if (input.defaultTargetAgent !== undefined) {
-        this.setSetting("default_target_agent", input.defaultTargetAgent)
-      }
+        if (parsed.defaultTargetAgent !== undefined) {
+          this.setSetting("default_target_agent", parsed.defaultTargetAgent)
+        }
 
-      if (input.defaultProjectId !== undefined) {
-        this.setSetting("default_project_id", input.defaultProjectId ?? "")
-      }
+        if (parsed.defaultProjectId !== undefined) {
+          this.setSetting("default_project_id", parsed.defaultProjectId ?? "")
+        }
 
-      if (input.defaultScenario !== undefined) {
-        this.setSetting("default_scenario", input.defaultScenario)
-      }
+        if (parsed.defaultScenario !== undefined) {
+          this.setSetting("default_scenario", parsed.defaultScenario)
+        }
 
-      if (input.appTheme !== undefined) {
-        this.setSetting("app_theme", input.appTheme)
-      }
+        if (parsed.appTheme !== undefined) {
+          this.setSetting("app_theme", parsed.appTheme)
+        }
 
-      if (input.compilerDefaultLanguage !== undefined) {
-        this.setSetting("compiler_default_language", input.compilerDefaultLanguage)
-      }
+        if (parsed.compilerDefaultLanguage !== undefined) {
+          this.setSetting("compiler_default_language", parsed.compilerDefaultLanguage)
+        }
 
-      return this.getDefaults()
+        return this.getDefaults()
+      })
     },
     getPrivacySettings() {
       return privacySettingsFromSettings(db.select().from(schema.settings).all())

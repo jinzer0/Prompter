@@ -5,7 +5,6 @@ import { BackupSettingsPanel } from "./backup/backup-settings-panel"
 import { MaintenanceWorkbench } from "./maintenance/maintenance-workbench"
 import { OpenAIKeyCard } from "./openai-key-card"
 import { SettingsDefaultsForm } from "./settings-defaults-form"
-import { Badge } from "./ui/badge"
 
 type SettingsPanelProps = {
   readonly appLockBridge: ElectronBridge["appLock"]
@@ -42,7 +41,6 @@ export function SettingsPanel({
         <h2 id="settings-heading" className="text-[16px] font-semibold text-foreground">
           Settings
         </h2>
-        <Badge variant={settings.keyStatus?.hasKey ? "success" : "neutral"}>Phase 9</Badge>
       </div>
 
       <SettingsDefaultsForm

@@ -35,7 +35,9 @@ export function OpenAIKeyCard({
     <Card>
       <CardHeader>
         <CardTitle>OpenAI key</CardTitle>
-        <CardDescription>Only encrypted secret status is exposed to the renderer.</CardDescription>
+        <CardDescription>
+          API 키는 암호화하여 보관하며, 저장된 키의 원문은 다시 표시하지 않습니다.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <output className="block font-mono text-[12px] text-muted-strong" aria-live="polite">

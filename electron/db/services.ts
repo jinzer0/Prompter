@@ -178,6 +178,7 @@ export function createPersistenceServices(
     duplicatePromptAsset(input: DuplicatePromptAssetInput) {
       const source = resolveSourcePrompt(input.sourcePromptAssetId, input.sourcePromptVersionId)
       assertLineageIsAcyclic(source.asset.id)
+      const version = input.editedVersion ?? source.version
       const sourceTagIds = input.copyTags
         ? tags.listTagsForPrompt(source.asset.id).map((tag) => tag.id)
         : []
@@ -185,16 +186,16 @@ export function createPersistenceServices(
       return createAtomicPrompt(
         {
           projectId: source.asset.projectId,
-          title: `Copy of ${source.asset.title}`,
+          title: input.title ?? `Copy of ${source.asset.title}`,
           scenario: source.asset.scenario,
           targetAgent: source.asset.targetAgent,
-          originalInput: source.version.originalInput,
-          compiledPrompt: source.version.compiledPrompt,
-          assumptions: source.version.assumptions,
-          questions: source.version.questions,
-          answers: source.version.answers,
-          acceptanceCriteria: source.version.acceptanceCriteria,
-          validationCommands: source.version.validationCommands,
+          originalInput: version.originalInput,
+          compiledPrompt: version.compiledPrompt,
+          assumptions: version.assumptions,
+          questions: version.questions,
+          answers: version.answers,
+          acceptanceCriteria: version.acceptanceCriteria,
+          validationCommands: version.validationCommands,
           qualityScore: null,
           tagIds: sourceTagIds,
         },

@@ -14,6 +14,10 @@ function navigateToFinding(location: SensitiveFinding["location"]): void {
   const target = Array.from(document.querySelectorAll<HTMLElement>("[data-privacy-field]")).find(
     (element) => element.dataset["privacyField"] === location.field,
   )
+  const options = target?.closest("details")
+  if (options !== null && options !== undefined) {
+    options.open = true
+  }
   target?.focus()
   target?.scrollIntoView({ block: "center" })
 }

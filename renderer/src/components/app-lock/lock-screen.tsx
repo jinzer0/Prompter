@@ -50,7 +50,7 @@ export function LockScreen({ onRefresh, onUnlock, phase }: LockScreenProps) {
     <main
       data-testid="lock-screen"
       aria-label="Prompter locked"
-      className="flex min-h-[100dvh] items-center justify-center overflow-auto bg-shell p-6 text-foreground"
+      className="flex h-full min-h-0 items-center justify-center overflow-auto bg-shell p-6 text-foreground"
     >
       <Card className="w-full max-w-[460px] shadow-panel">
         <CardHeader className="border-b border-border-subtle pb-4">
@@ -94,7 +94,7 @@ export function LockScreen({ onRefresh, onUnlock, phase }: LockScreenProps) {
             </form>
           )}
           <p id="app-lock-scope" className="text-[12px] leading-5 text-muted-strong">
-            App lock protects this UI session. It does not encrypt the SQLite file or protect
+            App lock protects this UI session. It does not encrypt the local database or protect
             against OS access, malware, or screen capture.
           </p>
         </CardContent>

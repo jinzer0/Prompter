@@ -47,6 +47,12 @@ export default defineConfig({
         test: {
           name: "parallel",
           include: [
+            "tests/appearance-contract.test.ts",
+            "tests/appearance-service.test.ts",
+            "tests/appearance-ui.test.ts",
+            "tests/prompt-editor-actions.test.ts",
+            "tests/unsaved-changes-guard.test.ts",
+            "tests/window-close-guard.test.ts",
             "tests/macos-release-contract.test.ts",
             "tests/privacy-guard-service.test.ts",
             "tests/privacy-guard-integration.test.ts",

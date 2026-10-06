@@ -84,8 +84,13 @@ test("searches prompts with filters and saves LLM suggested tags", async ({
     await expect(promptLibrary.getByText("No prompts match your filters")).toBeVisible()
     await promptLibrary.getByRole("button", { name: "Clear search filters" }).click()
 
+    await page.locator('[data-menu-action-target="open-settings"]').click()
     await page.getByRole("textbox", { name: "OpenAI API key" }).fill(phase5PlaintextKey)
     await page.getByRole("button", { name: "Save API key" }).click()
+    await page
+      .getByTestId("settings-workspace")
+      .getByRole("button", { name: "라이브러리로 돌아가기" })
+      .click()
     await page.getByRole("textbox", { name: "Original request" }).fill("Build Phase 7 search UX.")
     await page.getByRole("button", { name: "분석하기" }).click()
     await expect(

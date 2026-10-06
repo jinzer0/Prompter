@@ -8,7 +8,8 @@ import {
   resolveInsightsNavigationStep,
 } from "../lib/insights-workspace-navigation"
 
-export type WorkspaceView = "library" | "insights" | "privacy"
+export type ManagerDestination = "context" | "templates" | "harnesses"
+export type WorkspaceView = "library" | "insights" | "privacy" | "settings" | ManagerDestination
 
 export type InsightsSelectionRequest = {
   readonly id: string
@@ -68,7 +69,17 @@ export function useInsightsWorkspaceNavigation({
       requestIdRef.current += 1
       const requestId = requestIdRef.current
       const projectId = targetProjectId(intent)
-      setWorkspaceView("library")
+      setWorkspaceView(
+        intent.kind === "project_context"
+          ? "context"
+          : intent.kind === "prompt_templates"
+            ? "templates"
+            : intent.kind === "harness_templates"
+              ? "harnesses"
+              : intent.kind === "maintenance"
+                ? "settings"
+                : "library",
+      )
       setPendingNavigation({ intent, requestId })
       setStatePreservationRequest(
         projectId !== null &&
@@ -126,12 +137,24 @@ export function useInsightsWorkspaceNavigation({
   }, [pendingNavigation, selectAsset, selectProject, selectVersion, snapshot])
 
   return {
+    isNavigationPending: pendingNavigation !== null,
     statePreservationRequest,
     contextProfileRequest,
     harnessTemplateRequest,
     navigate,
     openInsights: () => setWorkspaceView("insights"),
-    openLibrary: () => setWorkspaceView("library"),
+    openLibrary: () => {
+      setPendingNavigation(null)
+      setWorkspaceView("library")
+    },
+    openSettings: () => {
+      setPendingNavigation(null)
+      setWorkspaceView("settings")
+    },
+    openManager: (destination: ManagerDestination) => {
+      setPendingNavigation(null)
+      setWorkspaceView(destination)
+    },
     openPrivacy: () => setWorkspaceView("privacy"),
     promptTemplateRequest,
     tagRequest,

@@ -1,10 +1,6 @@
 import { useCallback, useState } from "react"
 
-type UseCompilerSuggestedTagsConfig = {
-  readonly onTagsChanged: () => void
-}
-
-export function useCompilerSuggestedTags({ onTagsChanged }: UseCompilerSuggestedTagsConfig) {
+export function useCompilerSuggestedTags() {
   const [selectedSuggestedTags, setSelectedSuggestedTags] = useState<readonly string[]>([])
 
   const clearSuggestedTags = useCallback((): void => {
@@ -21,24 +17,7 @@ export function useCompilerSuggestedTags({ onTagsChanged }: UseCompilerSuggested
     })
   }, [])
 
-  const attachSelectedSuggestedTags = useCallback(
-    async (promptAssetId: string): Promise<void> => {
-      if (selectedSuggestedTags.length === 0) {
-        return
-      }
-
-      await Promise.all(
-        selectedSuggestedTags.map((tagName) =>
-          window.prompter.tags.createAndAttachToPrompt({ promptAssetId, tagName }),
-        ),
-      )
-      onTagsChanged()
-    },
-    [onTagsChanged, selectedSuggestedTags],
-  )
-
   return {
-    attachSelectedSuggestedTags,
     clearSuggestedTags,
     selectedSuggestedTags,
     setSuggestedTagSelection,

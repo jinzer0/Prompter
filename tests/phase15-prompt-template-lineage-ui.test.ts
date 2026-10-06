@@ -50,7 +50,13 @@ test("phase15 prompt template and lineage controls are usable", async ({
       .getByRole("textbox", { name: "Version prompt template body" })
       .fill("Rendered {{feature}} template body")
     await run.page.getByRole("button", { name: "Create Prompt Template From Version" }).click()
+    await run.page.getByTestId("left-sidebar").getByRole("button", { name: "템플릿 관리" }).click()
     await expect(run.page.getByRole("button", { name: /Phase 15 Version Template/ })).toBeVisible()
+    await run.page
+      .getByTestId("templates-workspace")
+      .getByRole("button", { name: "라이브러리로 돌아가기" })
+      .click()
+    await run.page.locator("summary").filter({ hasText: "추가 옵션" }).click()
 
     await run.page.getByRole("combobox", { exact: true, name: "Prompt template" }).selectOption({
       label: "Phase 15 Version Template",
@@ -72,17 +78,27 @@ test("phase15 prompt template and lineage controls are usable", async ({
     )
     expect(await promptAssetCount(run.page)).toBe(1)
 
+    await run.page.getByTestId("left-sidebar").getByRole("button", { name: "템플릿 관리" }).click()
     await run.page.getByRole("button", { name: /Phase 15 Version Template/ }).click()
     await run.page
       .getByRole("textbox", { name: "Prompt template body" })
       .fill("Updated {{feature}} template body")
     await run.page.getByRole("button", { name: "Save Prompt Template" }).click()
+    await run.page
+      .getByTestId("templates-workspace")
+      .getByRole("button", { name: "라이브러리로 돌아가기" })
+      .click()
     await expect(run.page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue(
       "Rendered lineage template body",
     )
+    await run.page.getByTestId("left-sidebar").getByRole("button", { name: "템플릿 관리" }).click()
     await run.page.getByRole("button", { name: "Delete Prompt Template" }).click()
     await run.page.getByRole("button", { name: "Confirm Delete Prompt Template" }).click()
     await expect(run.page.getByRole("button", { name: /Phase 15 Version Template/ })).toHaveCount(0)
+    await run.page
+      .getByTestId("templates-workspace")
+      .getByRole("button", { name: "라이브러리로 돌아가기" })
+      .click()
     await expect(run.page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue(
       "Rendered lineage template body",
     )
@@ -98,7 +114,13 @@ test("phase15 prompt template and lineage controls are usable", async ({
     await expect(run.page.getByText("active_source")).toBeVisible()
 
     await run.page.getByRole("button", { name: /Phase 15 Source Prompt · v1 · Derived/ }).click()
-    await run.page.getByRole("button", { exact: true, name: "Duplicate Prompt" }).click()
+    await run.page
+      .getByTestId("prompt-editor")
+      .getByRole("button", { exact: true, name: "복제하여 저장" })
+      .click()
+    const duplicateDialog = run.page.getByRole("alertdialog", { name: "복제하여 저장" })
+    await duplicateDialog.getByLabel("복제본 제목 (필수)").fill("Copy of Phase 15 Source Prompt")
+    await duplicateDialog.getByRole("button", { exact: true, name: "복제하여 저장" }).click()
     await expect(run.page.getByRole("button", { name: /Copy/ }).first()).toBeVisible()
     await expect(run.page.getByRole("heading", { name: "Lineage" })).toBeVisible()
     await expect(run.page.getByText("active_source")).toBeVisible()

@@ -7,11 +7,11 @@ type ReloadProjectsOptions = {
   readonly preserveSelection?: boolean
 }
 
-export function useProjects() {
+export function useProjects(initialProjectId: string | null = null) {
   const [projects, setProjects] = useState<readonly Project[]>([])
   const [projectStatus, setProjectStatus] = useState<LoadStatus>("loading")
   const [projectError, setProjectError] = useState<string | null>(null)
-  const [projectId, setProjectId] = useState<string | null>(null)
+  const [projectId, setProjectId] = useState<string | null>(initialProjectId)
 
   const reloadProjects = useCallback(async (options: ReloadProjectsOptions = {}) => {
     setProjectStatus("loading")

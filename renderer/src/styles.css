@@ -7,20 +7,21 @@
   --color-panel-muted: #141516;
   --color-foreground: #f7f8f8;
   --color-muted-strong: #d0d6e0;
-  --color-muted: #8a8f98;
-  --color-border-subtle: rgba(255, 255, 255, 0.05);
-  --color-border: rgba(255, 255, 255, 0.08);
+  --color-muted: #d0d6e0;
+  --color-tertiary: #8a8f98;
+  --color-border-subtle: #ffffff0d;
+  --color-border: #ffffff14;
   --color-accent: #7170ff;
   --color-accent-hover: #828fff;
-  --color-atmosphere-violet: rgba(113, 112, 255, 0.1);
+  --color-tint: #7170ff1a;
   --color-success: #27a644;
   --font-sans:
-    Inter, SF Pro Display, -apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif;
-  --font-mono: Berkeley Mono, ui-monospace, SFMono-Regular, Menlo, monospace;
-  --radius-control: 6px;
-  --radius-card: 8px;
-  --radius-panel: 12px;
-  --shadow-panel: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 24px 60px rgba(0, 0, 0, 0.24);
+    -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-control: 5px;
+  --radius-card: 4px;
+  --radius-panel: 10px;
+  --shadow-panel: none;
 }
 
 :root {
@@ -33,22 +34,45 @@
   --space-6: 24px;
   --space-8: 32px;
   --layout-sidebar-width: 210px;
-  --layout-library-min: 320px;
-  --layout-compiler-width: 460px;
-  --layout-shell-min: 1040px;
+  --layout-library-width: 280px;
+  --layout-chrome-height: 40px;
   background: var(--color-shell);
   font-family: var(--font-sans);
-  font-feature-settings: "cv01", "ss03";
   color: var(--color-foreground);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-shell: #f7f8f8;
+  --color-panel: #ffffff;
+  --color-panel-elevated: #f3f4f5;
+  --color-panel-muted: #e9eaec;
+  --color-foreground: #08090a;
+  --color-muted-strong: #62666d;
+  --color-muted: #62666d;
+  --color-border-subtle: #d0d6e0;
+  --color-border: #bfc4cd;
+  --color-accent: #5e6ad2;
+  --color-accent-hover: #4f5bc5;
+  --color-tint: #5e6ad214;
+  --color-success: #16833a;
 }
 
 body {
   min-width: 0;
   min-height: 100dvh;
   margin: 0;
-  background:
-    radial-gradient(circle at top left, var(--color-atmosphere-violet), transparent 32rem),
-    var(--color-shell);
+  background: var(--color-shell);
+}
+
+:root:not([data-theme]) {
+  background: transparent;
+  color-scheme: normal;
+}
+
+:root:not([data-theme]) body {
+  background: transparent;
+  visibility: hidden;
 }
 
 button,
@@ -58,10 +82,106 @@ textarea {
   font: inherit;
 }
 
+:where(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.prompter-window {
+  display: flex;
+  height: 100dvh;
+  min-width: 0;
+  flex-direction: column;
+  background: var(--color-shell);
+}
+
+.prompter-window-chrome {
+  display: flex;
+  height: var(--layout-chrome-height);
+  flex: none;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-panel-elevated);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.prompter-window-traffic-light-inset {
+  width: 80px;
+  height: 100%;
+  flex: none;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+.prompter-window-title {
+  flex: none;
+  color: var(--color-muted-strong);
+  font-size: 12px;
+  font-weight: 590;
+  -webkit-app-region: no-drag;
+}
+
+.prompter-window-drag-region {
+  height: 100%;
+  min-width: var(--space-8);
+  flex: 1;
+  margin-left: var(--space-4);
+  -webkit-app-region: drag;
+}
+
+.prompter-window-content {
+  min-height: 0;
+  min-width: 0;
+  flex: 1;
+  -webkit-app-region: no-drag;
+}
+
+.prompter-window-content > main {
+  height: 100%;
+  min-height: 0;
+}
+
 .prompter-shell-grid {
-  grid-template-columns:
-    var(--layout-sidebar-width) minmax(var(--layout-library-min), 1fr)
-    var(--layout-compiler-width);
+  grid-template-columns: var(--layout-sidebar-width) minmax(0, var(--layout-library-width)) minmax(
+      0,
+      1fr
+    );
+  overflow-wrap: anywhere;
+}
+
+.prompter-library-panels > section,
+.prompter-workspace > section {
+  border: 0;
+  border-radius: 0;
+  padding: var(--space-4);
+  box-shadow: none;
+}
+
+.prompter-library-panels > section:first-child {
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.prompter-shell-grid :where(.flex:not(.flex-col)) {
+  flex-wrap: wrap;
+}
+
+.prompter-shell-grid :where(.flex > *, .grid > *, input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.prompter-shell-grid .text-success {
+  color: var(--color-foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s;
+    animation-duration: 0s;
+  }
 }
 
 .backup-action-button {

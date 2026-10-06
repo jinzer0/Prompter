@@ -3,7 +3,6 @@ import type {
   CreateDerivedPromptAssetInput,
   CreateNextPromptVersionInput,
   CreatePromptWithInitialVersionResult,
-  DuplicatePromptAssetInput,
   Project,
   PromptAsset,
   PromptVersion,
@@ -25,9 +24,6 @@ export type PromptCompilerPanelProps = {
   ) => Promise<CreatePromptWithInitialVersionResult>
   readonly createNextVersion: (input: CreateNextPromptVersionInput) => Promise<PromptVersion>
   readonly createPrompt: CreatePrompt
-  readonly duplicateAsset: (
-    input: DuplicatePromptAssetInput,
-  ) => Promise<CreatePromptWithInitialVersionResult>
   readonly changedProjectContextProfileId: string | null
   readonly compilerStatePreservationRequest: CompilerStatePreservationRequest | null
   readonly currentVersion: PromptVersion | null

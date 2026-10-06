@@ -37,7 +37,9 @@ GitHub Issue: [#26](https://github.com/jinzer0/Prompter/issues/26)
 git status --short --branch
 git diff --check
 gh issue view 26 --repo jinzer0/Prompter --json number,state,milestone,labels,url
-gh pr view 20-25 --repo jinzer0/Prompter
+for number in 20 21 22 23 24 25; do
+  gh pr view "$number" --repo jinzer0/Prompter --json number,state,mergeCommit,url
+done
 ```
 
 ### 커밋

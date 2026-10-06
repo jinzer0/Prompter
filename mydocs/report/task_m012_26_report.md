@@ -89,6 +89,16 @@ GitHub Issue: [#26](https://github.com/jinzer0/Prompter/issues/26) / 마일스�
 - 로컬 검증 통과와 원격 CI를 구분한다. PR 생성만으로 리뷰/CI 통과를 주장하지 않는다.
 - merge·Issue 종료·의존성 정리·배포는 실행하지 않았다.
 
+### PR #34 리뷰 대응 및 merge 승인
+
+- 작업지시자의 “PR Merge진행”으로 PR #34 병합 승인을 받았다.
+- Codex의 [P2 명령 재실행 오류](https://github.com/jinzer0/Prompter/pull/34#discussion_r4195524705)를
+  확인했다. `gh pr view 20-25`는 범위 조회가 아니므로 기존 구현계획서에서 각 PR 번호를 순회하도록 수정했다.
+- 수정한 조회를 실제 실행해 PR #20–#25 여섯 건 모두 MERGED와 해당 merge SHA를 확인했다.
+  문서-only 수정으로 `git diff --check`를 검증했으며 제품/테스트/의존성에는 변경이 없다.
+- 최신 제품 검증 1182/65 통과 근거는 유지한다. 새 Codex 무지적 승인이나 원격 CI 통과를 주장하지 않는다.
+- merge는 승인됐으며 의존성 수정/merge 및 release/tag/배포는 이 승인에 포함하지 않는다.
+
 ---
 
 **이하 과거 검증 기록:** 후속 #27 수정 전 실행의 FAIL과 stale build 한계를 그대로 보존한다.

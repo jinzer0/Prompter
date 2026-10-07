@@ -47,15 +47,18 @@ npm run package
 
 The packaged app is written to `release/`.
 
-Maintainers preparing the signed ARM64 macOS release use the separate release path after setting
-the required signing identity and notary Keychain profile in their local shell:
+Issue #35의 v0.1.2 signed ARM64 macOS 릴리스를 준비하는 메인테이너는 로컬 셸에 필요한
+서명 identity와 notary Keychain profile을 설정한 뒤 별도 릴리스 경로를 사용한다.
+준비 조건과 검증 절차는 [macOS 릴리스 안내](docs/release-macos.md)를 따른다.
 
 ```bash
 npm run package:release:macos
 ```
 
-That command is for release maintainers only. It signs and notarizes the v0.1.1 candidate, but it
-does not publish a GitHub Release or create or rewrite tags.
+이 명령은 메인테이너 전용이며 정확한 버전 0.1.2 후보의 서명·공증을 위한 경로다.
+현재 안내는 v0.1.2의 패키징·서명·공증·게시 완료를 뜻하지 않는다. 명령 자체는 GitHub Release를
+게시하거나 태그를 생성·재작성하지 않으며, 공개 게시는 Issue #35의 별도 승인이 필요하다.
+게시 전까지 위 설치 링크와 공개 다운로드 버전은 v0.1.1을 유지한다.
 
 ## Basic Use
 

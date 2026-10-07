@@ -20,12 +20,12 @@ describe("Electron shell contract", () => {
 
     expect(packageJson.scripts?.["package"]).toBe("npm run build && node scripts/package-macos.mjs")
     expect(packageJson.scripts?.["make"]).toBe("npm run package")
-    expect(packageJson.version).toBe("0.1.1")
+    expect(packageJson.version).toBe("0.1.2")
     expect(packageJson.scripts?.["package:release:macos"]).toBe(
       "node scripts/macos/release-version-preflight.mjs && npm run build && node scripts/release-macos.mjs",
     )
     expect(releaseGuide).toContain("release-version-preflight.mjs")
-    expect(releaseGuide).toContain("not trusted alone")
+    expect(releaseGuide).toContain("캐시된 Accepted receipt만으로는 신뢰하지 않는다")
     expect(qaChecklist).toContain("submissionId")
     expect(qaChecklist).toContain("artifactKind")
     expect(qaChecklist).toContain("artifactSha256")

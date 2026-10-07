@@ -41,8 +41,8 @@ test("retains final receipts through candidate removal and replaces them on a fr
   const result = await second.run()
 
   assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
+    "Prompter-0.1.2-mac-arm64.dmg",
+    "Prompter-0.1.2-mac-arm64.zip",
     "SHA256SUMS",
   ])
   assert.equal(submissionCount([first, second], "app"), 2)
@@ -110,7 +110,7 @@ test("removes only generated storage remnants after successful recovery", async 
   const externalTarget = join(first.evidenceRoot, "external-remnant-target")
   const siblingSentinel = join(
     first.evidenceRoot,
-    "v0.1.1",
+    "v0.1.2",
     `.notarization-resume.json.${ownerId}.tmpx`,
   )
   const externalSentinel = join(

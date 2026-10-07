@@ -20,6 +20,19 @@ async function fixture(options) {
   return temporaryDirectories.track(await createCoordinatorFixture(options))
 }
 
+const invalidVersions = [
+  ["legacy version", "0.1.1"],
+  ["future version", "0.1.3"],
+  ["empty version", ""],
+  ["blank version", "   "],
+  ["prefixed version", "v0.1.2"],
+  ["numeric version", 0.12],
+  ["null version", null],
+  ["boolean version", true],
+  ["object version", { version: "0.1.2" }],
+  ["array version", ["0.1.2"]],
+]
+
 test("keeps signed Apple trust gates on absolute paths despite earlier PATH executables", async () => {
   const release = await fixture()
   const root = release.shared.root
@@ -55,18 +68,28 @@ test("keeps signed Apple trust gates on absolute paths despite earlier PATH exec
   )
 })
 
-test("rejects every signed release version except 0.1.1 before the first external command", async () => {
+test.each(
+  invalidVersions,
+)("rejects a %s instead of exact signed version 0.1.2 before the first external command", async (_label, version) => {
   const release = await fixture()
-  await writeFile(
-    join(release.shared.sourceRoot, "package.json"),
-    JSON.stringify({ version: "0.1.2" }),
-  )
+  await writeFile(join(release.shared.sourceRoot, "package.json"), JSON.stringify({ version }))
   await assert.rejects(release.run(), /Invalid package version/)
   assert.deepEqual(release.calls, [])
+  assert.deepEqual(release.rawCalls, [])
+  await assert.rejects(access(release.candidate))
+})
+
+test("rejects a missing signed release version before the first external command", async () => {
+  const release = await fixture()
+  await writeFile(join(release.shared.sourceRoot, "package.json"), JSON.stringify({}))
+  await assert.rejects(release.run(), /Invalid package version/)
+  assert.deepEqual(release.calls, [])
+  assert.deepEqual(release.rawCalls, [])
+  await assert.rejects(access(release.candidate))
 })
 
 test("uses the production macOS release command unchanged in the entrypoint fixture", async () => {
-  const release = temporaryDirectories.track(await createReleaseEntrypointFixture("0.1.1"))
+  const release = temporaryDirectories.track(await createReleaseEntrypointFixture("0.1.2"))
   const [fixturePackageJson, productionPackageJson] = await Promise.all([
     readFile(join(release.root, "package.json"), "utf8"),
     readFile("package.json", "utf8"),
@@ -76,12 +99,15 @@ test("uses the production macOS release command unchanged in the entrypoint fixt
     JSON.parse(fixturePackageJson).scripts?.["package:release:macos"],
     JSON.parse(productionPackageJson).scripts?.["package:release:macos"],
   )
+  assert.equal(JSON.parse(fixturePackageJson).version, "0.1.2")
 })
 
-test("rejects a wrong package version at the npm release entrypoint before build or downstream mutation", async () => {
+test.each(
+  invalidVersions,
+)("rejects a %s at the npm release entrypoint before build or downstream mutation", async (_label, version) => {
   await assertReleaseEntrypointRejectsBeforeMutation({
     errorMessage: "Invalid package version",
-    version: "0.1.2",
+    version,
   })
 })
 
@@ -101,7 +127,7 @@ test.each([
     errorMessage: `Missing required release input: ${inputName}`,
     inputName,
     inputValue,
-    version: "0.1.1",
+    version: "0.1.2",
   })
 })
 
@@ -130,7 +156,7 @@ test("rejects a symlinked release root before external commands or outside mutat
   await assert.rejects(release.run(), /Release root is unavailable/)
 
   assert.deepEqual(release.calls, [])
-  await assert.rejects(access(join(outsideDirectory, "v0.1.1")))
+  await assert.rejects(access(join(outsideDirectory, "v0.1.2")))
 })
 
 test("rejects a regular release root beneath a symlinked ancestor before mutation", async () => {
@@ -146,7 +172,7 @@ test("rejects a regular release root beneath a symlinked ancestor before mutatio
 
   assert.deepEqual(release.calls, [])
   assert.equal(await readFile(join(outsideRoot, "caller-sentinel"), "utf8"), "retain")
-  await assert.rejects(access(join(outsideRoot, "v0.1.1")))
+  await assert.rejects(access(join(outsideRoot, "v0.1.2")))
 })
 
 test("creates a missing release root only after non-mutating preflight", async () => {
@@ -184,17 +210,17 @@ testEvidenceEscape(
     const outsideDirectory = join(release.shared.root, `outside-${escapedDirectory}`)
     const outsideEvidenceDirectory =
       escapedDirectory === "root"
-        ? join(outsideDirectory, "v0.1.1", artifactKind)
+        ? join(outsideDirectory, "v0.1.2", artifactKind)
         : outsideDirectory
     const outsideAttemptDirectory = join(outsideEvidenceDirectory, "notarization-attempt")
-    const outsideArtifact = join(outsideAttemptDirectory, `Prompter-0.1.1-mac-arm64.${extension}`)
+    const outsideArtifact = join(outsideAttemptDirectory, `Prompter-0.1.2-mac-arm64.${extension}`)
     await mkdir(outsideAttemptDirectory, { recursive: true })
     await writeFile(outsideArtifact, "outside-sentinel")
     if (escapedDirectory === "root") {
       await rm(release.evidenceRoot, { recursive: true })
       await symlink(outsideDirectory, release.evidenceRoot)
     } else {
-      const versionDirectory = join(release.evidenceRoot, "v0.1.1")
+      const versionDirectory = join(release.evidenceRoot, "v0.1.2")
       await mkdir(versionDirectory, { recursive: true })
       await symlink(outsideDirectory, join(versionDirectory, artifactKind))
     }
@@ -220,5 +246,5 @@ test("rejects a regular evidence root beneath a symlinked ancestor without outsi
 
   assert.deepEqual(release.calls, [])
   assert.equal(await readFile(join(outsideRoot, "caller-sentinel"), "utf8"), "retain")
-  await assert.rejects(access(join(outsideRoot, "v0.1.1")))
+  await assert.rejects(access(join(outsideRoot, "v0.1.2")))
 })

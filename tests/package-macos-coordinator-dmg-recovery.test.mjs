@@ -35,7 +35,7 @@ test.each([
     shared: first.shared,
   })
   const result = await second.run()
-  const finalDmg = join(second.candidate, "Prompter-0.1.1-mac-arm64.dmg")
+  const finalDmg = join(second.candidate, "Prompter-0.1.2-mac-arm64.dmg")
   assert.equal(submissionCount([first, second], "app"), 1)
   assert.equal(submissionCount([first, second], "dmg"), 1)
   assert.equal(second.calls.includes("dmg-info"), true)
@@ -113,7 +113,7 @@ test.each([
     false,
   )
   assert.deepEqual(
-    await readFile(join(second.candidate, "Prompter-0.1.1-mac-arm64.dmg")),
+    await readFile(join(second.candidate, "Prompter-0.1.2-mac-arm64.dmg")),
     submittedBytes,
   )
   await assert.rejects(access(attempt.directory))
@@ -155,7 +155,7 @@ test("preserves submitted DMG bytes when a mutating staple is followed by valida
 
   assert.equal(submissionCount([first, second], "dmg"), 1)
   assert.deepEqual(
-    await readFile(join(second.candidate, "Prompter-0.1.1-mac-arm64.dmg")),
+    await readFile(join(second.candidate, "Prompter-0.1.2-mac-arm64.dmg")),
     submittedBytes,
   )
   assert.equal(second.calls.includes("dmg-staple"), true)
@@ -177,7 +177,7 @@ test.each([
   if (mode === "escaped") {
     const outsideDirectory = join(release.shared.root, "escaped-attempt")
     await mkdir(outsideDirectory)
-    await writeFile(join(outsideDirectory, "Prompter-0.1.1-mac-arm64.zip"), "outside")
+    await writeFile(join(outsideDirectory, "Prompter-0.1.2-mac-arm64.zip"), "outside")
     await mkdir(attempt.evidenceDirectory, { recursive: true })
     await symlink(outsideDirectory, attempt.directory)
     await writeFile(

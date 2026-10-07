@@ -123,8 +123,8 @@ test.each([
   const result = await third.run()
 
   assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
+    "Prompter-0.1.2-mac-arm64.dmg",
+    "Prompter-0.1.2-mac-arm64.zip",
     "SHA256SUMS",
   ])
   assert.equal(submissionCount([first, second, third], "app"), 2)
@@ -137,7 +137,7 @@ test("removes only terminal app evidence and unlinks nested symlinks", async () 
   const first = await fixture(acceptedFailure("app"))
   await assert.rejects(first.run())
   const attempt = notarizationAttempt(first, "app")
-  const versionDirectory = join(first.evidenceRoot, "v0.1.1")
+  const versionDirectory = join(first.evidenceRoot, "v0.1.2")
   const dmgEvidenceDirectory = join(versionDirectory, "dmg")
   const outsideDirectory = join(first.shared.root, "outside-terminal-evidence")
   await Promise.all([mkdir(dmgEvidenceDirectory), mkdir(outsideDirectory)])
@@ -164,7 +164,7 @@ test("rebuilds a terminal DMG without discarding accepted app evidence", async (
   const app = notarizationAttempt(first, "app")
   await access(join(app.evidenceDirectory, "notarization-final.json"))
   const dmg = notarizationAttempt(first, "dmg")
-  const versionDirectory = join(first.evidenceRoot, "v0.1.1")
+  const versionDirectory = join(first.evidenceRoot, "v0.1.2")
   const outsideDirectory = join(first.shared.root, "outside-terminal-dmg-evidence")
   await mkdir(outsideDirectory)
   await Promise.all([
@@ -199,7 +199,7 @@ test("rebuilds after malformed app evidence is discarded", async () => {
   const first = await fixture({ failure: "app-staple-exhaustion" })
   await assert.rejects(first.run())
   const app = notarizationAttempt(first, "app")
-  const versionDirectory = join(first.evidenceRoot, "v0.1.1")
+  const versionDirectory = join(first.evidenceRoot, "v0.1.2")
   const dmgEvidenceDirectory = join(versionDirectory, "dmg")
   const outsideDirectory = join(first.shared.root, "outside-malformed-evidence")
   await Promise.all([mkdir(dmgEvidenceDirectory), mkdir(outsideDirectory)])

@@ -124,7 +124,7 @@ export function runner(runFile) {
 export async function versionFrom(packageJsonPath) {
   try {
     const value = JSON.parse(await readFile(packageJsonPath, "utf8"))
-    if (typeof value.version !== "string" || value.version !== "0.1.1")
+    if (typeof value.version !== "string" || value.version !== "0.1.2")
       fail("Invalid package version")
     return value.version
   } catch {

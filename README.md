@@ -20,13 +20,16 @@ A local-first macOS app for turning rough ideas into reusable prompts for coding
 
 ### macOS (Apple Silicon)
 
-1. Download `Prompter-0.1.1-mac-arm64.dmg` from
-   [Releases](https://github.com/jinzer0/Prompter/releases).
+1. Download `Prompter-0.1.2-mac-arm64.dmg` from
+   [v0.1.2 Release](https://github.com/jinzer0/Prompter/releases/tag/v0.1.2).
 2. Open the DMG and drag `Prompter.app` to `Applications`.
 3. Launch Prompter from `Applications`.
 
-The v0.1.1 Apple Silicon release is Developer ID signed, notarized, and stapled. If OpenAI key
+The v0.1.2 Apple Silicon release is Developer ID signed, notarized, and stapled. If OpenAI key
 status does not carry over from an older unsigned build, re-enter the key in Settings.
+
+의존성 취약점은 이번 릴리스에서 해소하지 않았다. 공개 시점의 알려진 위험과 검증 한계는
+[릴리스 노트](https://github.com/jinzer0/Prompter/releases/tag/v0.1.2)를 확인한다.
 
 ### From Source
 
@@ -47,7 +50,7 @@ npm run package
 
 The packaged app is written to `release/`.
 
-Issue #35의 v0.1.2 signed ARM64 macOS 릴리스를 준비하는 메인테이너는 로컬 셸에 필요한
+signed ARM64 macOS 릴리스를 준비하는 메인테이너는 로컬 셸에 필요한
 서명 identity와 notary Keychain profile을 설정한 뒤 별도 릴리스 경로를 사용한다.
 준비 조건과 검증 절차는 [macOS 릴리스 안내](docs/release-macos.md)를 따른다.
 
@@ -56,14 +59,13 @@ npm run package:release:macos
 ```
 
 이 명령은 메인테이너 전용이며 정확한 버전 0.1.2 후보의 서명·공증을 위한 경로다.
-현재 안내는 v0.1.2의 패키징·서명·공증·게시 완료를 뜻하지 않는다. 명령 자체는 GitHub Release를
-게시하거나 태그를 생성·재작성하지 않으며, 공개 게시는 Issue #35의 별도 승인이 필요하다.
-게시 전까지 위 설치 링크와 공개 다운로드 버전은 v0.1.1을 유지한다.
+명령 자체는 GitHub Release를 게시하거나 태그를 생성·재작성하지 않으며, 공개 게시는 별도
+승인이 필요하다. Issue #35의 v0.1.2는 승인 후 실제 서명·공증 및 공개 다운로드 checksum 검증을
+완료했다. 기존 v0.1.2 후보·태그·assets를 재실행으로 교체하지 않는다.
 
 ## Basic Use
 
-아래는 현재 소스 구현의 사용 흐름이다. 위 Installation의 공개 v0.1.1 배포본과 구분하며,
-이 안내 갱신은 새 릴리스의 게시·서명·패키징 완료를 뜻하지 않는다.
+아래는 공개 v0.1.2 배포본의 사용 흐름이다.
 
 1. 프로젝트를 만들거나 선택한다.
 2. Library에서 검색·태그 필터로 프롬프트를 찾고 행을 선택한다.
@@ -93,7 +95,7 @@ npm run package:release:macos
 
 두 계약은 [#31](https://github.com/jinzer0/Prompter/issues/31)의 승인된 목표 설계다.
 시각·행동 기준은 이 두 문서가 소유하며 위 사용 안내는 별도의 최종 계약이 아니다.
-현재 소스의 적용과 공개 v0.1.1 배포본의 제공 범위, 실제 검증 결과는 구분한다.
+공개 v0.1.2의 실제 검증 출처와 알려진 제한은 릴리스 노트에서 확인한다.
 
 ## Built With
 

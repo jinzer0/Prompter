@@ -27,8 +27,8 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
   const release = await fixture()
   const result = await release.run()
   assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
+    "Prompter-0.1.2-mac-arm64.dmg",
+    "Prompter-0.1.2-mac-arm64.zip",
     "SHA256SUMS",
   ])
   const submitted = release.rawCalls
@@ -53,7 +53,7 @@ test("keeps the coordinator's two-submission ordering and cleanup boundaries exp
     ({ command, arguments_ }) =>
       command === "/usr/bin/ditto" &&
       arguments_[0] === "-c" &&
-      arguments_.at(-1).includes("v0.1.1") &&
+      arguments_.at(-1).includes("v0.1.2") &&
       !arguments_.at(-1).includes("notarization-attempt"),
   )
   const appStaple = release.rawCalls.findIndex(

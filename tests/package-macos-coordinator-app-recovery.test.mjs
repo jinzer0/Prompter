@@ -29,7 +29,7 @@ test("retains only sanitized unknown app resume evidence after an ambiguous time
   assert.equal(release.calls.includes("app-staple"), false)
   assert.equal(release.calls.includes("dmg-create"), false)
   const evidence = await readFile(
-    join(release.evidenceRoot, "v0.1.1", "app", "notarization-resume.json"),
+    join(release.evidenceRoot, "v0.1.2", "app", "notarization-resume.json"),
     "utf8",
   )
   assert.match(evidence, /123e4567-e89b-42d3-a456-426614174000/)
@@ -48,8 +48,8 @@ test.each([
   const second = await fixture({ pendingAppStatus: "Accepted", shared: first.shared })
   const result = await second.run()
   assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
+    "Prompter-0.1.2-mac-arm64.dmg",
+    "Prompter-0.1.2-mac-arm64.zip",
     "SHA256SUMS",
   ])
   assert.equal(submissionCount([first, second], "app"), 1)
@@ -143,8 +143,8 @@ test("retains an accepted app ZIP until a fresh invocation successfully retries 
   const second = await fixture({ pendingAppStatus: "Accepted", shared: first.shared })
   const result = await second.run()
   assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
+    "Prompter-0.1.2-mac-arm64.dmg",
+    "Prompter-0.1.2-mac-arm64.zip",
     "SHA256SUMS",
   ])
   assert.equal(submissionCount([first, second], "app"), 1)

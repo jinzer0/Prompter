@@ -27,7 +27,7 @@ test.each([
     await assert.rejects(first.run(), /Notarization command failed/)
   }
   const app = notarizationAttempt(first, "app")
-  const versionDirectory = join(first.evidenceRoot, "v0.1.1")
+  const versionDirectory = join(first.evidenceRoot, "v0.1.2")
   const siblingDirectory = join(versionDirectory, "dmg")
   const externalDirectory = join(first.shared.root, "external-artifact-drift")
   await Promise.all([mkdir(siblingDirectory, { recursive: true }), mkdir(externalDirectory)])
@@ -69,8 +69,8 @@ test.each([
   const result = await third.run()
 
   assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
+    "Prompter-0.1.2-mac-arm64.dmg",
+    "Prompter-0.1.2-mac-arm64.zip",
     "SHA256SUMS",
   ])
   assert.equal(submissionCount([first, second, third], "app"), 2)
@@ -123,8 +123,8 @@ test.each([
   const result = await third.run()
 
   assert.deepEqual(result.artifacts, [
-    "Prompter-0.1.1-mac-arm64.dmg",
-    "Prompter-0.1.1-mac-arm64.zip",
+    "Prompter-0.1.2-mac-arm64.dmg",
+    "Prompter-0.1.2-mac-arm64.zip",
     "SHA256SUMS",
   ])
   assert.equal(submissionCount([first, second, third], "app"), 2)

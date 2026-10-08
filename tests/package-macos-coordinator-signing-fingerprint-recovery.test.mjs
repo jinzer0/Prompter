@@ -59,7 +59,7 @@ test("checks the selected leaf certificate at every final artifact gate", async 
   const displays = finalArtifactSignerDisplays(release)
   assert.equal(displays.length, 3)
   assert.equal(displays[0].arguments_.at(-1).includes("prompter-release-extract-"), true)
-  assert.equal(displays[1].arguments_.at(-1).endsWith("Prompter-0.1.1-mac-arm64.dmg"), true)
+  assert.equal(displays[1].arguments_.at(-1).endsWith("Prompter-0.1.2-mac-arm64.dmg"), true)
   assert.equal(displays[2].arguments_.at(-1).includes("prompter-release-mount-"), true)
   for (const display of displays) {
     const displayIndex = release.rawCalls.indexOf(display)

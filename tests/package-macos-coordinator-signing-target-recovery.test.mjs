@@ -42,7 +42,7 @@ test.each([
   const first = await fixture({ failure: "app-timeout" })
   await assert.rejects(first.run())
   const app = notarizationAttempt(first, "app")
-  const siblingDirectory = join(first.evidenceRoot, "v0.1.1", "dmg")
+  const siblingDirectory = join(first.evidenceRoot, "v0.1.2", "dmg")
   await mkdir(siblingDirectory, { recursive: true })
   await writeFile(join(siblingDirectory, "sibling-sentinel"), "retain")
 

@@ -70,10 +70,10 @@ export function commandStage(command, arguments_) {
 
 export function notarizationAttempt(fixture, artifactKind) {
   const extension = artifactKind === "app" ? "zip" : "dmg"
-  const evidenceDirectory = join(fixture.evidenceRoot, "v0.1.1", artifactKind)
+  const evidenceDirectory = join(fixture.evidenceRoot, "v0.1.2", artifactKind)
   const directory = join(evidenceDirectory, "notarization-attempt")
   return {
-    artifactPath: join(directory, `Prompter-0.1.1-mac-arm64.${extension}`),
+    artifactPath: join(directory, `Prompter-0.1.2-mac-arm64.${extension}`),
     directory,
     evidenceDirectory,
   }

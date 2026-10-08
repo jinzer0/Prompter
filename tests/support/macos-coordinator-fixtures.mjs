@@ -60,8 +60,8 @@ export async function createCoordinatorFixture({
   const evidenceRoot = shared?.evidenceRoot ?? join(root, "evidence-parent", "evidence")
   const electron = shared?.electron ?? (await createElectronAppFixture())
   const fakeArtifacts = shared?.fakeArtifacts ?? createFakeArtifacts(root)
-  const appAttemptFile = "Prompter-0.1.1-mac-arm64.zip"
-  const appAttemptPath = join(evidenceRoot, "v0.1.1", "app", "notarization-attempt", appAttemptFile)
+  const appAttemptFile = "Prompter-0.1.2-mac-arm64.zip"
+  const appAttemptPath = join(evidenceRoot, "v0.1.2", "app", "notarization-attempt", appAttemptFile)
   if (shared === undefined) {
     await mkdir(sourceRoot, { recursive: true })
     await mkdir(dirname(nativeSourcePath), { recursive: true })
@@ -78,7 +78,7 @@ export async function createCoordinatorFixture({
       ].map((name) => mkdir(join(sourceRoot, name), { recursive: true })),
     ])
     await Promise.all([
-      writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.1" })),
+      writeFile(join(sourceRoot, "package.json"), JSON.stringify({ version: "0.1.2" })),
       writeFile(nativeSourcePath, "native"),
       writeFile(join(sourceRoot, "node_modules", "bindings", "bindings.js"), "bindings"),
       writeFile(
@@ -89,8 +89,8 @@ export async function createCoordinatorFixture({
       writeFile(join(evidenceRoot, "caller-sentinel"), "retain"),
     ])
   }
-  if (failure === "stale-candidate") await mkdir(join(releaseRoot, "v0.1.1"))
-  if (failure === "stale-candidate") await writeFile(join(releaseRoot, "v0.1.1", "stale"), "stale")
+  if (failure === "stale-candidate") await mkdir(join(releaseRoot, "v0.1.2"))
+  if (failure === "stale-candidate") await writeFile(join(releaseRoot, "v0.1.2", "stale"), "stale")
   const [calls, rawCalls, observedTempRoots] = [[], [], new Set()]
   let candidateExistsDuringProfile = false
   const runFile = async (command, arguments_, options = {}) => {
@@ -151,7 +151,7 @@ export async function createCoordinatorFixture({
       if (certificatePrefix !== undefined && certificateExtraction === "malformed")
         await writeFile(`${certificatePrefix}0`, "")
       options.finalDmgExistsDuringSignerDisplay = await access(
-        join(releaseRoot, "v0.1.1", "Prompter-0.1.1-mac-arm64.dmg"),
+        join(releaseRoot, "v0.1.2", "Prompter-0.1.2-mac-arm64.dmg"),
       ).then(
         () => true,
         () => false,
@@ -159,12 +159,12 @@ export async function createCoordinatorFixture({
       return displayOutput ?? { stdout: "", stderr: `Authority=${displayIdentity}\n` }
     }
     if (stage === "worktree" && failure === "candidate-race") {
-      await mkdir(join(releaseRoot, "v0.1.1"))
-      await writeFile(join(releaseRoot, "v0.1.1", "race"), "race")
+      await mkdir(join(releaseRoot, "v0.1.2"))
+      await writeFile(join(releaseRoot, "v0.1.2", "race"), "race")
     }
     if (stage === "worktree") await reservationBarrier?.wait(label)
     if (stage === "profile")
-      candidateExistsDuringProfile = await stat(join(releaseRoot, "v0.1.1")).then(
+      candidateExistsDuringProfile = await stat(join(releaseRoot, "v0.1.2")).then(
         () => true,
         () => false,
       )
@@ -222,7 +222,7 @@ export async function createCoordinatorFixture({
     calls,
     rawCalls,
     observedTempRoots,
-    candidate: join(releaseRoot, "v0.1.1"),
+    candidate: join(releaseRoot, "v0.1.2"),
     evidenceRoot,
     get candidateExistsDuringProfile() {
       return candidateExistsDuringProfile

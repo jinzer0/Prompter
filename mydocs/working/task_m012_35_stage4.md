@@ -69,14 +69,14 @@ git diff --check
 - 공개 승인 요청 전 및 실행 직전 조회에서 열린 Dependabot 알림 **24건(Critical 1·High 10·Medium 9·Low 4)**. 과거 push의 15건 알림과 다른 API 관측이다. 저장소 alerts이지 최종 앱 전체 exploitability audit가 아니다. 위험 미해소를 Release notes 및 README 링크로 안내했다.
 - dependency PR #29/#30/#33은 보류, native/Biome/bundle 경고 유지. 자동 remediation 없음.
 - Finder 다운로드 quarantine 첫 실행 시뮬레이션 미실행. 실제 공개 download bytes checksum과 설치 OS 손동작은 별개 근거다.
-- 최종 설치 안내·완료 기록의 문서 PR merge는 아직 수행하지 않았다. 공개 성공만으로 문서 master 반영/Issue close/cleanup 완료를 주장하지 않는다.
+- 최종 설치 안내·완료 기록의 문서 PR #39는 별도 승인 후 merge됐다(54c93b6). 이후 완료 정리 승인에 따라 Issue CLOSED 및 근거 보존/브랜치/worktree 정리까지 수행했다. 상세는 최종 보고의 완료 근거 섹션에 있다.
 
 ## 다음 단계 영향
 
 - 공개 tag와 assets는 immutable로 유지한다. 이후 문서 commit/PR/merge는 candidate source/tag와 별개다.
-- 공개 후 문서 PR review와 별도 merge 승인 후 master 동기화·#35 상태 기록/종료·필요 없는 작업 branch/worktree를 안전하게 정리한다. 로컬 후보/evidence는 정리 전에 저장 위치와 보존 필요를 확인한다.
+- 공개 후 문서 PR review/승인된 merge와 master 동기화 완료. 근거를 `_bmad-output/retained-task35`에 894개 파일 bytes 검증 보존 후 #35 종료 및 작업 branch/worktree 정리를 완료했다.
 - 의존성 PR 검토는 사용자 후속 지시까지 재개하지 않는다.
 
 ## 승인 요청
 
-- Stage 4 공개 결과 및 최종 보고/설치 안내를 검토하고 공개 후 문서 PR merge와 #35 완료 정리를 승인한다.
+- 공개 후 문서 PR #39 merge와 #35 완료 정리 각각 명시 승인 후 수행했다. #35 완료이며 추가 실행 승인 요청 없음. 의존성 PR은 사용자 별도 지시까지 보류한다.

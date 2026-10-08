@@ -7,7 +7,7 @@ GitHub Issue: [#35](https://github.com/jinzer0/Prompter/issues/35)
 
 - 대상 이슈: #35
 - 마일스톤: M012
-- 단계 수: Stage 1–4 공개 및 다운로드 검증 완료. 공개 후 설치 안내/완료 기록의 원격 반영·검토와 이슈/작업 부산물 정리가 남아 있다.
+- 단계 수: Stage 1–4 및 공개 후 설치 안내/완료 기록·이슈 종료·근거 보존·브랜치/worktree 정리 완료.
 - 작업 목적: 최신 macOS UX·테마 개선을 v0.1.2 ARM64 서명·공증 릴리스로 배포하기 위해 정확한 버전 계약과 검증된 로컬 후보를 준비했다.
 - 작업지시자가 Stage 3 결과·최종 보고·PR 게시를 승인했고, “codex 리뷰 문제 없으면 merge진행해”에 따라 최신 head 리뷰 완료·지적 없음·bot +1 확인 후 PR #36을 merge했다. 이후 exact source/bytes와 미해소 위험을 제시하고 “Stage 4 공개 실행 승인”을 받아 공개했다.
 - 작업 브랜치 `local/task35`, 전용 `Prompter-task35` worktree. 게시 브랜치는 `publish/task35`, PR base는 `master`다. 원본 master·사용자 BMAD·미추적 자료·기존 앱/DB를 보존한다.
@@ -95,16 +95,24 @@ binary·receipts·runtime·스크린샷·agent state는 로컬 ignored 근거이
 - 의존성 PR #29(Electron)/#30(undici)/#33(axios)은 사용자 결정에 따라 보류. 공개 승인 요청 전/실행 직전 API 재조회 모두 열린 Dependabot 알림 24건(Critical 1·High 10·Medium 9·Low 4)이었다. 과거 push 알림 15건과 구분하며 취약점 해소를 주장하지 않는다. Release notes와 README에서 알려진 위험을 안내한다.
 - native compile·Biome deprecated info·esbuild/Vite bundle 크기 경고 유지, 억제 없음.
 - quarantine 다운로드 첫 실행 시뮬레이션 미실행. 실제 Apple 검증/로컬 설치 QA/사용자 손동작 결과와 공개 다운로드 경험은 다르다.
-- 로컬 QA screenshots/runtime는 임시 디렉터리이며 OS cleanup으로 소실될 수 있다. 장기 핵심 근거는 Stage 보고에 기록했다.
+- 최초 QA screenshots/runtime의 임시 디렉터리 소실 위험을 줄이기 위해 완료 정리 시 로컬 `_bmad-output/retained-task35`로 복사하고 원본/복사본 bytes를 검증했다. Git에는 포함하지 않는다. 장기 핵심 근거는 Stage 보고에 기록했다.
 - 공개 전 README v0.1.1을 유지했고 실제 게시/다운로드 검증 후에만 v0.1.2로 갱신했다. 기존 v0.1.0/v0.1.1 tag/Release/assets 수정·교체 금지.
 
 ### 후속 작업 후보
 
-- 별도 새 이슈 제안 없음. 남은 작업은 같은 #35의 공개 후 안내/완료 기록 원격 반영·검토 및 이슈/작업 부산물 정리다.
+- 별도 새 이슈 제안 없음. #35 완료. 의존성 위험 검토는 별도 후속 지시 대상이다.
 - 보류된 dependency PR은 #35 이후 작업지시자의 지시에 따라 검토한다. 자동 재개하지 않는다.
 
 ## 작업지시자 승인 요청
 
 - Stage 3 결과·PR 게시·PR #36 merge 및 Stage 4 공개는 각각 명시 승인 후 수행했다.
-- 공개 후 설치 안내와 최종 기록을 별도 문서 PR로 반영한다. 해당 PR merge는 별도 승인까지 실행하지 않는다.
-- 공개 결과와 최종 기록을 확인한 뒤 #35 종료 및 안전한 부산물 정리를 진행한다. 기존 앱/사용자 DB/BMAD·타 작업 자료는 정리 대상이 아니다.
+- 공개 후 문서 PR #39도 최신 head a385ae9의 Codex 리뷰 완료·지적 없음·bot +1을 확인한 후 별도 승인으로 merge했다. merge SHA `54c93b6fc2bb30cac565c9a8cb4a6a8cb1e12bb2`, 시각 2026-10-08 15:51:37 +09:00. 원격 checks는 빈 배열이며 CI PASS를 주장하지 않는다.
+- 작업지시자가 “#35 완료 기록·이슈 종료·근거 보존 후 브랜치/worktree 정리”를 승인했다. 2026-10-08 21:53:10 +09:00 Issue #35 CLOSED 확인. 원격 publish/task35·로컬 local/task35 및 Prompter-task35 worktree 제거, master 복귀 확인. 기존 앱/사용자 DB/BMAD·타 작업 자료는 보존했다.
+
+## 완료 근거 보존 및 검증
+
+- 보존 위치: `_bmad-output/retained-task35/`(ignored/untracked 로컬 자료, 미커밋).
+- `release/`, `.omo/`, `test-results/`, `packaged-qa/`를 복사했다. 후보 ZIP/DMG/SHA256SUMS, app/dmg sanitized receipts, smoke screenshots와 packaged 앱/QA user-data가 포함된다.
+- 894개 일반 파일을 SHA-256으로 원본/복사본 일치 검증, symlink는 link target 일치 확인. `preservation-manifest.json`에 relative path/bytes/hash와 candidate source를 기록했다. 이후 owned task worktree만 제거했다.
+- 보존한 ZIP/DMG `shasum -c SHA256SUMS` 모두 OK, SHA256SUMS 자체 hash `5c0c36383136672b6080b2e7d0a8676027efb67d294a92243ce91508a92fff5e` 일치. latest 공개 API의 tag/3 assets/digests도 승인된 공개 bytes와 같았다.
+- 원본 master의 사용자 tracked 변경 없음 확인, 기존 미추적 BMAD/skills 자료 보존. 완료 기록은 제품/태그/assets와 별도의 사후 문서 commit이다. 전체 제품 tests는 문서만 변경하므로 반복하지 않고 diff-check로 검증한다.

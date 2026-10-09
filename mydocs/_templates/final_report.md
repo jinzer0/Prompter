@@ -1,6 +1,6 @@
 # 최종 보고서 템플릿
 
-이 파일은 `mydocs/report/task_{milestone}_{issue}_report.md` 작성용 중앙 템플릿이다. 최종 보고서는 모든 Stage의 결과, 수용 기준 검증, 남은 위험을 장기 보관용으로 정리하고 PR 게시 전 승인을 받기 위한 문서다.
+이 파일은 필요한 `mydocs/report/task_{milestone}_{issue}_report.md` 작성용 중앙 템플릿이다. 최종 보고서는 실제 결과·수용 기준 검증·Evidence·남은 위험을 비차단 기록한다. AGENTS 정책에 따라 작은 독립 LOW에는 별도 파일/Stage/PR를 강제하지 않고 검증·결과·제약을 보고하며 기존 Issue가 있으면 연결한다. 충분한 기존 기록은 참조하고 명시 요청된 산출물은 작성한다. 없는 계획/Stage/Issue 링크는 생략한다.
 
 GitHub Issue: [#{issue}](https://github.com/jinzer0/Prompter/issues/{issue})
 마일스톤: M{milestone}
@@ -42,6 +42,8 @@ GitHub Issue: [#{issue}](https://github.com/jinzer0/Prompter/issues/{issue})
 
 ### 단계별 검증 결과
 
+실제 존재하는 Stage만 기록한다 (아래는 예시이며 고정 Stage 수가 아니다).
+
 - Stage 1: {보고서 링크 또는 검증 요약}
 - Stage 2: {보고서 링크 또는 검증 요약}
 - Stage 3: {보고서 링크 또는 검증 요약}
@@ -56,6 +58,8 @@ GitHub Issue: [#{issue}](https://github.com/jinzer0/Prompter/issues/{issue})
 
 - {후속 이슈 후보. 없으면 `없음`으로 적는다.}
 
-## 작업지시자 승인 요청
+## 최종 상태 / 별도 권한
 
-- 최종 보고서와 수용 기준 검증 결과를 승인하면 PR 게시 절차로 진행한다.
+- 검증 결과·미검증·잔여 위험과 실제 상태를 기록한다. HIGH 미승인/거절·안전 cap 초과·검증 미완료를 완료로 위장하지 않는다.
+- HIGH/큰 Scope 결정은 기존 동일 승인 기록을 참조한다. 결과 기록에는 응답 대기가 없다.
+- local commit 권한이 없어도 기록하고 미커밋 상태를 보고한다. PR/원격 게시·Merge·Release·Issue close는 기존 별도 권한을 따르며 이 보고서가 권한을 부여하지 않는다.

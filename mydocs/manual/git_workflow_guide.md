@@ -34,6 +34,8 @@ local/task{N} ── 커밋 · 커밋 · 커밋 ──→ publish/task{N} push
 
 병렬 task는 각각 독립적인 `local/task{N}` 브랜치로 위 흐름을 반복한다.
 
+위 흐름은 브랜치·commit·게시가 필요한 task에 적용한다. 작은 독립 LOW에는 새 Issue·브랜치·계획/Stage/보고 파일·PR을 일률 강제하지 않는다. 명확한 MEDIUM 요청은 Scope 승인으로 범위 내 일반 계획·리뷰·Stage·Checkpoint·기록은 비차단이며 충분한 기존 기록을 재사용한다. 실제 PR에는 존재하는 기록만 링크하고 생략한 계획/Stage의 가짜 링크를 만들지 않는다. 이는 기존 local commit·브랜치·원격 게시·merge·close·rebase/merge recovery·강제 삭제·release 권한을 확대하지 않는다. HIGH 결정/행동·큰 Scope 확장은 명시 승인받고 미승인/거절 행동과 의존 작업만 보류한다. 기존 finite safety cap·영속 counter·동일 실패 resume 누적·blocked 규칙과 실제 차단/정상 종료 HALT는 유지한다.
+
 - **타스크 브랜치**: `local/task{N}`에서 잘게 커밋. 작업 단위마다 커밋.
 - **원격 게시 브랜치**: `local/task{N}` 작업이 리뷰 가능한 상태가 되면 `publish/task{N}` 이름으로 원격에 push하고 `master` 대상 PR을 생성한다.
 - **원격 push**: `local/task` 브랜치는 **로컬 유지 (원격 push 금지)**를 원칙으로 한다. 원격에는 `publish/task{N}`와 merge 결과 브랜치만 유지한다.
@@ -110,7 +112,7 @@ PR이 `MERGED` 상태인지 먼저 확인한다. merge 확인 후 `master`로 �
 
 ## 관련 매뉴얼
 
-- [`task_workflow_guide.md`](task_workflow_guide.md): 이슈 기반 타스크 시작, 단계 승인, 최종 보고, PR 게시 순서.
+- [`task_workflow_guide.md`](task_workflow_guide.md): 위험 비례 타스크 시작·기록, 필요한 HIGH 승인, 결과 보고와 별도 권한에 따른 PR 게시.
 - [`document_structure_guide.md`](document_structure_guide.md): 계획서, 단계 보고서, 최종 보고서의 문서 위치와 파일명.
 - [`pr_command_guide.md`](pr_command_guide.md): PR 생성 명령과 문서 링크 규칙.
 - [`pr_process_guide.md`](pr_process_guide.md): PR 처리 entrypoint.

@@ -1,6 +1,6 @@
 # 수행계획서 템플릿
 
-이 파일은 `mydocs/plans/task_{milestone}_{issue}.md` 작성용 중앙 템플릿이다. 수행계획서는 구현 전에 작업 목적, 범위, 설계 방향, 검증 기준을 고정하고 작업지시자 승인을 받기 위한 문서다.
+이 파일은 필요한 `mydocs/plans/task_{milestone}_{issue}.md` 작성용 중앙 템플릿이다. AGENTS 공통 위험/Scope 정책에 따라 충분한 기존 계획을 참조·보완하고 중복 생성하지 않는다. 작은 독립 LOW는 검증·결과·제약 보고와 기존 Issue 연결만 필수이며 새 추적 산출물을 강제하지 않는다. 명시 요청된 산출물은 작성한다. 명확한 MEDIUM Scope의 계획·구현·검증·수정·Stage 전환·기록은 비차단 Checkpoint다.
 
 GitHub Issue: [#{issue}](https://github.com/jinzer0/Prompter/issues/{issue})
 마일스톤: M{milestone}
@@ -32,7 +32,7 @@ GitHub Issue: [#{issue}](https://github.com/jinzer0/Prompter/issues/{issue})
 
 이번 task에서 제품/사용자/기여자/외부 통합/API/아키텍처/로드맵 문서를 생성, 이동, 수정한다면 공식 문서 루트와 `mydocs/` 중 어느 위치를 사용할지 먼저 판단한다. 문서 변경이 없으면 `해당 없음`과 이유를 적는다.
 
-Hyper-Waterfall은 공식 문서 루트 이름을 고정하지 않는다. 대상 프로젝트가 `docs/`, `specs/`, `site/`, `website/`, `adr/`, `book/`, GitHub Wiki 등을 명시적으로 선택할 수 있지만, 선택 이유는 이 계획서에서 승인받아야 한다.
+Hyper-Waterfall은 공식 문서 루트 이름을 고정하지 않는다. 기존 루트 안 위치·독자 판단 기록은 비차단이며, 공식 루트 새 채택 등 큰 Scope 변경만 해당 결정 직전 승인받는다. 작은 LOW에 이 기록 때문에 계획서를 만들지 않는다.
 
 | 파일 | 분류 | 대상 독자 | 선택 위치 | 대안 위치 | 선택 이유 |
 |---|---|---|---|---|---|
@@ -48,7 +48,7 @@ Hyper-Waterfall은 공식 문서 루트 이름을 고정하지 않는다. 대상
 
 - `{path}`
 
-이번 task 산출물:
+이번 task에서 실제 필요한 산출물만 선택한다 (기존 계획은 링크, 없는 문서는 생략):
 
 - `mydocs/orders/{yyyymmdd}.md`
 - `mydocs/plans/task_{milestone}_{issue}.md`
@@ -58,7 +58,7 @@ Hyper-Waterfall은 공식 문서 루트 이름을 고정하지 않는다. 대상
 
 ## 잠정 단계
 
-{기본 3~6단계로 나눈다. 한 단계는 구현, 검증, 보고를 한 번에 끝낼 수 있는 크기로 둔다.}
+{복잡도·위험·의존성·검증 경계에 필요한 단계만 선택한다. 아래 Stage 1~3은 예시이며 고정 최소/최대 수가 아니다. 형식 Stage와 해당 검증 행은 필요 없으면 생략한다.}
 
 - **Stage 1 — {제목}**
   - {산출물}
@@ -84,15 +84,15 @@ Hyper-Waterfall은 공식 문서 루트 이름을 고정하지 않는다. 대상
 ### 통합 검증
 
 - `{최종 수용 기준}`
-- `git status --short`가 PR 준비 전 빈 출력이다.
+- 자기 변경의 소유권·검증·기록과 별도 허용된 Git 작업 상태를 확인한다. unrelated dirty/untracked는 보존하며 전체 clean tree를 성공 조건으로 강제하지 않는다.
 - `git diff --check`가 경고 없이 통과한다.
 
 ## 리스크
 
 - **{리스크 이름}**: {영향과 대응}
 
-## 승인 요청 사항
+## 위험 결정 / 승인 기록
 
-- {작업지시자가 승인해야 할 범위, 설계 방향, 제외 항목}
+- {Scope·LOW/MEDIUM/HIGH 근거·기존 동일 결정 승인 참조. HIGH/큰 Scope 이탈만 해당 결정/행동 직전 명시 승인; 미승인/거절 행동만 보류하고 독립 안전 작업은 계속한다.}
 
-승인되면 `task_{milestone}_{issue}_impl.md`에서 단계별 산출물, 검증 명령, 커밋 메시지를 구체화한다.
+기존 충분한 계획에 단계/검증을 보완하고 별도 구현계획서는 필요할 때만 작성한다. 기록은 local commit·게시·Merge·Release 권한을 부여하지 않으며 기존 권한은 별도다.

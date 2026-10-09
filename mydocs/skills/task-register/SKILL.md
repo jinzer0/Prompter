@@ -16,6 +16,8 @@ description: |
 
 ## 사전 조건
 
+- 작은 독립 LOW에는 새 Issue를 강제하지 않는다. 기존 Issue가 있으면 연결하고 검증·결과/제약을 보고한다.
+- 명확한 작업 요청의 Scope 승인과 GitHub Issue 생성 권한은 별개다. 본 절차의 명시 생성 승인 경계를 유지한다.
 - 아직 이슈 번호가 없는 작업
 - 작업 목적, 배경, 범위가 최소한 초안 수준으로 정리됨
 - 현재 사용자 자격 증명으로 `gh` CLI 인증 완료
@@ -85,7 +87,7 @@ description: |
    - label 선택 이유는 type/area/kind 기준으로 나누어 적고, 5개 이상이면 예외 사유를 별도로 적는다.
 7. 이슈 생성 전 승인 요청
    - 작업지시자에게 제목, 본문, milestone, label 초안과 선택 이유를 보여준다.
-   - 작업지시자가 같은 스레드에서 생성 승인을 명시하기 전에는 `gh issue create`를 실행하지 않는다.
+   - 작업지시자가 같은 스레드에서 해당 초안/범위의 생성 승인을 명시하기 전에는 `gh issue create`를 실행하지 않는다. 같은 결정에 대한 충분한 기존 승인 기록은 재사용하고 중복 승인을 요구하지 않는다.
 8. 승인 후 이슈 생성
    ```bash
    gh issue create --repo jinzer0/Prompter \
@@ -101,7 +103,7 @@ description: |
    gh issue view {N} --repo jinzer0/Prompter \
      --json number,title,state,milestone,labels,url
    ```
-10. 작업지시자에게 생성된 이슈 번호와 URL을 보고하고 `task-start` 진입 승인 요청
+10. 생성된 이슈 번호와 URL을 보고한다. 이미 명확하게 요청된 Scope의 작업은 `task-start`로 이어가며 시작 재승인을 요구하지 않는다. Issue 등록만 요청했다면 별도 구현 요청으로 확대하지 않는다.
 
 ## 검증
 
@@ -119,7 +121,7 @@ description: |
 - 작업지시자 승인 없이 `gh issue create` 실행
 - 새 milestone 또는 새 label 생성
 - 닫힌 milestone을 임의로 사용
-- 이슈 생성 후 승인 없이 `task-start`까지 이어서 실행
+- Issue 생성 승인만으로 요청되지 않은 구현 Scope나 HIGH 행동까지 확대
 - 이 Skill 안에서 브랜치 생성, 오늘할일 갱신, 수행계획서 작성
 
 ## 호출 방법

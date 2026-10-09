@@ -4,7 +4,7 @@ description: |
   하이퍼-워터폴 타스크의 최종 보고와 PR 게시 절차를 적용한다.
   최종 결과 보고서(`_report.md`) 작성, 오늘할일 완료 처리, 승인 확인 후 최종 커밋,
   publish/task{N} 원격 push, master 대상 Open PR 생성을 수행한다.
-  모든 단계 완료 후 PR 직전에만 호출.
+  결과 기록은 게시 승인과 독립적으로 수행하고, PR 게시는 별도 승인 후 수행한다.
 ---
 
 # 하이퍼-워터폴 최종 보고와 PR 게시
@@ -16,46 +16,52 @@ description: |
 
 ## 사전 조건
 
-- 구현 계획서의 모든 단계 종료, 각 단계 보고서 커밋 완료
-- 통합 검증(전체 수용 기준) 통과 확인
-- `local/task{N}`에 commit 안 된 변경 없음 또는 본 절차에서 함께 커밋할 것만 남아 있음
+- 요청 Scope와 기존 충분한 계획·실제 수행 Evidence가 확인됨. 새 계획이나 형식 Stage/단계 보고서 커밋을 강제하지 않음
+- 작은 독립 LOW는 검증·결과/제약 보고로 충분하며 본 Skill·보고 파일·PR을 강제하지 않음. 명시 요청한 산출물은 작성함
+- 완료 판정과 PR 생성에는 통합 검증(전체 수용 기준) 통과가 필요함. 실패·미완료 기록은 별도로 작성함
+- unrelated dirty/untracked는 보존하며 실제 변경 겹침·소유권 분리 불가·branch/필수 권한/metadata 충돌만 해당 행동을 보류함
 
 ## 절차
 
-1. 통합 검증: 구현 계획서의 "수용 기준" 또는 마지막 단계 "검증" 섹션 명령 실행
+1. 통합 검증: 요청 Scope 또는 충분한 기존 계획의 수용 기준에 해당하는 검증 실행
+   - 충분한 기존 계획의 수용 기준을 사용한다. Scope 내 실패는 응답 대기 없이 수정·재검증하되 기존 finite safety cap·영속 counter·동일 실패 resume 누적·counted review >5 blocked 종료와 실제 실패/충돌 HALT를 유지한다.
 2. 최종 보고서 작성: `mydocs/report/task_m{milestone}_{N}_report.md`
    - 중앙 템플릿 `mydocs/_templates/final_report.md`를 기준으로 작성한다.
    - 템플릿을 읽을 수 없는 경우에만 다음 최소 섹션을 fallback으로 사용한다:
-     - 작업 요약 (이슈 링크, 마일스톤, 단계 수)
+     - 작업 요약 (존재하는 이슈 링크, 마일스톤, 적용한 단계)
      - 변경 파일 목록과 영향 범위
      - 변경 전·후 정량 비교 (라인 수, 토큰, 검증 통과 등 적용 시)
      - 검증 결과 (수용 기준별 OK/MISS)
      - 잔여 위험과 후속 작업
-     - 작업지시자 승인 요청
-3. 오늘할일 갱신: `mydocs/orders/{yyyymmdd}.md`의 #{N} 행
+     - Scope·상태·Evidence·인계 및 필요한 HIGH/게시 결정 승인
+   - 기록·검증은 비차단이며 local commit 허가나 원격 push/PR 승인 부재로 중단하지 않는다. 미커밋/미게시 상태와 검증 실패·미수행·제약을 정확히 남긴다. Checkpoint는 human consent나 runtime 안전/정상 종료 HALT가 아니다.
+3. 추적 중인 오늘할일이 있으면 갱신: `mydocs/orders/{yyyymmdd}.md`의 #{N} 행
    - 출력 형식은 `mydocs/_templates/orders.md`를 기준으로 한다.
-   - 상태 `완료`로 변경, 비고에 `완료: HH:mm` 기록
+   - 수용 기준 통과 시 상태 `완료`로 변경하고 `완료: HH:mm` 기록. 실패/차단은 미완료 상태와 사유를 기록
 4. 변경 점검
+   - 필요한 명령만 적용한다. 브랜치 간 log는 해당 작업 브랜치가 있을 때만 조회하며, 기록만 요청한 작업에 브랜치를 만들지 않는다.
    ```bash
    git status --short
    git diff --check
    git log --oneline master..local/task{N}
    ```
-5. 작업지시자에게 최종 보고서와 PR 게시 승인 요청
+5. 결과 기록을 보고하고 local commit 및 원격 게시 권한을 각각 확인
    - 최종 보고서 경로, 오늘할일 변경, 변경 점검 결과를 함께 보고한다.
-   - 작업지시자의 명시 승인이 있기 전에는 `git commit`, `git push`, `gh pr create`를 실행하지 않는다.
-6. 최종 커밋 (Stage 마지막 + 최종 보고서를 묶을 수도, 보고서만 단일 커밋도 가능)
+   - 최종 local commit은 기존 명시 승인 권한을 별도로 확인한다. 기록 작성이 commit 권한을 확대하지 않으며 같은 결정의 기존 승인 기록을 재사용한다.
+   - 원격 push와 PR 생성은 해당 행동에 대한 작업지시자 명시 승인 전 실행하지 않는다. local commit 허가나 Scope 승인을 게시 승인으로 간주하지 않는다.
+6. 허용된 자기 변경만 최종 커밋 (Stage 마지막 + 최종 보고서를 묶을 수도, 보고서만 단일 커밋도 가능)
+   - 아래 예시에서 실제 작성·변경한 파일만 staging한다. 생략한 오늘할일/단계 파일을 새로 만들지 않는다.
    ```bash
    git add mydocs/report/task_m{milestone}_{N}_report.md mydocs/orders/{yyyymmdd}.md
    git commit -m "Task #{N} Stage {마지막} + 최종 보고서: {요약}"
    # 또는
    git commit -m "Task #{N}: 최종 보고서 작성과 오늘할일 완료 처리"
    ```
-7. 원격 게시 브랜치 push
+7. 원격 게시 승인 후 브랜치 push
    ```bash
    git push origin local/task{N}:publish/task{N}
    ```
-8. master 대상 Open PR 생성
+8. PR 생성 승인 후 master 대상 Open PR 생성
    ```bash
    HEAD_SHA=$(git rev-parse HEAD)
    PR_BODY=/tmp/task{N}-pr-body.md
@@ -67,6 +73,7 @@ description: |
    - PR 본문은 `.github/pull_request_template.md`를 기준으로 작성한다.
    - 최대 4개 요약 bullet (대상 타스크/왜/무엇/리뷰 포인트), Stage당 1줄 요약, 검증 결과 요약, 남은 리스크를 포함
    - Stage 제목은 단계 보고서 URL로, 옆의 짧은 commit SHA는 commit URL로 링크
+   - 존재하는 계획/Stage/보고서/커밋만 링크하고 없는 형식 산출물을 PR 때문에 생성하거나 가짜 링크를 만들지 않는다.
    - 작업 문서는 `HEAD_SHA` 기준 `https://github.com/jinzer0/Prompter/blob/{HEAD_SHA}/mydocs/...` URL로 연결
    - 링크 표시는 raw URL이 아니라 `[파일명](URL)` 형식으로 작성
    - 상대 링크(`mydocs/...`)나 `blob/publish/task{N}/...` 링크는 사용하지 않음
@@ -82,21 +89,22 @@ description: |
 
 ## 검증
 
-- 모든 단계 보고서 + 최종 보고서 존재
+- 요청/실행 규모에 따라 작성한 단계 보고서와 최종 보고서 존재 (생략한 형식 산출물은 강제하지 않음)
 - 최종 보고서가 `mydocs/_templates/final_report.md`의 필수 섹션을 채움
-- `git status --short` 결과 빈 출력
-- `gh pr view` 결과에 draft가 아닌 PR이 정확한 base/head로 등록
+- 자기 변경과 unrelated 사용자 변경의 소유권이 구분됨. 전체 clean tree는 정상 종료의 일률 조건이 아님
+- 게시했다면 `gh pr view` 결과에 draft가 아닌 PR이 정확한 base/head로 등록하고 아래 PR 형식을 검증함
 - PR 본문 `변경 내역`의 Stage별 요약이 단계 보고서 링크와 짧은 commit SHA 링크를 함께 사용
 - PR 본문 `변경 내역`의 작업 문서 항목이 commit SHA 고정 URL과 `[파일명](URL)` 표시 형식을 사용
 - PR 본문 작업 문서 항목에 raw GitHub blob URL, 상대 링크, `blob/publish/task{N}` 링크 없음
 - PR 본문 `검증` 섹션이 `자동 검증`, `수동/시나리오 검증`, `CI/원격 검증`, `검증 한계` 구조를 따름
 - PR 본문에 실행하지 않은 검증 체크리스트가 남아 있지 않고, 미수행 항목은 `검증 한계` 또는 `남은 리스크`로 분리됨
-- 오늘할일 #{N} 상태 `완료` + `완료: HH:mm`
+- 추적 중이며 수용 기준을 통과한 경우 오늘할일 #{N} 상태 `완료` + `완료: HH:mm`
 
 ## 절대 하지 말 것
 
 - 통합 검증 실패 상태에서 PR 생성
 - 작업지시자 명시 승인 없이 최종 보고서 커밋, 원격 push, PR 생성
+- commit/게시 승인 부재를 이유로 결과/Evidence 기록 중단, 실패를 완료로 기록, 사용자 변경 staging/되돌리기 또는 safety HALT 우회
 - `local/task{N}` 브랜치를 원격에 직접 push (반드시 `publish/task{N}`로 명명)
 - squash merge 강제 옵션 사용 (단계 커밋 의미 보존)
 - 작업지시자 명시 지시 없이 Draft PR로 생성하거나 self-merge

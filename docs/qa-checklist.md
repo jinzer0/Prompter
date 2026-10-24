@@ -18,8 +18,9 @@ Use this checklist after Phase 10 and later release-candidate changes before pac
 아래 항목은 새 UI를 포함한 현재 v0.1.3 후보 검증 절차이며 실제 서명·공증·게시 완료 기록이 아니다.
 이번 릴리스의 commit·push·배포는 명시적으로 승인되었다. ARM64 macOS에서 메인테이너 signed
 명령 전에 사전 점검을 수행하고, 완료 후 점검은 `npm run package:release:macos`가 성공한 뒤에만
-수행한다. 모든 검증을 통과해 실제 게시가 성공하기 전까지 공개 설치 링크와 최신 배포본은
-v0.1.2를 유지한다. 수행하지 않은 항목은 체크하지 않는다.
+수행한다. v0.1.3은 실제 게시와 공개 다운로드 검증을 완료했으며 결과는
+[macOS 릴리스 안내](release-macos.md#v013-실제-배포-결과)에 기록했다. 아래 체크리스트 자체는
+완료 증거나 게시된 후보의 재실행 허가가 아니다. 수행하지 않은 항목은 체크하지 않는다.
 
 Prepare local path variables without embedding secrets:
 

@@ -9,21 +9,22 @@ Use this checklist after Phase 10 and later release-candidate changes before pac
 - [ ] `npm test` exits 0.
 - [ ] `npm run build` exits 0.
 - [ ] `npm run package` creates `release/Prompter-darwin-${process.arch}/Prompter.app`.
-- [ ] `npm run package`가 현재 버전의 `release/Prompter-0.1.2-mac-${process.arch}.zip`을 만든다.
+- [ ] `npm run package`가 현재 버전의 `release/Prompter-0.1.3-mac-${process.arch}.zip`을 만든다.
 - [ ] Packaged `Prompter.app` opens without a missing-executable error.
 - [ ] `npm run test:smoke` exits 0, or the exact blocker is recorded.
 
 ## Signed macOS Release Checks
 
-아래 항목은 Issue #35의 v0.1.2 후보 검증 절차이며 실제 서명·공증 완료 기록이 아니다.
-ARM64 macOS에서 해당 실행 단계 승인 후 메인테이너 signed 명령 전에 사전 점검을 수행한다.
-완료 후 점검은 `npm run package:release:macos`가 성공한 뒤에만 수행하며, 공개 게시에는 별도
-Stage 4 승인이 필요하다. 게시 전 공개 설치 링크와 최신 배포본은 v0.1.1을 유지한다.
+아래 항목은 새 UI를 포함한 현재 v0.1.3 후보 검증 절차이며 실제 서명·공증·게시 완료 기록이 아니다.
+이번 릴리스의 commit·push·배포는 명시적으로 승인되었다. ARM64 macOS에서 메인테이너 signed
+명령 전에 사전 점검을 수행하고, 완료 후 점검은 `npm run package:release:macos`가 성공한 뒤에만
+수행한다. 모든 검증을 통과해 실제 게시가 성공하기 전까지 공개 설치 링크와 최신 배포본은
+v0.1.2를 유지한다. 수행하지 않은 항목은 체크하지 않는다.
 
 Prepare local path variables without embedding secrets:
 
 ```bash
-RELEASE_DIR="release/v0.1.2"
+RELEASE_DIR="release/v0.1.3"
 ```
 
 - [ ] The version-specific candidate directory is absent before the release starts:
@@ -90,8 +91,8 @@ RELEASE_DIR="release/v0.1.2"
 Prepare artifact paths only after the signed command succeeds:
 
 ```bash
-ZIP_PATH="${RELEASE_DIR}/Prompter-0.1.2-mac-arm64.zip"
-DMG_PATH="${RELEASE_DIR}/Prompter-0.1.2-mac-arm64.dmg"
+ZIP_PATH="${RELEASE_DIR}/Prompter-0.1.3-mac-arm64.zip"
+DMG_PATH="${RELEASE_DIR}/Prompter-0.1.3-mac-arm64.dmg"
 CHECKSUM_PATH="${RELEASE_DIR}/SHA256SUMS"
 EXTRACT_DIR="$(mktemp -d)"
 MOUNT_DIR="$(mktemp -d)"
@@ -104,19 +105,19 @@ MOUNT_DIR="$(mktemp -d)"
   import { readdir } from "node:fs/promises"
 
   const expected = [
-    "Prompter-0.1.2-mac-arm64.dmg",
-    "Prompter-0.1.2-mac-arm64.zip",
+    "Prompter-0.1.3-mac-arm64.dmg",
+    "Prompter-0.1.3-mac-arm64.zip",
     "SHA256SUMS",
   ]
-  const actual = (await readdir("release/v0.1.2")).sort()
+  const actual = (await readdir("release/v0.1.3")).sort()
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error(`Unexpected release candidate allowlist: ${actual.join(",")}`)
   }
   NODE
   ```
 
-  허용 파일은 `Prompter-0.1.2-mac-arm64.zip`,
-  `Prompter-0.1.2-mac-arm64.dmg`, `SHA256SUMS`뿐이다.
+  허용 파일은 `Prompter-0.1.3-mac-arm64.zip`,
+  `Prompter-0.1.3-mac-arm64.dmg`, `SHA256SUMS`뿐이다.
 
 - [ ] The app and DMG evidence roots each retain a separate sanitized `notarization-final.json`
        receipt with `Accepted` plus warning-free and error-free issues. The validator reads these
@@ -130,8 +131,8 @@ MOUNT_DIR="$(mktemp -d)"
   import { validateFinalNotarizationEvidence } from "./scripts/macos/notarization-evidence.mjs"
 
   const roots = [
-    [".omo/evidence/release-macos/v0.1.2/app", "app"],
-    [".omo/evidence/release-macos/v0.1.2/dmg", "dmg"],
+    [".omo/evidence/release-macos/v0.1.3/app", "app"],
+    [".omo/evidence/release-macos/v0.1.3/dmg", "dmg"],
   ]
 
   for (const [root, artifactKind] of roots) {
@@ -188,7 +189,7 @@ MOUNT_DIR="$(mktemp -d)"
   ```
 
   `CFBundleIdentifier`가 `com.jinzer0.prompter`, `CFBundleShortVersionString`이
-  `0.1.2`, `CFBundleVersion`이 `0.1.2`인지 확인한다.
+  `0.1.3`, `CFBundleVersion`이 `0.1.3`인지 확인한다.
 
 - [ ] The checksum file verifies after all signature, notary, staple, Gatekeeper, extract, and
       mount checks pass:
@@ -245,7 +246,7 @@ MOUNT_DIR="$(mktemp -d)"
 
 ## 현재 소스의 작업 공간·편집 수동 점검
 
-아래는 현재 소스를 대상으로 수행할 절차이며 Stage 5 결과나 공개 v0.1.1 배포본의 동작 증거가
+아래는 현재 소스를 대상으로 수행할 절차이며 Stage 5 결과나 공개 v0.1.2 배포본의 동작 증거가
 아니다. 실행한 환경·관찰 결과·실패/차단 사유는 별도로 기록하고 수행하지 않은 항목은 체크하지 않는다.
 시각·행동 판정 기준은 [DESIGN](../DESIGN.md)과 [EXPERIENCE](ux/EXPERIENCE.md)를 따른다.
 실패 주입은 격리된 테스트 데이터와 환경에서 수행하고 실제 라이브러리는 변경하지 않는다.

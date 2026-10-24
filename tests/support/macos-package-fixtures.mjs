@@ -107,7 +107,7 @@ export async function assertReleaseEntrypointRejectsBeforeMutation({
     for (const path of [
       "build-ran",
       "downstream-ran",
-      "release/v0.1.2",
+      "release/v0.1.3",
       ".omo/evidence/release-macos",
     ])
       await assert.rejects(access(join(fixture.root, path)))

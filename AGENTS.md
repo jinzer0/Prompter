@@ -125,14 +125,17 @@ Follow `biome.json`:
 # UI and Design Rules
 
 `DESIGN.md`의 시각 계약과 `docs/ux/EXPERIENCE.md`의 행동 계약을 따른다.
-두 문서는 #31의 승인된 목표 설계이며, 제품 코드 적용은 별도 단계 승인 후 진행한다.
+두 문서는 #31의 목표 설계에서 이어진 승인 계약이다. 후속 재설계의 시각값과 제품 적용은
+별도로 승인됐으며 `docs/ux/mockups/redesign-*`가 승인 시안이다. 이 승인은 출시·게시 승인이 아니다.
 
 - 조밀한 macOS 네이티브 작업 공간을 유지하고 라이트·다크를 동등하게 지원한다.
   기본은 시스템 테마 추종이며 기존 `app_theme` 설정을 재사용한다.
 - Library는 사이드바·프롬프트 목록·오른쪽 편집/컴파일 영역의 3패널을 유지한다.
   오른쪽 상단은 선택한 본문·복사·새 버전 저장, 하단은 보조 컴파일러다.
-- Insights·Privacy Center는 사이드바를 유지하는 기존 작업 공간 예외이며 Settings는
-  별도 설정 화면이다. Library 복귀 시 선택·편집·컴파일 상태를 보존한다.
+- Settings·Insights·Privacy Center와 관리자는 사이드바를 유지한다. 숨긴 Library의
+  mounted 수명주기와 선택·검색/필터·편집·컴파일 초안을 보존한다. 잠금은 보안 은폐를 우선한다.
+- 주요 동작은 본문 복사·새 버전 저장이며 버전·복제·태그·내보내기·품질은 이름 있는 더보기에서
+  실제 기능으로 연결한다. 민트/중립 단일 토큰과 큰 주제의 둥근 표면·정돈된 행을 재사용한다.
 - Use existing design tokens and CSS variables from `renderer/src/styles.css`.
 - Do not introduce new visual colors unless `DESIGN.md` is updated.
 - Preserve visible focus states and keyboard accessibility.

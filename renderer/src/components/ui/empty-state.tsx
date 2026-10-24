@@ -20,7 +20,7 @@ export function EmptyState({ className, description, label, title, ...props }: E
           {label}
         </p>
       ) : null}
-      <p className="text-[13px] font-medium text-muted-strong">{title}</p>
+      <p className="text-[14px] font-medium text-foreground">{title}</p>
       <p className="mt-1 text-[12px] leading-5 text-muted">{description}</p>
     </div>
   )

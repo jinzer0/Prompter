@@ -5,7 +5,14 @@ import type { ElectronApplication, Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
 import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
-import { launchPrompter, type RunningApp } from "./electron-playwright-helpers"
+import {
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  openEditorAction,
+  openPromptDetails,
+  type RunningApp,
+} from "./electron-playwright-helpers"
 import { phase5CompileResponse } from "./phase5-llm-compiler-fixtures"
 
 const originalBody = "Saved current editor body"
@@ -258,6 +265,7 @@ test("compiler application explicitly replaces dirty editing but never auto-save
       .getByRole("textbox", { name: "Original request", exact: true })
       .fill("Explicit compiler application request")
     await page.getByRole("button", { name: "프롬프트 컴파일", exact: true }).click()
+    await openCompilerResult(page)
     const preview = page.getByRole("textbox", { name: "Generated prompt preview", exact: true })
     await expect(preview).toContainText("# Objective")
     const appliedBody = "  Explicitly applied preview.\n\nKeep exact whitespace.  \n"
@@ -286,10 +294,10 @@ test("edited duplicate requires a title, copies the draft, and leaves the origin
   await withEditorFixture(async ({ page }) => {
     const { assetId, projectId } = await seedEditor(page)
     const before = await storedPrompt(page, assetId)
-    await editor(page).getByRole("button", { name: "태그 편집", exact: true }).click()
+    await openEditorAction(page, "태그 편집")
     await expect(page.getByRole("textbox", { name: "Prompt tag name", exact: true })).toBeFocused()
     await body(page).fill(editedBody)
-    await editor(page).getByRole("button", { name: "복제하여 저장", exact: true }).click()
+    await openEditorAction(page, "복제하여 저장")
     const dialog = page.getByRole("alertdialog", { name: "복제하여 저장", exact: true })
     await dialog.getByLabel("복제본 제목 (필수)").fill("  ")
     await dialog.getByRole("button", { name: "복제하여 저장", exact: true }).click()
@@ -343,6 +351,7 @@ for (const destination of ["prompt", "project", "history"] as const) {
             })
             .click()
         } else {
+          await openPromptDetails(page)
           await page.getByRole("button", { name: "Version 1", exact: true }).click()
         }
       }
@@ -457,6 +466,8 @@ for (const destination of ["same prompt", "other prompt"] as const) {
         const compileAndSave = async (text: string) => {
           await compiler.getByRole("textbox", { name: "Original request" }).fill(text)
           await compiler.getByRole("button", { name: "프롬프트 컴파일", exact: true }).click()
+          await openCompilerResult(page)
+          await openCompilerTools(page)
           const preview = compiler.getByRole("textbox", { name: "Generated prompt preview" })
           await expect(preview).toContainText(text)
           await preview.fill(`# Objective\n${text}`)
@@ -580,7 +591,9 @@ for (const failure of ["search rebuild", "tag attachment"] as const) {
         )
         const compiler = page.getByTestId("prompt-compiler")
         await compiler.getByRole("textbox", { name: "Original request" }).fill("Saved snapshot")
+        await openCompilerTools(page)
         await compiler.getByRole("button", { name: "최종 프롬프트 생성", exact: true }).click()
+        await openCompilerResult(page)
         await compiler.getByRole("checkbox", { name: "Save tag saved-first", exact: true }).check()
         await compiler.getByRole("checkbox", { name: "Save tag saved-second", exact: true }).check()
         await compiler
@@ -625,7 +638,9 @@ for (const failure of ["search rebuild", "tag attachment"] as const) {
         ).toBeVisible()
         await app.evaluate(() => Reflect.set(globalThis, "__compilerLockTags", ["new-selection"]))
         await compiler.getByRole("textbox", { name: "Original request" }).fill("New unsaved output")
+        await openCompilerTools(page)
         await compiler.getByRole("button", { name: "최종 프롬프트 생성", exact: true }).click()
+        await openCompilerResult(page)
         const newTag = compiler.getByRole("checkbox", {
           name: "Save tag new-selection",
           exact: true,

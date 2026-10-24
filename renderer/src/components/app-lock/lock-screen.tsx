@@ -55,7 +55,7 @@ export function LockScreen({ onRefresh, onUnlock, phase }: LockScreenProps) {
       <Card className="w-full max-w-[460px] shadow-panel">
         <CardHeader className="border-b border-border-subtle pb-4">
           <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">Prompter</p>
-          <CardTitle className="pt-2 text-[16px]">Workspace locked</CardTitle>
+          <CardTitle className="pt-2 text-[17px]">Workspace locked</CardTitle>
           <CardDescription className="text-[14px] text-muted-strong">
             Your current session is protected until the app-lock passphrase is verified.
           </CardDescription>
@@ -67,7 +67,7 @@ export function LockScreen({ onRefresh, onUnlock, phase }: LockScreenProps) {
             <form className="space-y-3" onSubmit={submitUnlock}>
               <label
                 htmlFor="app-lock-passphrase"
-                className="block space-y-2 text-[12px] font-medium text-muted-strong"
+                className="block space-y-2 text-[14px] font-medium text-muted-strong"
               >
                 App-lock passphrase
                 <Input
@@ -79,12 +79,11 @@ export function LockScreen({ onRefresh, onUnlock, phase }: LockScreenProps) {
                   maxLength={1024}
                   type="password"
                   value={passphrase}
-                  className="focus:border-accent focus:ring-accent/45"
                   onChange={(event) => setPassphrase(event.currentTarget.value)}
                 />
               </label>
               {message !== null && (
-                <p role="alert" className="text-[12px] leading-5 text-muted-strong">
+                <p role="alert" className="text-[14px] leading-5 text-muted-strong">
                   {message}
                 </p>
               )}
@@ -93,7 +92,7 @@ export function LockScreen({ onRefresh, onUnlock, phase }: LockScreenProps) {
               </Button>
             </form>
           )}
-          <p id="app-lock-scope" className="text-[12px] leading-5 text-muted-strong">
+          <p id="app-lock-scope" className="text-[14px] leading-5 text-muted-strong">
             App lock protects this UI session. It does not encrypt the local database or protect
             against OS access, malware, or screen capture.
           </p>
@@ -111,7 +110,7 @@ type ProtectedStatusProps = {
 function ProtectedStatus({ isLoading, onRefresh }: ProtectedStatusProps) {
   return (
     <div className="space-y-3" role="status" aria-live="polite">
-      <p className="text-[12px] leading-5 text-muted-strong">
+      <p className="text-[14px] leading-5 text-muted-strong">
         {isLoading
           ? "Checking app-lock status. The workspace remains protected."
           : "App-lock status could not be verified. Prompter remains locked."}

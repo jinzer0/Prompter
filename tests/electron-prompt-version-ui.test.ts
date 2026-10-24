@@ -4,7 +4,13 @@ import { join } from "node:path"
 import type { Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
-import { createNamedProject, launchPrompter } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  openPromptDetails,
+} from "./electron-playwright-helpers"
 
 const phase6ScreenshotPath = "test-results/phase6-prompt-version-ui.png"
 const phase6ActionTimeoutMs = 5_000
@@ -36,6 +42,7 @@ async function createInitialPrompt(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Save Prompt" }).click()
 
   await expect(page.getByRole("button", { name: /Phase 6 Prompt/ })).toBeVisible()
+  await openPromptDetails(page)
   await expect(page.getByText("Version 1")).toBeVisible()
   await expect(page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
     initialCompiledPrompt,
@@ -55,6 +62,10 @@ test("saves compiler output as a new version on the selected prompt without crea
     await createNamedProject(run.page, "Phase 6 Version Project")
     await createInitialPrompt(run.page)
     await assertNoExecutionUi(run.page)
+    await run.page
+      .getByRole("dialog", { name: "프롬프트 버전 · 내보내기 · 품질" })
+      .getByRole("button", { name: "닫기", exact: true })
+      .click()
 
     await run.page
       .getByRole("textbox", { name: "Original request" })
@@ -78,6 +89,7 @@ test("saves compiler output as a new version on the selected prompt without crea
       .getByRole("button", { name: "프롬프트 컴파일" })
       .click({ timeout: phase6ActionTimeoutMs })
 
+    await openCompilerResult(run.page)
     const preview = run.page.getByRole("textbox", { name: "Generated prompt preview" })
     await expect(preview).toContainText("# Objective")
     await preview.fill(
@@ -93,11 +105,13 @@ test("saves compiler output as a new version on the selected prompt without crea
     await run.page.getByRole("button", { name: "Copy compiled export" }).click()
     await expect(run.page.getByText("Copied Codex Prompt.")).toBeVisible()
 
+    await openCompilerTools(run.page)
     await expect(run.page.getByRole("button", { name: "Save as new version" })).toBeVisible({
       timeout: phase6ActionTimeoutMs,
     })
     await run.page.getByRole("button", { name: "Save as new version" }).click()
 
+    await openPromptDetails(run.page)
     await expect(run.page.getByRole("heading", { name: "Version history" })).toBeVisible()
     await expect(run.page.getByText("Version 2")).toBeVisible()
     await expect(run.page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
@@ -114,6 +128,7 @@ test("saves compiler output as a new version on the selected prompt without crea
     await expect(run.page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
       initialCompiledPrompt,
     )
+    await openPromptDetails(run.page)
     await run.page.getByRole("button", { name: "현재 버전으로 지정" }).click()
 
     await run.page.getByRole("tab", { name: "Version compare" }).click()

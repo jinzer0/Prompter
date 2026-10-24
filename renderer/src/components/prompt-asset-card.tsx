@@ -35,23 +35,25 @@ export function PromptAssetCard({
   const metadata = currentVersion === null ? null : parsePromptVersionMetadata(currentVersion)
 
   return (
-    <SelectableCard selected={isSelected} onClick={onSelect}>
-      <span className="flex items-center justify-between gap-3">
-        <span className="text-[14px] font-semibold text-foreground">{asset.title}</span>
+    <SelectableCard
+      selected={isSelected}
+      onClick={onSelect}
+      title={`${asset.title} · Updated ${formatTimestamp(asset.updatedAt)}`}
+    >
+      <span className="text-[14px] font-semibold text-foreground">{asset.title}</span>
+      <span className="mt-2 line-clamp-2 block text-[12px] leading-5 text-muted-strong">
+        {compiledPromptPreview(currentVersion)}
+      </span>
+      <span className="mt-2 flex flex-wrap gap-x-2 gap-y-1 text-[12px] text-muted">
         <Badge variant={currentVersion === null ? "neutral" : "accent"}>
           {currentVersion === null ? "No version" : `v${currentVersion.versionNumber}`}
         </Badge>
-      </span>
-      <span className="mt-2 flex flex-wrap gap-2 text-[12px] text-muted">
         <span>{scenarioLabel(asset.scenario)}</span>
         <span>{targetAgentLabel(asset.targetAgent)}</span>
-        <span>Updated {formatTimestamp(asset.updatedAt)}</span>
+        <span className="sr-only">Updated {formatTimestamp(asset.updatedAt)}</span>
         {metadata?.qualityScore !== null && metadata?.qualityScore !== undefined && (
           <span>Saved quality score {metadata.qualityScore}</span>
         )}
-      </span>
-      <span className="mt-3 line-clamp-2 block text-[12px] leading-5 text-muted-strong">
-        {compiledPromptPreview(currentVersion)}
       </span>
     </SelectableCard>
   )

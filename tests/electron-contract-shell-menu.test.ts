@@ -9,8 +9,10 @@ import {
 } from "../electron/app-menu"
 import { createWindowOptions } from "../electron/window-options"
 import {
+  CLOSE_ACTIVE_PANEL_EVENT,
   handleMenuAction,
   handleMenuKeyDown,
+  OPEN_LIBRARY_EVENT,
   OPEN_SETTINGS_EVENT,
 } from "../renderer/src/lib/menu-actions"
 
@@ -75,6 +77,68 @@ function findButtonBlock(source: string, text: string, handler: string): string 
 }
 
 describe("Electron shell contract", () => {
+  it("reveals Library before native New Project activates its enabled target", () => {
+    const events: string[] = []
+    const frames: FrameRequestCallback[] = []
+    class ProjectButton {
+      disabled = false
+      click() {
+        events.push("click")
+      }
+    }
+    const button = new ProjectButton()
+    vi.stubGlobal("HTMLButtonElement", ProjectButton)
+    vi.stubGlobal("window", {
+      dispatchEvent: (event: Event) => {
+        expect(event.type).toBe(OPEN_LIBRARY_EVENT)
+        events.push("reveal-library")
+      },
+      requestAnimationFrame: (callback: FrameRequestCallback) => frames.push(callback),
+    })
+    vi.stubGlobal("document", {
+      querySelector: (selector: string) => {
+        expect(selector).toBe('[data-menu-action-target="new-project"]')
+        return button
+      },
+    })
+    handleMenuAction("newProject")
+    expect(events).toEqual(["reveal-library"])
+    frames[0]?.(0)
+    expect(events).toEqual(["reveal-library", "click"])
+    button.disabled = true
+    handleMenuAction("newProject")
+    frames[1]?.(0)
+    expect(events).toEqual(["reveal-library", "click", "reveal-library"])
+  })
+
+  it("lets the active auxiliary owner cancel without blurring restored focus", () => {
+    class FocusedElement {
+      blur = vi.fn()
+      closest = vi.fn((): { requestClose: () => void } | null => null)
+    }
+    const element = new FocusedElement()
+    const events = new EventTarget()
+    let owned = true
+    events.addEventListener(CLOSE_ACTIVE_PANEL_EVENT, (event) => {
+      expect(event.cancelable).toBe(true)
+      if (owned) event.preventDefault()
+    })
+    vi.stubGlobal("HTMLElement", FocusedElement)
+    vi.stubGlobal("document", { activeElement: element })
+    vi.stubGlobal("window", { dispatchEvent: events.dispatchEvent.bind(events) })
+    handleMenuAction("closeActivePanel")
+    expect(element.blur).not.toHaveBeenCalled()
+    owned = false
+    handleMenuAction("closeActivePanel")
+    expect(element.blur).toHaveBeenCalledOnce()
+    const requestClose = vi.fn()
+    element.closest.mockReturnValue({ requestClose })
+    handleMenuAction("closeActivePanel")
+    expect(element.closest).toHaveBeenCalledWith("dialog[open]")
+    expect(requestClose).toHaveBeenCalledOnce()
+    expect(element.blur).toHaveBeenCalledOnce()
+  })
+
   it.each([
     ["exportFullBackup", "backup-export-full"],
     ["importBackup", "backup-import-open"],

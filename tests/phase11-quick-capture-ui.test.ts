@@ -4,7 +4,13 @@ import { join } from "node:path"
 import type { ElectronApplication, Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
-import { createNamedProject, launchPrompter, type RunningApp } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  type RunningApp,
+} from "./electron-playwright-helpers"
 import {
   exactHarnessQuickCaptureText,
   expandCompilerOptions,
@@ -46,6 +52,7 @@ function importButton(page: Page) {
 }
 
 async function clickImportButton(page: Page): Promise<void> {
+  await openCompilerTools(page)
   await expect(importButton(page)).toBeVisible()
   await importButton(page).click()
 }
@@ -75,6 +82,7 @@ test("imports exact clipboard text from the button without LLM or persistence", 
     await expect(
       page.getByText("Add an OpenAI API key in Settings before using LLM prompt compilation."),
     ).toHaveCount(0)
+    await openCompilerResult(page)
     await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue("")
     expect(await storedPromptCount(page)).toBe(0)
   })
@@ -160,7 +168,9 @@ test("resets stale compiled preview and copy and save state after import", async
 
     await originalRequest(page).fill("Compile this stale draft first.")
     await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+    await openCompilerResult(page)
     await expect(preview).toContainText("# Objective")
+    await openCompilerTools(page)
     await expect(page.getByRole("button", { exact: true, name: "Copy" })).toBeEnabled()
     await expect(page.getByRole("button", { name: "Save compiled prompt" })).toBeEnabled()
 

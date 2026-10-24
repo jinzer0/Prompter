@@ -1,27 +1,29 @@
 @import "tailwindcss";
 
 @theme {
-  --color-shell: #08090a;
-  --color-panel: #0f1011;
-  --color-panel-elevated: #191a1b;
-  --color-panel-muted: #141516;
-  --color-foreground: #f7f8f8;
-  --color-muted-strong: #d0d6e0;
-  --color-muted: #d0d6e0;
-  --color-tertiary: #8a8f98;
-  --color-border-subtle: #ffffff0d;
-  --color-border: #ffffff14;
-  --color-accent: #7170ff;
-  --color-accent-hover: #828fff;
-  --color-tint: #7170ff1a;
-  --color-success: #27a644;
+  --color-shell: #171d1a;
+  --color-panel: #202923;
+  --color-panel-elevated: #29332c;
+  --color-panel-muted: #171e1a;
+  --color-foreground: #e7eee9;
+  --color-muted-strong: #adbab1;
+  --color-muted: #adbab1;
+  --color-tertiary: #adbab1;
+  --color-border-subtle: #3d4a40;
+  --color-border: #3d4a40;
+  --color-accent: #9bd7b3;
+  --color-on-accent: #142b1f;
+  --color-accent-hover: color-mix(in srgb, #9bd7b3 94%, black);
+  --color-tint: #2c4335;
+  --color-success: #9bd7b3;
+  --color-danger: #f3b2a8;
   --font-sans:
     -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Segoe UI", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-  --radius-control: 5px;
-  --radius-card: 4px;
-  --radius-panel: 10px;
-  --shadow-panel: none;
+  --radius-control: 8px;
+  --radius-card: 16px;
+  --radius-panel: 16px;
+  --shadow-panel: 0 10px 30px #00000033;
 }
 
 :root {
@@ -33,29 +35,35 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
-  --layout-sidebar-width: 210px;
-  --layout-library-width: 280px;
+  --layout-sidebar-width: 176px;
+  --layout-library-width: 228px;
   --layout-chrome-height: 40px;
   background: var(--color-shell);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
   color: var(--color-foreground);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --color-shell: #f7f8f8;
+  --color-shell: #eef1ef;
   --color-panel: #ffffff;
-  --color-panel-elevated: #f3f4f5;
-  --color-panel-muted: #e9eaec;
-  --color-foreground: #08090a;
-  --color-muted-strong: #62666d;
-  --color-muted: #62666d;
-  --color-border-subtle: #d0d6e0;
-  --color-border: #bfc4cd;
-  --color-accent: #5e6ad2;
-  --color-accent-hover: #4f5bc5;
-  --color-tint: #5e6ad214;
-  --color-success: #16833a;
+  --color-panel-elevated: #f5f7f5;
+  --color-panel-muted: #e9eeea;
+  --color-foreground: #202b26;
+  --color-muted-strong: #526359;
+  --color-muted: #526359;
+  --color-tertiary: #526359;
+  --color-border-subtle: #d7dfd9;
+  --color-border: #d7dfd9;
+  --color-accent: #216449;
+  --color-on-accent: #ffffff;
+  --color-accent-hover: color-mix(in srgb, #216449 94%, black);
+  --color-tint: #dfeee5;
+  --color-success: #216449;
+  --color-danger: #933f35;
+  --shadow-panel: 0 10px 30px #142b1f14;
 }
 
 body {
@@ -159,7 +167,97 @@ textarea {
 }
 
 .prompter-library-panels > section:first-child {
-  border-right: 1px solid var(--color-border-subtle);
+  border-right: 0;
+}
+
+.prompter-sidebar {
+  padding: 14px 10px 12px;
+  background: var(--color-panel-muted);
+}
+
+.prompter-library-panels > .prompter-prompt-list {
+  padding: 12px 10px;
+  background: var(--color-shell);
+}
+
+.prompter-library-panels > .prompter-detail-workspace {
+  gap: 12px;
+  overflow: hidden;
+  padding: 8px 14px 12px 0;
+  background: var(--color-shell);
+}
+
+.prompter-editor-surface {
+  display: flex;
+  min-height: 220px;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  border-radius: var(--radius-panel);
+  padding: 22px 23px 15px;
+  background: var(--color-panel);
+}
+
+.prompter-editor {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prompter-editor .prompter-editor-body {
+  min-height: 120px;
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  font-family: var(--font-sans);
+  line-height: 1.85;
+}
+
+.prompter-editor-more {
+  anchor-name: --prompt-more;
+}
+
+.prompter-editor-menu {
+  position-anchor: --prompt-more;
+  inset: auto;
+  top: anchor(bottom);
+  left: anchor(left);
+  width: 220px;
+  margin: 6px 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 6px;
+  background: var(--color-panel);
+  color: var(--color-foreground);
+  box-shadow: var(--shadow-panel);
+}
+
+.prompter-editor-menu > button {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.prompter-compiler-surface {
+  min-height: 195px;
+  max-height: 42%;
+  flex: 0 1 224px;
+  overflow-y: auto;
+  border-radius: var(--radius-panel);
+  padding: 16px 18px;
+  background: var(--color-panel);
+}
+
+.prompter-compiler-surface #compiler-original-request {
+  height: 72px;
+  min-height: 64px;
+  padding: 10px;
+  font-family: var(--font-sans);
+  font-size: 14px;
 }
 
 .prompter-shell-grid :where(.flex:not(.flex-col)) {
@@ -173,6 +271,42 @@ textarea {
 
 .prompter-shell-grid .text-success {
   color: var(--color-foreground);
+}
+
+@media (max-width: 1080px) {
+  :root {
+    --layout-sidebar-width: 160px;
+    --layout-library-width: 205px;
+  }
+
+  .prompter-editor-surface {
+    padding: 18px;
+  }
+
+  .prompter-editor h3 {
+    font-size: 19px;
+  }
+
+  .prompter-library-panels > .prompter-detail-workspace {
+    gap: 10px;
+    padding-right: 12px;
+  }
+}
+
+@media (max-height: 600px) {
+  .prompter-library-panels > .prompter-detail-workspace {
+    overflow-y: auto;
+  }
+
+  .prompter-editor-surface {
+    min-height: 300px;
+    flex: none;
+  }
+
+  .prompter-compiler-surface {
+    max-height: none;
+    flex: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -43,14 +43,17 @@ export function PromptQualityLLMReviewAffordance({
   return (
     <section
       aria-labelledby="prompt-quality-llm-review-heading"
-      className="space-y-2 rounded-card border border-border-subtle bg-panel-muted p-3"
+      className="min-w-0 space-y-2 border-t border-border-subtle pt-4 [overflow-wrap:anywhere]"
     >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="space-y-1">
-          <h4 id="prompt-quality-llm-review-heading" className="font-mono text-[11px] text-muted">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0 space-y-1">
+          <h4
+            id="prompt-quality-llm-review-heading"
+            className="text-[14px] font-medium text-muted-strong"
+          >
             Optional LLM review
           </h4>
-          <p className="text-[12px] leading-5 text-muted-strong">
+          <p className="text-[14px] leading-6 text-muted-strong">
             Reviews instructions only. Clicking may send prompt text to OpenAI; local review stays
             primary and remains available.
           </p>
@@ -59,6 +62,7 @@ export function PromptQualityLLMReviewAffordance({
           type="button"
           size="sm"
           variant="ghost"
+          className="min-w-0 whitespace-normal text-[14px]"
           disabled={isDisabled}
           onClick={() => void onRunLLMReview()}
         >
@@ -66,12 +70,12 @@ export function PromptQualityLLMReviewAffordance({
         </Button>
       </div>
       {isDisabled && disabledReason !== null && !isReviewing && (
-        <p className="text-[12px] text-muted">{disabledReason}</p>
+        <p className="min-w-0 text-[14px] text-muted">{disabledReason}</p>
       )}
       {llmResult !== null && (
-        <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-strong">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] text-muted-strong">
           <Badge variant="neutral">{llmResultLabel(llmResult)}</Badge>
-          <p>{llmResult.message}</p>
+          <p className="min-w-0">{llmResult.message}</p>
         </div>
       )}
     </section>

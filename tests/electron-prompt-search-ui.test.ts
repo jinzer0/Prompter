@@ -4,7 +4,14 @@ import { join } from "node:path"
 import type { Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
-import { createNamedProject, launchPrompter } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  openLibraryFilters,
+  openPromptTags,
+} from "./electron-playwright-helpers"
 import {
   phase5AnalyzeResponse,
   phase5CompileResponse,
@@ -67,8 +74,10 @@ test("searches prompts with filters and saves LLM suggested tags", async ({
     const promptLibrary = page.getByTestId("prompt-library")
 
     await promptLibrary.getByRole("button", { name: /Command Palette Builder/ }).click()
+    await openPromptTags(page)
     await promptLibrary.getByRole("textbox", { name: "Prompt tag name" }).fill("frontend")
     await promptLibrary.getByRole("button", { name: "Add tag to prompt" }).click()
+    await openLibraryFilters(page)
     await expect(promptLibrary.getByRole("button", { name: "Filter tag frontend" })).toBeVisible()
 
     await promptLibrary.getByRole("textbox", { name: "Search prompts" }).fill("React command")
@@ -92,6 +101,8 @@ test("searches prompts with filters and saves LLM suggested tags", async ({
       .getByRole("button", { name: "라이브러리로 돌아가기" })
       .click()
     await page.getByRole("textbox", { name: "Original request" }).fill("Build Phase 7 search UX.")
+    await openCompilerTools(page)
+    await openCompilerResult(page)
     await page.getByRole("button", { name: "분석하기" }).click()
     await expect(
       page.getByText("The request needs one clarification before compiling."),

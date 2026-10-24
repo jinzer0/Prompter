@@ -43,27 +43,27 @@ function FindingCard({
   readonly onNavigate?: SensitiveFindingNavigationHandler | undefined
 }) {
   return (
-    <li className="rounded-card border border-border bg-panel-muted p-3">
+    <li className="min-w-0 border-b border-border-subtle py-4 last:border-b-0 [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-center gap-2">
         <SensitiveFindingBadge severity={finding.severity} />
         <Badge variant="neutral">{categoryLabels[finding.category]}</Badge>
         <Badge variant="neutral">{finding.confidence} confidence</Badge>
       </div>
       <div className="mt-3 space-y-1">
-        <p className="text-[14px] font-medium text-foreground">{finding.label}</p>
+        <p className="text-[14px] font-medium leading-6 text-foreground">{finding.label}</p>
         <p className="text-[12px] leading-5 text-muted-strong">{finding.description}</p>
       </div>
       <dl className="mt-3 grid gap-2 text-[12px] md:grid-cols-2">
         <div className="min-w-0">
           <dt className="text-muted">Field</dt>
-          <dd className="break-all font-mono text-[11px] text-muted-strong">
+          <dd className="break-all font-mono text-[12px] text-muted-strong">
             {finding.location.field}
           </dd>
         </div>
         <div className="min-w-0 md:col-span-2">
           <dt className="text-muted">Masked evidence</dt>
           <dd>
-            <code className="break-all font-mono text-[11px] text-foreground">
+            <code className="break-all font-mono text-[12px] text-foreground">
               {finding.evidenceMasked}
             </code>
           </dd>
@@ -90,7 +90,7 @@ function FindingCard({
 export function SensitiveFindingList({ findings, onNavigate }: SensitiveFindingListProps) {
   if (findings.length === 0) {
     return (
-      <div className="rounded-card border border-border bg-panel-muted p-3 text-[12px] leading-5 text-muted">
+      <div className="border-l-2 border-accent py-2 pl-3 text-[14px] leading-6 text-muted">
         No sensitive findings were detected in this manual scan.
       </div>
     )
@@ -112,23 +112,19 @@ export function SensitiveFindingList({ findings, onNavigate }: SensitiveFindingL
   )
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-5 [overflow-wrap:anywhere]">
       {groups.map((group) => (
-        <section
-          key={group.key}
-          className="space-y-2"
-          aria-labelledby={`finding-group-${group.key}`}
-        >
+        <section key={group.key} className="min-w-0" aria-labelledby={`finding-group-${group.key}`}>
           <h4
             id={`finding-group-${group.key}`}
-            className="text-[12px] font-medium capitalize text-muted-strong"
+            className="border-b border-border-subtle pb-3 text-[14px] font-medium capitalize text-foreground"
           >
             {group.label}
-            <span className="ml-2 font-mono text-[11px] font-normal text-muted">
+            <span className="ml-2 font-mono text-[12px] font-normal text-muted">
               {entityLabel(group.findings[0]?.location.entityType ?? "finding")}
             </span>
           </h4>
-          <ul className="space-y-2">
+          <ul className="min-w-0">
             {group.findings.map((finding) => (
               <FindingCard key={finding.id} finding={finding} onNavigate={onNavigate} />
             ))}

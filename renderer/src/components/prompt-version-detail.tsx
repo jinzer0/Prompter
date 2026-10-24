@@ -24,9 +24,11 @@ type PromptVersionDetailProps = {
 
 function DetailRow({ label, value }: { readonly label: string; readonly value: string }) {
   return (
-    <div className="space-y-1">
-      <dt className="font-mono text-[11px] text-muted">{label}</dt>
-      <dd className="text-[12px] text-muted-strong">{value}</dd>
+    <div className="grid gap-1 py-3 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-4">
+      <dt className="text-[12px] text-muted">{label}</dt>
+      <dd className="min-w-0 select-text whitespace-pre-wrap text-[14px] text-foreground [overflow-wrap:anywhere]">
+        {value}
+      </dd>
     </div>
   )
 }
@@ -43,11 +45,13 @@ function MetadataList({
   }
 
   return (
-    <section className="space-y-2">
-      <h4 className="font-mono text-[11px] text-muted">{label}</h4>
-      <ul className="space-y-1 text-[12px] leading-5 text-muted-strong">
+    <section className="grid gap-2 py-4 sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-4">
+      <h4 className="text-[12px] text-muted">{label}</h4>
+      <ul className="min-w-0 list-inside list-disc space-y-2 text-[14px] leading-6 text-foreground [overflow-wrap:anywhere]">
         {values.map((value) => (
-          <li key={value}>{value}</li>
+          <li key={value} className="select-text whitespace-pre-wrap">
+            {value}
+          </li>
         ))}
       </ul>
     </section>
@@ -87,12 +91,14 @@ export function PromptVersionDetail({
         </Button>
       </div>
       {currentMessage !== null && <p className="text-[12px] text-muted-strong">{currentMessage}</p>}
-      <details className="space-y-2">
-        <summary className="cursor-pointer text-[14px] font-medium">저장된 버전 본문 보기</summary>
+      <details className="min-w-0 space-y-3 border-y border-border-subtle py-4">
+        <summary className="cursor-pointer rounded-control text-[14px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+          저장된 버전 본문 보기
+        </summary>
         <h3 id="compiled-prompt-heading" className="text-[14px] font-medium text-foreground">
           저장된 본문
         </h3>
-        <p className="whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 font-mono text-[14px] leading-5 text-foreground">
+        <p className="min-w-0 select-text whitespace-pre-wrap rounded-control bg-panel-muted p-4 font-mono text-[14px] leading-6 text-foreground [overflow-wrap:anywhere]">
           {selectedVersion.compiledPrompt}
         </p>
       </details>
@@ -107,7 +113,7 @@ export function PromptVersionDetail({
         saveDisabledDescriptionId={null}
         title="Version export"
       />
-      <dl className="grid gap-3">
+      <dl className="divide-y divide-border-subtle border-y border-border-subtle">
         <DetailRow label="Title" value={selectedAsset.title} />
         <DetailRow label="Scenario" value={selectedAsset.scenario} />
         <DetailRow label="Target agent" value={targetAgentLabel(selectedAsset.targetAgent)} />
@@ -123,11 +129,11 @@ export function PromptVersionDetail({
         selectedAsset={selectedAsset}
         selectedVersion={selectedVersion}
       />
-      <section className="space-y-2" aria-labelledby="original-input-heading">
-        <h3 id="original-input-heading" className="font-mono text-[11px] text-muted">
+      <section className="min-w-0 space-y-3" aria-labelledby="original-input-heading">
+        <h3 id="original-input-heading" className="text-[12px] text-muted">
           original_input
         </h3>
-        <p className="min-h-24 whitespace-pre-wrap rounded-card border border-border-subtle bg-panel-muted p-4 text-[14px] leading-5 text-foreground">
+        <p className="min-h-24 min-w-0 select-text whitespace-pre-wrap rounded-control bg-panel-muted p-4 text-[14px] leading-6 text-foreground [overflow-wrap:anywhere]">
           {selectedVersion.originalInput}
         </p>
       </section>
@@ -137,7 +143,7 @@ export function PromptVersionDetail({
         onSaved={onPromptTemplateSaved}
       />
       {metadata !== null && (
-        <div className="grid gap-3">
+        <div className="divide-y divide-border-subtle border-y border-border-subtle">
           <MetadataList label="assumptions" values={metadata.assumptions} />
           <MetadataList label="questions" values={metadata.questions} />
           <MetadataList label="answers" values={metadata.answers} />

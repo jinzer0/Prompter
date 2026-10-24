@@ -26,6 +26,7 @@ type MenuActionHandlers = {
 
 export const OPEN_SETTINGS_EVENT = "prompter:open-settings"
 export const OPEN_LIBRARY_EVENT = "prompter:open-library"
+export const CLOSE_ACTIVE_PANEL_EVENT = "prompter:close-active-panel"
 
 function revealSettings(action: () => void): void {
   window.dispatchEvent(new Event(OPEN_SETTINGS_EVENT))
@@ -43,7 +44,7 @@ export function handleMenuAction(action: MenuAction, handlers: MenuActionHandler
       revealLibrary(() => clickMenuTarget("new-prompt"))
       return
     case "newProject":
-      clickMenuTarget("new-project")
+      revealLibrary(() => clickMenuTarget("new-project"))
       return
     case "quickCaptureFromClipboard":
       revealLibrary(() => clickMenuTarget("quick-capture-from-clipboard"))
@@ -84,9 +85,14 @@ export function handleMenuAction(action: MenuAction, handlers: MenuActionHandler
     case "lockPrompter":
       handlers.refreshAppLock?.()
       return
-    case "closeActivePanel":
-      document.activeElement instanceof HTMLElement && document.activeElement.blur()
+    case "closeActivePanel": {
+      if (!window.dispatchEvent(new Event(CLOSE_ACTIVE_PANEL_EVENT, { cancelable: true }))) return
+      const activeElement = document.activeElement
+      const dialog = activeElement?.closest<HTMLDialogElement>("dialog[open]")
+      if (dialog) dialog.requestClose()
+      else if (activeElement instanceof HTMLElement) activeElement.blur()
       return
+    }
     default:
       assertNever(action)
   }

@@ -258,10 +258,13 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
         <aside
           data-testid="left-sidebar"
           aria-label="프로젝트 및 작업 공간 탐색"
-          className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-border-subtle bg-panel-elevated p-4"
+          className="prompter-sidebar flex min-h-0 min-w-0 flex-col overflow-hidden"
         >
-          <div className="shrink-0 border-b border-border-subtle pb-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+          <div className="shrink-0">
+            <p className="mb-6 flex items-center gap-2 text-[17px] font-semibold tracking-tight">
+              <span className="text-accent" aria-hidden="true">
+                ›_
+              </span>{" "}
               Prompter
             </p>
             <SidebarItem
@@ -270,11 +273,6 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
             >
               Library
             </SidebarItem>
-            <WorkspaceViewNavigation
-              onOpenInsights={insightsNavigation.openInsights}
-              onOpenPrivacy={insightsNavigation.openPrivacy}
-              workspaceView={insightsNavigation.workspaceView}
-            />
           </div>
 
           <div className="mt-5 flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto">
@@ -308,7 +306,12 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
             </nav>
           </div>
 
-          <div className="mt-5 shrink-0 border-t border-border-subtle pt-3">
+          <div className="mt-4 shrink-0 space-y-1">
+            <WorkspaceViewNavigation
+              onOpenInsights={insightsNavigation.openInsights}
+              onOpenPrivacy={insightsNavigation.openPrivacy}
+              workspaceView={insightsNavigation.workspaceView}
+            />
             <SidebarItem
               data-menu-action-target="open-settings"
               onClick={insightsNavigation.openSettings}
@@ -340,6 +343,7 @@ export function AppShell({ compilerMemory, onAppLockStateChange }: AppShellProps
             onTagsChanged={refreshPromptTags}
           />
           <PromptCompilerPanel
+            active={insightsNavigation.workspaceView === "library"}
             compilerMemory={compilerMemory}
             assets={promptLibrary.assets}
             compareVersions={promptLibrary.compareVersions}

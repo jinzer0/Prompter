@@ -6,7 +6,13 @@ import { expect } from "@playwright/test"
 
 import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
 import type { ProjectContextProfile, UpdateProjectContextProfileInput } from "../electron/ipc-types"
-import { createNamedProject, launchPrompter, type RunningApp } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  type RunningApp,
+} from "./electron-playwright-helpers"
 
 type Phase13Callback = (run: RunningApp) => Promise<void>
 
@@ -35,6 +41,8 @@ export async function withPhase13Prompter(
 
   try {
     run = await launchPrompter(userDataDirectory, extraEnv)
+    await openCompilerTools(run.page)
+    await openCompilerResult(run.page)
     await callback(run)
   } finally {
     await run?.app.close()

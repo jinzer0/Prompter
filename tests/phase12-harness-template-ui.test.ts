@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test"
 
+import { openCompilerResult, openCompilerTools } from "./electron-playwright-helpers"
 import {
   confirmSelectedHarnessDelete,
   createHarnessTemplateViaUi,
@@ -222,6 +223,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
         .getByRole("textbox", { name: "Original request" })
         .fill("Compile before selecting.")
       await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+      await openCompilerResult(page)
       await expect(preview).toHaveValue(/# Objective/)
 
       await expandCompilerOptions(page)
@@ -229,6 +231,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
         .getByRole("combobox", { name: "Harness template" })
         .selectOption({ label: "Feature Implementation" })
       await expect(preview).toHaveValue("")
+      await openCompilerTools(page)
       await expect(page.getByRole("button", { exact: true, name: "Copy" })).toBeDisabled()
       await expect(page.getByRole("button", { name: "Save compiled prompt" })).toBeDisabled()
     })
@@ -242,6 +245,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
         .getByRole("combobox", { name: "Harness template" })
         .selectOption({ label: "Feature Implementation" })
 
+      await openCompilerResult(page)
       await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue("")
       await expect(page.getByText("Analysis is ready.")).toHaveCount(0)
       await expect(page.getByText("Compiled prompt saved.")).toHaveCount(0)
@@ -260,6 +264,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
   test("quick capture followed by harness selector selection preserves exact text", async () => {
     await withHarnessManager("prompter-phase12-selector-quick-capture", async ({ app, page }) => {
       await setClipboardText(app, exactHarnessQuickCaptureText)
+      await openCompilerTools(page)
       await page.getByRole("button", { name: "Import from Clipboard" }).click()
       await expect(page.getByRole("textbox", { name: "Original request" })).toHaveValue(
         exactHarnessQuickCaptureText,
@@ -272,6 +277,7 @@ test.describe("Phase 12 harness template selector flows for Todo 7", () => {
       await expect(page.getByRole("textbox", { name: "Original request" })).toHaveValue(
         exactHarnessQuickCaptureText,
       )
+      await openCompilerResult(page)
       await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue("")
     })
   })

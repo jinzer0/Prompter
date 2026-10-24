@@ -5,7 +5,11 @@ import type { ElectronApplication, Page, TestInfo } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
 import { PERSISTENCE_CHANNELS } from "../electron/ipc-contract"
-import { launchPrompter } from "./electron-playwright-helpers"
+import {
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+} from "./electron-playwright-helpers"
 import {
   installPromptCompilerIpcRecorder,
   promptCompilerIpcSnapshot,
@@ -189,6 +193,7 @@ test("Phase 19 privacy and encrypted-backup user flow stays manual and masked", 
     // When: a test-only key-shaped draft is scanned from the Library compiler.
     const originalRequest = run.page.getByRole("textbox", { name: "Original request" })
     await originalRequest.fill(originalRequestText)
+    await openCompilerResult(run.page)
     const draftScan = run.page
       .getByRole("heading", { name: "Sensitive information scan" })
       .locator('xpath=ancestor::*[@data-testid="ui-card"]')
@@ -204,6 +209,7 @@ test("Phase 19 privacy and encrypted-backup user flow stays manual and masked", 
 
     // When: Analyze reaches the privacy gate, then the user cancels the safe modal path.
     expect(await promptCompilerIpcSnapshot(run.app)).toMatchObject({ analyze: 0, compile: 0 })
+    await openCompilerTools(run.page)
     await run.page.getByRole("button", { name: /^(?:Analyze with LLM|분석하기)$/ }).click()
     const warningDialog = run.page.getByRole("alertdialog", {
       name: "Sensitive content needs review",

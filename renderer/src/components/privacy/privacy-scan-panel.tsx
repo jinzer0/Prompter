@@ -51,7 +51,7 @@ function ScanResult({
   readonly state: Extract<PrivacyScanState, { readonly kind: "ready" }>
 }) {
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 space-y-4">
       <div className="flex flex-wrap items-center gap-2" role="status" aria-live="polite">
         <Badge variant={state.result.safeToProceed ? "success" : "accent"}>
           {state.result.findingCount} finding(s)
@@ -86,13 +86,13 @@ function ScanState({
   switch (state.kind) {
     case "idle":
       return (
-        <p className="text-[12px] leading-5 text-muted">
+        <p className="text-[14px] leading-6 text-muted">
           No scan has run. Content stays unchanged until you request a scan.
         </p>
       )
     case "scanning":
       return (
-        <p className="text-[12px] leading-5 text-muted-strong" role="status" aria-live="polite">
+        <p className="text-[14px] leading-6 text-muted-strong" role="status" aria-live="polite">
           Scanning requested content...
         </p>
       )
@@ -101,7 +101,7 @@ function ScanState({
     case "error":
       return (
         <div className="space-y-2" role="alert">
-          <p className="text-[12px] leading-5 text-muted-strong">{state.message}</p>
+          <p className="text-[14px] leading-6 text-danger">{state.message}</p>
           <Button disabled={scanDisabled} size="sm" variant="secondary" onClick={onScan}>
             Retry privacy scan
           </Button>
@@ -126,11 +126,13 @@ export function PrivacyScanPanel({
   const scanAction = scanButton(state, scanDisabled)
 
   return (
-    <Card aria-labelledby={headingId}>
-      <CardHeader>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1">
-            <CardTitle id={headingId}>{title}</CardTitle>
+    <Card aria-labelledby={headingId} className="min-w-0 [overflow-wrap:anywhere]">
+      <CardHeader className="p-5 pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1 basis-72 space-y-1">
+            <CardTitle id={headingId} className="text-[17px] tracking-[-0.02em]">
+              {title}
+            </CardTitle>
             <CardDescription>{description}</CardDescription>
           </div>
           <Button disabled={scanAction.disabled} onClick={onScan}>
@@ -138,9 +140,11 @@ export function PrivacyScanPanel({
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-5 pt-2">
         {scanDisabled && scanDisabledReason !== undefined && (
-          <p className="mb-3 text-[12px] leading-5 text-muted-strong">{scanDisabledReason}</p>
+          <p className="mb-4 border-l-2 border-accent pl-3 text-[12px] leading-5 text-muted-strong">
+            {scanDisabledReason}
+          </p>
         )}
         <ScanState
           onNavigate={onNavigate}

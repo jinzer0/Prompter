@@ -13,6 +13,7 @@ import { Textarea } from "./ui/textarea"
 
 type PromptCompilerFormProps = {
   readonly children?: ReactNode
+  readonly actions?: ReactNode
   readonly draft: PromptCompilerInput
   readonly originalRequestRef?: Ref<HTMLTextAreaElement>
   readonly onChange: (draft: PromptCompilerInput) => void
@@ -20,13 +21,14 @@ type PromptCompilerFormProps = {
 
 export function PromptCompilerForm({
   children,
+  actions,
   draft,
   originalRequestRef,
   onChange,
 }: PromptCompilerFormProps) {
   return (
-    <div className="space-y-3">
-      <label className="block text-[14px] font-medium" htmlFor="compiler-original-request">
+    <div className="space-y-2">
+      <label className="sr-only" htmlFor="compiler-original-request">
         핵심 요청
       </label>
       <Textarea
@@ -38,7 +40,8 @@ export function PromptCompilerForm({
         value={draft.originalInput}
         onChange={(event) => onChange({ ...draft, originalInput: event.currentTarget.value })}
       />
-      <details className="border-y border-border-subtle py-3">
+      {actions}
+      <details className="py-1">
         <summary className="cursor-pointer text-[14px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
           추가 옵션
         </summary>

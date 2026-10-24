@@ -3,7 +3,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
 
-import { closePrompter, createNamedProject, launchPrompter } from "./electron-playwright-helpers"
+import {
+  closePrompter,
+  createNamedProject,
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  openPromptDetails,
+} from "./electron-playwright-helpers"
 import {
   phase5AnalyzeResponse,
   phase5CompiledPrompt,
@@ -28,6 +35,7 @@ test("analyzes, compiles, and saves an LLM prompt through the compiler panel", a
     await run.page
       .getByRole("textbox", { name: "Original request" })
       .fill("Build the Phase 5 LLM compiler flow.")
+    await openCompilerTools(run.page)
     await run.page.getByRole("button", { name: "분석하기" }).click()
     await expect(
       run.page.getByText("Add an OpenAI API key in Settings before using LLM prompt compilation."),
@@ -43,7 +51,9 @@ test("analyzes, compiles, and saves an LLM prompt through the compiler panel", a
       .getByRole("button", { name: "라이브러리로 돌아가기" })
       .click()
 
+    await openCompilerTools(run.page)
     await run.page.getByRole("button", { name: "분석하기" }).click()
+    await openCompilerResult(run.page)
     await expect(
       run.page.getByText("The request needs one clarification before compiling."),
     ).toBeVisible()
@@ -66,7 +76,12 @@ test("analyzes, compiles, and saves an LLM prompt through the compiler panel", a
     await expect(
       run.page.getByRole("button", { name: /Generate Phase 5 compiler prompt/ }),
     ).toBeVisible()
+    await openPromptDetails(run.page)
     await expect(run.page.getByText("Version 1")).toBeVisible()
+    await run.page
+      .getByRole("dialog", { name: "프롬프트 버전 · 내보내기 · 품질", exact: true })
+      .getByRole("button", { name: "닫기", exact: true })
+      .click()
 
     const stored = await run.page.evaluate(async () => {
       const projects = await window.prompter.projects.list()

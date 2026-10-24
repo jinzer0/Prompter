@@ -94,36 +94,42 @@ export function ProjectContextProfileEditor({
 
   return (
     <form
-      className="space-y-3 rounded-card border border-border bg-panel-muted p-3"
+      className="min-w-0 space-y-3 rounded-card bg-panel p-4 text-[14px] [overflow-wrap:anywhere]"
       onSubmit={submitForm}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[14px] font-medium text-foreground">
             {mode === "create" ? "New context profile" : "Edit context profile"}
           </p>
           <p className="mt-1 text-[12px] leading-5 text-muted">
             Profile body fields keep whitespace exactly; only the name is trimmed.
           </p>
         </div>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
+        <Button
+          className="h-auto min-w-0 whitespace-normal"
+          size="sm"
+          variant="ghost"
+          onClick={onCancel}
+        >
           Close
         </Button>
       </div>
 
       <Input
+        className="min-w-0 max-w-full"
         aria-label="Context profile name"
         placeholder="Context profile name"
         value={form.name}
         onChange={(event) => setForm({ ...form, name: event.currentTarget.value })}
       />
       {errorFor("name") !== null && (
-        <p className="text-[12px] text-muted-strong">{errorFor("name")}</p>
+        <p className="text-[14px] text-muted-strong">{errorFor("name")}</p>
       )}
 
       <label
         htmlFor="context-profile-default"
-        className="flex items-center gap-2 text-[12px] text-muted-strong"
+        className="flex min-w-0 items-center gap-2 border-t border-border-subtle pt-4 text-[14px] text-muted-strong"
       >
         <Checkbox
           id="context-profile-default"
@@ -138,13 +144,13 @@ export function ProjectContextProfileEditor({
         <label
           key={field.field}
           htmlFor={`context-profile-${field.field}`}
-          className="block space-y-1 text-[12px] text-muted-strong"
+          className="block min-w-0 space-y-1 border-t border-border-subtle pt-4 text-[14px] text-muted-strong"
         >
           <span>{field.label}</span>
           <Textarea
             aria-label={field.label}
             id={`context-profile-${field.field}`}
-            className="min-h-24 font-mono text-[12px] leading-5"
+            className="min-h-24 min-w-0 max-w-full text-[14px] leading-5 [overflow-wrap:anywhere]"
             placeholder={field.placeholder}
             value={form[field.field]}
             onChange={(event) => updateTextField(field.field, event.currentTarget.value)}
@@ -152,8 +158,8 @@ export function ProjectContextProfileEditor({
         </label>
       ))}
 
-      {message !== null && <p className="text-[12px] text-muted-strong">{message}</p>}
-      <Button className="w-full" type="submit" disabled={isSaving}>
+      {message !== null && <p className="text-[14px] text-muted-strong">{message}</p>}
+      <Button className="h-auto w-full min-w-0 whitespace-normal" type="submit" disabled={isSaving}>
         Save Context Profile
       </Button>
     </form>

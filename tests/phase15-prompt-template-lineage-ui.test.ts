@@ -3,7 +3,14 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
 
-import { createNamedProject, launchPrompter } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  openEditorAction,
+  openPromptDetails,
+} from "./electron-playwright-helpers"
 import {
   expectNoPromptCompilerIpcCalls,
   installPromptCompilerIpcRecorder,
@@ -20,6 +27,7 @@ async function createInitialPrompt(page: Awaited<ReturnType<typeof launchPrompte
   await page.getByRole("textbox", { name: "Compiled prompt" }).fill("Compiled source body")
   await page.getByRole("button", { name: "Save Prompt" }).click()
   await expect(page.getByRole("button", { name: /Phase 15 Source Prompt/ })).toBeVisible()
+  await openPromptDetails(page)
   await expect(page.getByRole("button", { name: /Version 1/ })).toBeVisible()
 }
 
@@ -50,6 +58,7 @@ test("phase15 prompt template and lineage controls are usable", async ({
       .getByRole("textbox", { name: "Version prompt template body" })
       .fill("Rendered {{feature}} template body")
     await run.page.getByRole("button", { name: "Create Prompt Template From Version" }).click()
+    await run.page.getByRole("dialog").getByRole("button", { name: "닫기", exact: true }).click()
     await run.page.getByTestId("left-sidebar").getByRole("button", { name: "템플릿 관리" }).click()
     await expect(run.page.getByRole("button", { name: /Phase 15 Version Template/ })).toBeVisible()
     await run.page
@@ -57,6 +66,7 @@ test("phase15 prompt template and lineage controls are usable", async ({
       .getByRole("button", { name: "라이브러리로 돌아가기" })
       .click()
     await run.page.locator("summary").filter({ hasText: "추가 옵션" }).click()
+    await openCompilerResult(run.page)
 
     await run.page.getByRole("combobox", { exact: true, name: "Prompt template" }).selectOption({
       label: "Phase 15 Version Template",
@@ -103,25 +113,26 @@ test("phase15 prompt template and lineage controls are usable", async ({
       "Rendered lineage template body",
     )
 
+    await openPromptDetails(run.page)
     await run.page.getByRole("button", { name: "Derive Draft" }).click()
     await expect(
       run.page.getByText("Derived draft seeded from Phase 15 Source Prompt. Save when ready."),
     ).toBeVisible()
+    await openCompilerTools(run.page)
     await run.page.getByRole("button", { name: "Save compiled prompt" }).click()
     await expect(
       run.page.getByRole("button", { name: /Phase 15 Source Prompt Derived/ }),
     ).toBeVisible()
+    await openPromptDetails(run.page)
     await expect(run.page.getByText("active_source")).toBeVisible()
 
     await run.page.getByRole("button", { name: /Phase 15 Source Prompt · v1 · Derived/ }).click()
-    await run.page
-      .getByTestId("prompt-editor")
-      .getByRole("button", { exact: true, name: "복제하여 저장" })
-      .click()
+    await openEditorAction(run.page, "복제하여 저장")
     const duplicateDialog = run.page.getByRole("alertdialog", { name: "복제하여 저장" })
     await duplicateDialog.getByLabel("복제본 제목 (필수)").fill("Copy of Phase 15 Source Prompt")
     await duplicateDialog.getByRole("button", { exact: true, name: "복제하여 저장" }).click()
     await expect(run.page.getByRole("button", { name: /Copy/ }).first()).toBeVisible()
+    await openPromptDetails(run.page)
     await expect(run.page.getByRole("heading", { name: "Lineage" })).toBeVisible()
     await expect(run.page.getByText("active_source")).toBeVisible()
 

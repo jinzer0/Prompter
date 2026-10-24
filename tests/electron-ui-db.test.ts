@@ -4,7 +4,13 @@ import { join } from "node:path"
 import type { Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
-import { createNamedProject, launchPrompter } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  openPromptDetails,
+} from "./electron-playwright-helpers"
 
 const phase3ScreenshotPath = "test-results/phase3-ui.png"
 const phase4ScreenshotPath = "test-results/phase4-compiler-ui.png"
@@ -54,7 +60,12 @@ async function createPrompt(page: Page): Promise<void> {
   await expect(page.getByRole("textbox", { name: "Prompt editor body" })).toHaveValue(
     "Compiled phase 3 instructions for the selected project.",
   )
+  await openPromptDetails(page)
   await expect(page.getByText("Version 1")).toBeVisible()
+  await page
+    .getByRole("dialog", { name: "프롬프트 버전 · 내보내기 · 품질", exact: true })
+    .getByRole("button", { name: "닫기", exact: true })
+    .click()
 }
 
 test("supports project and prompt library CRUD through the UI", async ({
@@ -186,12 +197,14 @@ test("compiles and saves a static prompt through the compiler panel", async ({
     await validationCommands.fill("npm run typecheck")
     await expect(validationCommands).toHaveValue("npm run typecheck")
     await firstRun.page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+    await openCompilerResult(firstRun.page)
 
     const preview = firstRun.page.getByRole("textbox", { name: "Generated prompt preview" })
     await expect(preview).toContainText("# Objective")
     await expect(preview).toContainText("# Final Response Format")
     await preview.fill("# Objective\nManual preview edit before save.")
     await expect(preview).toHaveValue("# Objective\nManual preview edit before save.")
+    await openCompilerTools(firstRun.page)
     await firstRun.page.getByRole("button", { name: "Copy", exact: true }).click()
     await expect(firstRun.page.getByText("Compiled prompt copied.")).toBeVisible()
 
@@ -202,7 +215,12 @@ test("compiles and saves a static prompt through the compiler panel", async ({
         name: /Add a settings screen for local prompt preferences/,
       }),
     ).toBeVisible()
+    await openPromptDetails(firstRun.page)
     await expect(firstRun.page.getByText("Version 1")).toBeVisible()
+    await firstRun.page
+      .getByRole("dialog", { name: "프롬프트 버전 · 내보내기 · 품질", exact: true })
+      .getByRole("button", { name: "닫기", exact: true })
+      .click()
 
     const stored = await firstRun.page.evaluate(async () => {
       const projects = await window.prompter.projects.list()

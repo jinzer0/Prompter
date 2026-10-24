@@ -67,25 +67,39 @@ export function PromptTemplateSidebarSection({
   const hasSelection = selectedTemplateId !== null
 
   return (
-    <section className="space-y-3" aria-labelledby="prompt-templates-heading">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="prompt-templates-heading" className="text-[16px] font-semibold text-foreground">
+    <section
+      className="min-w-0 space-y-3 rounded-card bg-panel p-4 [overflow-wrap:anywhere]"
+      aria-labelledby="prompt-templates-heading"
+    >
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <h2
+          id="prompt-templates-heading"
+          className="min-w-0 text-[17px] font-semibold text-foreground"
+        >
           Prompt Templates
         </h2>
-        <Button aria-label="New Prompt Template" variant="ghost" size="sm" onClick={onNewTemplate}>
+        <Button
+          aria-label="New Prompt Template"
+          className="h-auto min-w-0 whitespace-normal text-[14px]"
+          variant="ghost"
+          size="sm"
+          onClick={onNewTemplate}
+        >
           New
         </Button>
       </div>
 
-      <div className="space-y-2 rounded-card border border-border bg-panel-muted p-3">
+      <div className="min-w-0 space-y-2">
         <Input
           aria-label="Search prompt templates"
+          className="min-w-0 max-w-full"
           placeholder="Search templates"
           value={query}
           onChange={(event) => onQueryChange(event.currentTarget.value)}
         />
         <Select
           aria-label="Prompt template scenario filter"
+          className="min-w-0 max-w-full"
           value={scenario}
           onChange={(event) => onScenarioChange(scenarioFilterFromValue(event.currentTarget.value))}
         >
@@ -98,6 +112,7 @@ export function PromptTemplateSidebarSection({
         </Select>
         <Select
           aria-label="Prompt template target agent filter"
+          className="min-w-0 max-w-full"
           value={targetAgent}
           onChange={(event) =>
             onTargetAgentChange(targetAgentFilterFromValue(event.currentTarget.value))
@@ -110,8 +125,9 @@ export function PromptTemplateSidebarSection({
             </option>
           ))}
         </Select>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex min-w-0 flex-wrap gap-2">
           <Button
+            className="h-auto min-w-0 whitespace-normal text-[14px]"
             size="sm"
             variant="secondary"
             disabled={!hasSelection}
@@ -122,6 +138,7 @@ export function PromptTemplateSidebarSection({
           </Button>
           <Button
             aria-label="Delete Prompt Template"
+            className="h-auto min-w-0 whitespace-normal text-[14px]"
             size="sm"
             variant="ghost"
             disabled={!hasSelection}
@@ -130,14 +147,19 @@ export function PromptTemplateSidebarSection({
             Delete
           </Button>
           {hasActiveFilters && (
-            <Button size="sm" variant="ghost" onClick={onClearFilters}>
+            <Button
+              className="h-auto min-w-0 whitespace-normal text-[14px]"
+              size="sm"
+              variant="ghost"
+              onClick={onClearFilters}
+            >
               Clear prompt template filters
             </Button>
           )}
         </div>
       </div>
 
-      <div className="space-y-1">
+      <div className="min-w-0 divide-y divide-border-subtle">
         {status === "loading" && (
           <p className="text-[12px] text-muted">Loading prompt templates...</p>
         )}
@@ -152,16 +174,18 @@ export function PromptTemplateSidebarSection({
               aria-label={`${template.name}, ${scenarioLabel(template.scenario)}, ${targetAgentLabel(
                 template.targetAgent,
               )}, ${sourceLabel(template)}`}
-              className="min-h-14 items-start gap-2 overflow-hidden py-2"
+              className="h-auto min-h-14 min-w-0 flex-wrap items-start gap-2 whitespace-normal rounded-none py-2"
               variant={isSelected ? "active" : "default"}
               onClick={() => onSelectTemplate(template.id)}
             >
               <span className="flex min-w-0 flex-col items-start gap-1">
-                <span className="max-w-full truncate">{template.name}</span>
-                <span className="text-[11px] font-normal text-muted">
+                <span className="max-w-full text-[14px] [overflow-wrap:anywhere]">
+                  {template.name}
+                </span>
+                <span className="max-w-full text-[12px] font-normal text-muted [overflow-wrap:anywhere]">
                   {scenarioLabel(template.scenario)} · {targetAgentLabel(template.targetAgent)}
                 </span>
-                <span className="font-mono text-[11px] font-normal text-muted">
+                <span className="max-w-full font-mono text-[12px] font-normal text-muted [overflow-wrap:anywhere]">
                   {sourceLabel(template)}
                 </span>
               </span>

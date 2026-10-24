@@ -105,36 +105,43 @@ export function HarnessTemplateEditor({
 
   return (
     <form
-      className="space-y-3 rounded-card border border-border bg-panel-muted p-3"
+      className="min-w-0 space-y-3 rounded-card bg-panel p-4 text-[14px] [overflow-wrap:anywhere]"
       onSubmit={submitForm}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[14px] font-medium text-foreground">
             {mode === "create" ? "New harness" : "Edit harness"}
           </p>
           <p className="mt-1 text-[12px] leading-5 text-muted">
             JSON fields are validated locally before bridge calls.
           </p>
         </div>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
+        <Button
+          className="h-auto min-w-0 max-w-full whitespace-normal"
+          size="sm"
+          variant="ghost"
+          onClick={onCancel}
+        >
           Close
         </Button>
       </div>
 
       <Input
         aria-label="Harness name"
+        className="min-w-0 max-w-full text-[14px]"
         placeholder="Harness name"
         value={form.name}
         onChange={(event) => setForm({ ...form, name: event.currentTarget.value })}
       />
       {errorFor("name") !== null && (
-        <p className="text-[12px] text-muted-strong">{errorFor("name")}</p>
+        <p className="text-[14px] text-muted-strong">{errorFor("name")}</p>
       )}
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 gap-2">
         <Select
           aria-label="Scenario"
+          className="min-w-0 max-w-full text-[14px]"
           value={form.scenario}
           onChange={(event) =>
             setForm({ ...form, scenario: parseScenario(event.currentTarget.value) })
@@ -148,6 +155,7 @@ export function HarnessTemplateEditor({
         </Select>
         <Select
           aria-label="Target agent"
+          className="min-w-0 max-w-full text-[14px]"
           value={form.targetAgent}
           onChange={(event) =>
             setForm({ ...form, targetAgent: parseTargetAgent(event.currentTarget.value) })
@@ -163,38 +171,43 @@ export function HarnessTemplateEditor({
 
       <Textarea
         aria-label="Template body"
+        className="min-w-0 max-w-full text-[14px]"
         placeholder="Template body"
         value={form.templateBody}
         onChange={(event) => setForm({ ...form, templateBody: event.currentTarget.value })}
       />
       {errorFor("templateBody") !== null && (
-        <p className="text-[12px] text-muted-strong">{errorFor("templateBody")}</p>
+        <p className="text-[14px] text-muted-strong">{errorFor("templateBody")}</p>
       )}
 
       <Textarea
         aria-label="Required fields JSON"
-        className="min-h-24 font-mono text-[12px] leading-5"
+        className="min-h-24 min-w-0 max-w-full font-mono text-[14px] leading-5"
         placeholder='["originalInput"]'
         value={form.requiredFields}
         onChange={(event) => setForm({ ...form, requiredFields: event.currentTarget.value })}
       />
       {errorFor("requiredFields") !== null && (
-        <p className="text-[12px] text-muted-strong">{errorFor("requiredFields")}</p>
+        <p className="text-[14px] text-muted-strong">{errorFor("requiredFields")}</p>
       )}
 
       <Textarea
         aria-label="Clarification policy JSON"
-        className="min-h-24 font-mono text-[12px] leading-5"
+        className="min-h-24 min-w-0 max-w-full font-mono text-[14px] leading-5"
         placeholder='{"mode":"ask_when_missing"}'
         value={form.clarificationPolicy}
         onChange={(event) => setForm({ ...form, clarificationPolicy: event.currentTarget.value })}
       />
       {errorFor("clarificationPolicy") !== null && (
-        <p className="text-[12px] text-muted-strong">{errorFor("clarificationPolicy")}</p>
+        <p className="text-[14px] text-muted-strong">{errorFor("clarificationPolicy")}</p>
       )}
 
-      {message !== null && <p className="text-[12px] text-muted-strong">{message}</p>}
-      <Button className="w-full" type="submit" disabled={isSaving}>
+      {message !== null && <p className="text-[14px] text-muted-strong">{message}</p>}
+      <Button
+        className="h-auto w-full min-w-0 max-w-full whitespace-normal"
+        type="submit"
+        disabled={isSaving}
+      >
         Save Harness
       </Button>
     </form>

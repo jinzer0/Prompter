@@ -3,7 +3,11 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
 
-import { launchPrompter } from "./electron-playwright-helpers"
+import {
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+} from "./electron-playwright-helpers"
 import {
   installPromptCompilerIpcRecorder,
   promptCompilerIpcSnapshot,
@@ -66,6 +70,8 @@ test("preserved compiler output requires explicit project rebind before B persis
     await targetAgent.selectOption("claude_code")
     await harness.selectOption(seed.harnessId)
     await installPromptCompilerIpcRecorder(run.app)
+    await openCompilerTools(run.page)
+    await openCompilerResult(run.page)
     await run.page.getByRole("button", { name: "프롬프트 컴파일" }).click()
     await expect(preview).toHaveValue(seed.staticOutput)
     const promptTemplate = run.page.getByRole("combobox", {

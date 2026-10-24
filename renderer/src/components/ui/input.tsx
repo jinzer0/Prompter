@@ -9,7 +9,7 @@ export function Input({ className, ...props }: InputProps) {
     <input
       data-testid="ui-input"
       className={cn(
-        "h-8 w-full rounded-control border border-border bg-panel-muted px-3 text-[14px] text-foreground outline-none transition-colors duration-150 ease-out placeholder:text-muted focus:border-accent/65 focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50",
+        "h-8 w-full rounded-control border border-border bg-panel px-3 text-[14px] text-foreground outline-none transition-colors duration-150 ease-out placeholder:text-muted focus:border-accent focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}

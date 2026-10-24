@@ -46,16 +46,20 @@ export function PrivacyCenterView({
   settings,
 }: PrivacyCenterViewProps) {
   return (
-    <Panel headingId="privacy-center-heading" className="h-full min-h-0 gap-4 overflow-auto">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
-            Local privacy controls
-          </p>
-          <h2 id="privacy-center-heading" className="mt-1 text-[24px] font-medium text-foreground">
+    <Panel
+      headingId="privacy-center-heading"
+      className="h-full min-h-0 gap-5 overflow-auto bg-shell p-6 [overflow-wrap:anywhere] [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[740px] [&>*]:shrink-0"
+    >
+      <header className="flex flex-wrap items-start justify-between gap-4 py-2">
+        <div className="min-w-0 flex-1 basis-80">
+          <p className="text-[12px] font-medium text-muted">Local privacy controls</p>
+          <h2
+            id="privacy-center-heading"
+            className="mt-1 text-[23px] font-semibold tracking-[-0.035em] text-foreground"
+          >
             Privacy Center
           </h2>
-          <p className="mt-1 text-[12px] leading-5 text-muted">
+          <p className="mt-2 text-[14px] leading-6 text-muted">
             Review masked signals and warning gates without changing saved prompts or drafts.
           </p>
         </div>
@@ -64,16 +68,17 @@ export function PrivacyCenterView({
         </Button>
       </header>
 
-      <div className="grid gap-3 xl:grid-cols-3">
+      <Card className="min-w-0 px-5">
         {privacyGuidance.map((item) => (
-          <Card key={item.title}>
-            <CardHeader>
-              <CardTitle>{item.title}</CardTitle>
-              <CardDescription>{item.description}</CardDescription>
-            </CardHeader>
-          </Card>
+          <CardHeader
+            key={item.title}
+            className="border-b border-border-subtle px-0 py-4 last:border-b-0"
+          >
+            <CardTitle>{item.title}</CardTitle>
+            <CardDescription>{item.description}</CardDescription>
+          </CardHeader>
         ))}
-      </div>
+      </Card>
 
       <PrivacyScanPanel
         description="Inspect the saved local library only when requested. Results are transient, masked, and grouped by entity."

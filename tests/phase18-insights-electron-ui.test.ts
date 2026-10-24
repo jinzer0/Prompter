@@ -4,7 +4,7 @@ import { join } from "node:path"
 import type { ElectronApplication, Locator, Page } from "@playwright/test"
 import { expect, test } from "@playwright/test"
 
-import { launchPrompter } from "./electron-playwright-helpers"
+import { launchPrompter, openLibraryFilters } from "./electron-playwright-helpers"
 import {
   exactTemplateName,
   insightsProjectName,
@@ -197,10 +197,12 @@ test("populated Insights stays read-only while filters and navigation reach exac
       versionQualityScore: 25,
     })
 
+    await run.page.getByRole("dialog").getByRole("button", { name: "닫기", exact: true }).click()
     await openInsights(run.page)
     await projectFilter.selectOption({ label: insightsProjectName })
     await expect(projectFilter).toHaveValue(seed.projectId)
     await mostUsedTags.getByRole("button", { name: new RegExp(insightsTagName) }).click()
+    await openLibraryFilters(run.page)
     await expect(
       run.page
         .getByTestId("prompt-library")

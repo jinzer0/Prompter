@@ -43,8 +43,28 @@ export function focusInsightsElement(element: InsightsFocusableElement): void {
 }
 
 export function focusInsightsTarget(target: string): void {
-  requestAnimationFrame(() => {
+  function revealAndFocus(): void {
     const element = document.querySelector<HTMLElement>(`[data-insights-target="${target}"]`)
-    if (element !== null) focusInsightsElement(element)
+    if (element === null) return
+    for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+      if (ancestor instanceof HTMLDetailsElement) ancestor.open = true
+      if (ancestor instanceof HTMLDialogElement && !ancestor.open) ancestor.showModal()
+    }
+    focusInsightsElement(element)
+  }
+
+  requestAnimationFrame(() => {
+    const versionTab =
+      target === "prompt-quality"
+        ? document.querySelector<HTMLButtonElement>(
+            '[data-insights-target="prompt-version"] [role="tab"][data-value="version"]',
+          )
+        : null
+    if (versionTab !== null && versionTab.getAttribute("aria-selected") !== "true") {
+      versionTab.click()
+      requestAnimationFrame(revealAndFocus)
+    } else {
+      revealAndFocus()
+    }
   })
 }

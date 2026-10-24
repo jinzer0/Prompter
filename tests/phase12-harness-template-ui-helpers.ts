@@ -5,7 +5,12 @@ import type { ElectronApplication, Page } from "@playwright/test"
 import { expect } from "@playwright/test"
 
 import type { HarnessTemplate } from "../electron/ipc-types"
-import { launchPrompter, type RunningApp } from "./electron-playwright-helpers"
+import {
+  launchPrompter,
+  openCompilerResult,
+  openCompilerTools,
+  type RunningApp,
+} from "./electron-playwright-helpers"
 
 type HarnessCallback = (run: RunningApp) => Promise<void>
 type PersistentHarnessCallback = (userDataDirectory: string) => Promise<void>
@@ -104,6 +109,8 @@ export async function openHarnessManagement(page: Page): Promise<void> {
 }
 
 export async function expandCompilerOptions(page: Page): Promise<void> {
+  await openCompilerTools(page)
+  await openCompilerResult(page)
   await page.getByText("추가 옵션", { exact: true }).click()
   await expect(page.getByRole("region", { name: "컴파일러 추가 옵션" })).toBeVisible()
 }
@@ -153,6 +160,7 @@ export async function expectStaticCompileUsesSelectedHarness(
   await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue("")
 
   await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+  await openCompilerResult(page)
   await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue(
     /# Feature Implementation/,
   )
@@ -182,6 +190,7 @@ export async function expectDeletedSelectedHarnessFallsBackAfterReload(
 
   await page.getByRole("textbox", { name: "Original request" }).fill(originalInput)
   await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+  await openCompilerResult(page)
   await expect(page.getByRole("textbox", { name: "Generated prompt preview" })).toHaveValue(
     /# Objective/,
   )
@@ -212,6 +221,7 @@ export async function expectSameSessionDeletedHarnessClearsBeforeStaticCompile(
   await expect(selector).toBeVisible()
   await expect(selector).toHaveValue("")
   await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+  await openCompilerResult(page)
   await expect(preview).toHaveValue(/# Objective/)
   await expect(preview).toHaveValue(new RegExp(originalInput))
   await expect(preview).not.toHaveValue(/# Documentation/)

@@ -88,45 +88,53 @@ export function SavePromptTemplateFromVersion({
   }
 
   return (
-    <div className="space-y-3 rounded-card border border-border bg-panel-muted p-3">
+    <div className="min-w-0 space-y-3 border-t border-border-subtle pt-4 [overflow-wrap:anywhere]">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-[13px] font-medium text-muted-strong">Save as Prompt Template</p>
+        <div className="min-w-0">
+          <p className="text-[14px] font-medium text-muted-strong">Save as Prompt Template</p>
           <p className="text-[12px] leading-5 text-muted">
             Seed editable template body from this version's compiled prompt.
           </p>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => setIsOpen((current) => !current)}>
+        <Button
+          size="sm"
+          variant="secondary"
+          className="min-w-0 whitespace-normal text-[14px]"
+          onClick={() => setIsOpen((current) => !current)}
+        >
           {isOpen ? "Close Template Save" : "Save as template"}
         </Button>
       </div>
 
       {isOpen && (
-        <form className="space-y-3" onSubmit={submitForm}>
+        <form className="min-w-0 space-y-3" onSubmit={submitForm}>
           <Input
+            className="min-w-0 max-w-full"
             aria-label="Version prompt template name"
             value={form.name}
             onChange={(event) => setForm({ ...form, name: event.currentTarget.value })}
           />
           {errorFor("name") !== null && (
-            <p className="text-[12px] text-muted-strong">{errorFor("name")}</p>
+            <p className="text-[14px] text-muted-strong">{errorFor("name")}</p>
           )}
           <Input
+            className="min-w-0 max-w-full"
             aria-label="Version prompt template description"
             placeholder="Optional description"
             value={form.description}
             onChange={(event) => setForm({ ...form, description: event.currentTarget.value })}
           />
           <Textarea
+            className="min-w-0 max-w-full"
             aria-label="Version prompt template body"
             value={form.templateBody}
             onChange={(event) => setForm({ ...form, templateBody: event.currentTarget.value })}
           />
           {errorFor("templateBody") !== null && (
-            <p className="text-[12px] text-muted-strong">{errorFor("templateBody")}</p>
+            <p className="text-[14px] text-muted-strong">{errorFor("templateBody")}</p>
           )}
-          {message !== null && <p className="text-[12px] text-muted-strong">{message}</p>}
-          <Button type="submit" disabled={isSaving}>
+          {message !== null && <p className="text-[14px] text-muted-strong">{message}</p>}
+          <Button type="submit" className="min-w-0 whitespace-normal" disabled={isSaving}>
             Create Prompt Template From Version
           </Button>
         </form>

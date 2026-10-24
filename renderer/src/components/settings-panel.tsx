@@ -31,16 +31,20 @@ export function SettingsPanel({
 
   return (
     <section
-      className="space-y-3"
+      className="min-w-0 space-y-6"
       aria-labelledby="settings-heading"
       data-insights-target="settings"
       data-menu-action-target="settings-panel"
       tabIndex={-1}
     >
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="settings-heading" className="text-[16px] font-semibold text-foreground">
+      <div className="space-y-2">
+        <h2
+          id="settings-heading"
+          className="text-[23px] font-semibold tracking-tight text-foreground"
+        >
           Settings
         </h2>
+        <p className="text-[12px] text-muted-strong">익숙한 작업 공간을, 나에게 맞게.</p>
       </div>
 
       <SettingsDefaultsForm

@@ -1,7 +1,11 @@
 import { mkdir } from "node:fs/promises"
 import { expect, test } from "@playwright/test"
 
-import { createNamedProject } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  openCompilerResult,
+  openCompilerTools,
+} from "./electron-playwright-helpers"
 import {
   phase5AnalyzeResponse,
   phase5CompileResponse,
@@ -124,6 +128,7 @@ test.describe("project context profile management", () => {
 
       await originalRequest(page).fill("Static include behavior stays explicit.")
       await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+      await openCompilerResult(page)
       await expect(preview).toHaveValue(/Static include behavior stays explicit/)
       await expect(preview).not.toHaveValue(/## Project Context Profile/)
       await expectNoPromptCompilerIpcCalls(app)
@@ -173,6 +178,8 @@ test.describe("project context profile management", () => {
       await includeToggle.check()
       await originalRequest(page).fill("Keep deletion input exact")
       await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+      await openCompilerResult(page)
+      await openCompilerTools(page)
       await expect(preview).toHaveValue(/Keep deletion input exact/)
       await expect(page.getByRole("button", { exact: true, name: "Copy" })).toBeEnabled()
 
@@ -244,7 +251,9 @@ test.describe("project context profile management", () => {
         await includeProfileToggle(page).check()
         await originalRequest(page).fill("Build the Phase 13 LLM profile include flow.")
 
+        await openCompilerTools(page)
         await page.getByRole("button", { name: "분석하기" }).click()
+        await openCompilerResult(page)
         await expect(
           page.getByText("The request needs one clarification before compiling."),
         ).toBeVisible()
@@ -280,6 +289,7 @@ test.describe("project context profile management", () => {
   test("quick capture whitespace survives profile and harness selector changes", async () => {
     await withPhase13Project("Phase 13 Quick Capture Project", async ({ app, page }) => {
       await setClipboardText(app, exactHarnessQuickCaptureText)
+      await openCompilerTools(page)
       await page.getByRole("button", { name: "Import from Clipboard" }).click()
       await expect(originalRequest(page)).toHaveValue(exactHarnessQuickCaptureText)
 
@@ -294,6 +304,7 @@ test.describe("project context profile management", () => {
       })
 
       await expect(originalRequest(page)).toHaveValue(exactHarnessQuickCaptureText)
+      await openCompilerResult(page)
       await expect(generatedPreview(page)).toHaveValue("")
     })
   })

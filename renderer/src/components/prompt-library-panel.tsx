@@ -56,17 +56,14 @@ export function PromptLibraryPanel({
       data-insights-target="prompt-library"
       tabIndex={-1}
       headingId="prompt-library-heading"
+      className="prompter-prompt-list"
     >
-      <header className="flex items-start justify-between gap-4 border-b border-border-subtle pb-4">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">Library</p>
-          <h1
-            id="prompt-library-heading"
-            className="mt-2 text-[24px] font-medium tracking-[-0.012em]"
-          >
+      <header className="flex items-start justify-between gap-2 pb-3">
+        <div className="min-w-0 flex-1">
+          <h1 id="prompt-library-heading" className="text-[16px] font-semibold tracking-tight">
             Prompt Library
           </h1>
-          <p className="mt-1 text-[14px] text-muted">
+          <p className="mt-1 text-[12px] text-muted">
             {selectedProject === null
               ? "Create or select a project to view prompts."
               : `Prompts for ${selectedProject.name}`}
@@ -74,10 +71,14 @@ export function PromptLibraryPanel({
         </div>
         <Button
           data-menu-action-target="new-prompt"
+          aria-label="New Prompt"
+          title="새 프롬프트"
+          size="sm"
+          variant="ghost"
           disabled={selectedProject === null}
           onClick={() => library.setIsFormOpen(true)}
         >
-          New Prompt
+          +
         </Button>
       </header>
 
@@ -178,7 +179,10 @@ export function PromptLibraryPanel({
         ))}
       </div>
       {selectedProject !== null && (
-        <PromptTagAttachmentForm selectedAsset={selectedAsset} onTagsChanged={onTagsChanged} />
+        <details className="mt-4 text-[12px] text-muted">
+          <summary className="cursor-pointer py-2">태그 편집</summary>
+          <PromptTagAttachmentForm selectedAsset={selectedAsset} onTagsChanged={onTagsChanged} />
+        </details>
       )}
     </Panel>
   )

@@ -67,25 +67,36 @@ export function HarnessTemplateSidebarSection({
   const hasSelection = selectedTemplateId !== null
 
   return (
-    <section className="space-y-3" aria-labelledby="harnesses-heading">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="harnesses-heading" className="text-[16px] font-semibold text-foreground">
+    <section
+      className="min-w-0 space-y-3 rounded-card bg-panel p-4 [overflow-wrap:anywhere]"
+      aria-labelledby="harnesses-heading"
+    >
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <h2 id="harnesses-heading" className="min-w-0 text-[17px] font-semibold text-foreground">
           Harnesses
         </h2>
-        <Button aria-label="New Harness" variant="ghost" size="sm" onClick={onNewTemplate}>
+        <Button
+          aria-label="New Harness"
+          className="h-auto min-w-0 max-w-full whitespace-normal"
+          variant="ghost"
+          size="sm"
+          onClick={onNewTemplate}
+        >
           New
         </Button>
       </div>
 
-      <div className="space-y-2 rounded-card border border-border bg-panel-muted p-3">
+      <div className="min-w-0 space-y-2">
         <Input
           aria-label="Search harnesses"
+          className="min-w-0 max-w-full text-[14px]"
           placeholder="Search harnesses"
           value={query}
           onChange={(event) => onQueryChange(event.currentTarget.value)}
         />
         <Select
           aria-label="Harness scenario filter"
+          className="min-w-0 max-w-full text-[14px]"
           value={scenario}
           onChange={(event) => onScenarioChange(scenarioFilterFromValue(event.currentTarget.value))}
         >
@@ -98,6 +109,7 @@ export function HarnessTemplateSidebarSection({
         </Select>
         <Select
           aria-label="Harness target agent filter"
+          className="min-w-0 max-w-full text-[14px]"
           value={targetAgent}
           onChange={(event) =>
             onTargetAgentChange(targetAgentFilterFromValue(event.currentTarget.value))
@@ -112,6 +124,7 @@ export function HarnessTemplateSidebarSection({
         </Select>
         <div className="flex flex-wrap gap-2">
           <Button
+            className="h-auto min-w-0 max-w-full whitespace-normal"
             size="sm"
             variant="secondary"
             disabled={!hasSelection}
@@ -122,6 +135,7 @@ export function HarnessTemplateSidebarSection({
           </Button>
           <Button
             aria-label="Delete Harness"
+            className="h-auto min-w-0 max-w-full whitespace-normal"
             size="sm"
             variant="ghost"
             disabled={!hasSelection}
@@ -130,14 +144,19 @@ export function HarnessTemplateSidebarSection({
             Delete
           </Button>
           {hasActiveFilters && (
-            <Button size="sm" variant="ghost" onClick={onClearFilters}>
+            <Button
+              className="h-auto min-w-0 max-w-full whitespace-normal"
+              size="sm"
+              variant="ghost"
+              onClick={onClearFilters}
+            >
               Clear harness filters
             </Button>
           )}
         </div>
       </div>
 
-      <div className="space-y-1">
+      <div className="min-w-0 divide-y divide-border-subtle">
         {status === "loading" && <p className="text-[12px] text-muted">Loading harnesses...</p>}
         {status === "error" && <p className="text-[12px] text-muted-strong">{error}</p>}
         {templates.map((template) => {
@@ -151,16 +170,16 @@ export function HarnessTemplateSidebarSection({
               aria-label={`${template.name}, ${scenarioLabel(template.scenario)}, ${targetAgentLabel(
                 template.targetAgent,
               )}, Updated ${updatedAt}`}
-              className="min-h-14 items-start gap-2 overflow-hidden py-2"
+              className="h-auto min-h-14 min-w-0 max-w-full items-start gap-2 rounded-none py-2 whitespace-normal [overflow-wrap:anywhere]"
               variant={isSelected ? "active" : "default"}
               onClick={() => onSelectTemplate(template.id)}
             >
-              <span className="flex min-w-0 flex-col items-start gap-1">
-                <span className="max-w-full truncate">{template.name}</span>
-                <span className="text-[11px] font-normal text-muted">
+              <span className="flex min-w-0 max-w-full flex-col items-start gap-1">
+                <span className="max-w-full whitespace-normal text-[14px]">{template.name}</span>
+                <span className="max-w-full text-[12px] font-normal text-muted">
                   {scenarioLabel(template.scenario)} · {targetAgentLabel(template.targetAgent)}
                 </span>
-                <span className="font-mono text-[11px] font-normal text-muted">
+                <span className="max-w-full font-mono text-[12px] font-normal text-muted">
                   Updated {updatedAt}
                 </span>
               </span>

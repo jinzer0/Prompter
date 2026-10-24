@@ -38,16 +38,7 @@ export function PromptCompilerActions({
   onSavePrompt,
 }: PromptCompilerActionsProps) {
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button
-        data-menu-action-target="quick-capture-from-clipboard"
-        type="button"
-        variant="secondary"
-        disabled={isReadingClipboard}
-        onClick={() => void onImportFromClipboard()}
-      >
-        {isReadingClipboard ? "Reading Clipboard..." : "Import from Clipboard"}
-      </Button>
+    <div className="flex flex-wrap items-start gap-2">
       <Button
         type="submit"
         aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
@@ -55,54 +46,70 @@ export function PromptCompilerActions({
       >
         프롬프트 컴파일
       </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
-        disabled={!compilerActionsEnabled || isAnalyzing || isCompilingLLM}
-        onClick={onAnalyzeWithLLM}
-      >
-        {isAnalyzing ? "분석 중..." : "분석하기"}
-      </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
-        disabled={!compilerActionsEnabled || isAnalyzing || isCompilingLLM}
-        onClick={onCompileWithLLM}
-      >
-        {isCompilingLLM ? "생성 중..." : "최종 프롬프트 생성"}
-      </Button>
-      <Button
-        data-menu-action-target="save-compiled-prompt"
-        type="button"
-        variant="secondary"
-        aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
-        disabled={!compilerActionsEnabled || !canSavePrompt || isSaving}
-        onClick={() => void onSavePrompt()}
-      >
-        {isSaving ? "Saving..." : "Save compiled prompt"}
-      </Button>
-      {canSaveNextVersion && (
-        <Button
-          type="button"
-          variant="secondary"
-          aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
-          disabled={!compilerActionsEnabled || isSavingNextVersion}
-          onClick={() => void onSaveNextVersion()}
-        >
-          {isSavingNextVersion ? "Saving..." : "Save as new version"}
-        </Button>
-      )}
-      <Button
-        data-menu-action-target="copy-compiled-prompt"
-        type="button"
-        variant="ghost"
-        disabled={!canCopy}
-        onClick={() => void onCopyPrompt()}
-      >
-        Copy
-      </Button>
+      <details className="min-w-0 rounded-control border border-border bg-panel">
+        <summary className="cursor-pointer px-3 py-1.5 text-[12px] text-muted-strong">
+          LLM · 저장 · 클립보드
+        </summary>
+        <div className="flex flex-wrap gap-2 p-3">
+          <Button
+            data-menu-action-target="quick-capture-from-clipboard"
+            type="button"
+            variant="secondary"
+            disabled={isReadingClipboard}
+            onClick={() => void onImportFromClipboard()}
+          >
+            {isReadingClipboard ? "Reading Clipboard..." : "Import from Clipboard"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+            disabled={!compilerActionsEnabled || isAnalyzing || isCompilingLLM}
+            onClick={onAnalyzeWithLLM}
+          >
+            {isAnalyzing ? "분석 중..." : "분석하기"}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+            disabled={!compilerActionsEnabled || isAnalyzing || isCompilingLLM}
+            onClick={onCompileWithLLM}
+          >
+            {isCompilingLLM ? "생성 중..." : "최종 프롬프트 생성"}
+          </Button>
+          <Button
+            data-menu-action-target="save-compiled-prompt"
+            type="button"
+            variant="secondary"
+            aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+            disabled={!compilerActionsEnabled || !canSavePrompt || isSaving}
+            onClick={() => void onSavePrompt()}
+          >
+            {isSaving ? "Saving..." : "Save compiled prompt"}
+          </Button>
+          {canSaveNextVersion && (
+            <Button
+              type="button"
+              variant="secondary"
+              aria-describedby={compilerActionsEnabled ? undefined : guardDescriptionId}
+              disabled={!compilerActionsEnabled || isSavingNextVersion}
+              onClick={() => void onSaveNextVersion()}
+            >
+              {isSavingNextVersion ? "Saving..." : "Save as new version"}
+            </Button>
+          )}
+          <Button
+            data-menu-action-target="copy-compiled-prompt"
+            type="button"
+            variant="ghost"
+            disabled={!canCopy}
+            onClick={() => void onCopyPrompt()}
+          >
+            Copy
+          </Button>
+        </div>
+      </details>
     </div>
   )
 }

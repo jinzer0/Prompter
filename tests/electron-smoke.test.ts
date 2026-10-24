@@ -103,7 +103,9 @@ test("opens the main window and resolves the preload ping bridge", async ({
     await expect(
       page.getByRole("heading", { name: "Select a project to view prompts", exact: true }),
     ).toBeVisible()
-    await expect(page.getByText("Select a project first")).toBeVisible()
+    await expect(
+      page.locator(".prompter-editor-surface").getByText("Select a project first", { exact: true }),
+    ).toBeVisible()
     await expect(page.getByRole("button", { name: "New Project" })).toBeVisible()
     await expect(page.getByTestId("settings-workspace")).toBeHidden()
     const additionalOptions = page

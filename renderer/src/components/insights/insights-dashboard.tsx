@@ -75,7 +75,7 @@ function DashboardContent({
       )
     case "ready":
       return (
-        <div className="grid gap-4">
+        <div className="grid min-w-0 gap-5">
           <InsightsSummary summary={insights.data.dashboardSummary} />
           <ProjectHealthPanel insights={insights.data.projectHealth} onNavigate={onNavigate} />
           <div className="grid gap-4 xl:grid-cols-2">
@@ -118,19 +118,20 @@ export function InsightsDashboardView({
   projects,
 }: InsightsDashboardViewProps) {
   return (
-    <Panel headingId="insights-dashboard-heading" className="h-full min-h-0 gap-4 overflow-auto">
-      <header className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted">
-            Read-only analytics
-          </p>
+    <Panel
+      headingId="insights-dashboard-heading"
+      className="h-full min-h-0 gap-5 overflow-auto bg-shell p-6 [overflow-wrap:anywhere] [&>*]:mx-auto [&>*]:w-full [&>*]:max-w-[740px] [&>*]:shrink-0"
+    >
+      <header className="flex flex-wrap items-start justify-between gap-4 py-2">
+        <div className="min-w-0 flex-1 basis-80">
+          <p className="text-[12px] font-medium text-muted">Read-only analytics</p>
           <h2
             id="insights-dashboard-heading"
-            className="mt-1 text-[24px] font-medium text-foreground"
+            className="mt-1 text-[23px] font-semibold tracking-[-0.035em] text-foreground"
           >
             Insights Dashboard
           </h2>
-          <p className="mt-1 text-[12px] leading-5 text-muted">
+          <p className="mt-2 text-[14px] leading-6 text-muted">
             Inspect library health without changing prompts, projects, or maintenance state.
           </p>
         </div>

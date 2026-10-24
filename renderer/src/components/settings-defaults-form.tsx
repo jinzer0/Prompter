@@ -44,24 +44,24 @@ export function SettingsDefaultsForm({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>화면 및 기본값</CardTitle>
+    <Card role="group" aria-labelledby="settings-defaults-heading">
+      <CardHeader className="px-5 pt-5">
+        <CardTitle id="settings-defaults-heading">화면 및 기본값</CardTitle>
         <CardDescription>앱 테마와 컴파일러 기본값을 관리합니다.</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-5 pb-5">
         {form === null ? (
           <p className="text-[12px] text-muted">Loading settings...</p>
         ) : (
-          <form className="space-y-3" onSubmit={submitDefaults}>
-            <fieldset className="space-y-3" disabled={isSaving}>
+          <form onSubmit={submitDefaults}>
+            <fieldset className="min-w-0 space-y-4" disabled={isSaving}>
               <SettingsDefaultsControls form={form} onChange={onChange} />
               <p className="text-[12px] text-muted-strong" aria-live="polite">
                 Saved appearance: {savedAppearanceLabel}. Current theme:{" "}
                 {appearance.effectiveTheme === "dark" ? "Dark" : "Light"}.
               </p>
               {form.appTheme !== appearance.preference && (
-                <p className="text-[14px] text-muted-strong">
+                <p className="text-[12px] text-muted-strong">
                   Unsaved appearance selection. Save defaults to apply; the saved appearance remains
                   active until saving succeeds.
                 </p>
@@ -71,9 +71,11 @@ export function SettingsDefaultsForm({
                   {message}
                 </p>
               )}
-              <Button className="w-full" type="submit" disabled={isSaving}>
-                {isSaving ? "Saving..." : "Save defaults"}
-              </Button>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? "Saving..." : "Save defaults"}
+                </Button>
+              </div>
             </fieldset>
           </form>
         )}
@@ -89,12 +91,17 @@ type SettingsDefaultsControlsProps = {
 
 function SettingsDefaultsControls({ form, onChange }: SettingsDefaultsControlsProps) {
   return (
-    <>
+    <div className="divide-y divide-border-subtle border-y border-border-subtle">
       <label
         htmlFor="settings-default-model"
-        className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center"
+        className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center sm:gap-6"
       >
-        <span className="text-[14px] font-medium">Default model</span>
+        <span>
+          <span className="block text-[14px] font-medium text-foreground">Default model</span>
+          <span className="mt-1 block text-[12px] text-muted-strong">
+            컴파일러에서 사용할 기본 모델입니다.
+          </span>
+        </span>
         <Input
           id="settings-default-model"
           aria-label="Default model"
@@ -104,9 +111,16 @@ function SettingsDefaultsControls({ form, onChange }: SettingsDefaultsControlsPr
       </label>
       <label
         htmlFor="settings-default-agent"
-        className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center"
+        className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center sm:gap-6"
       >
-        <span className="text-[14px] font-medium">Default target agent</span>
+        <span>
+          <span className="block text-[14px] font-medium text-foreground">
+            Default target agent
+          </span>
+          <span className="mt-1 block text-[12px] text-muted-strong">
+            새 컴파일 요청의 대상 에이전트입니다.
+          </span>
+        </span>
         <Select
           id="settings-default-agent"
           aria-label="Default target agent"
@@ -124,9 +138,14 @@ function SettingsDefaultsControls({ form, onChange }: SettingsDefaultsControlsPr
       </label>
       <label
         htmlFor="settings-default-project"
-        className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center"
+        className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center sm:gap-6"
       >
-        <span className="text-[14px] font-medium">Default project ID</span>
+        <span>
+          <span className="block text-[14px] font-medium text-foreground">Default project ID</span>
+          <span className="mt-1 block text-[12px] text-muted-strong">
+            기본 프로젝트를 선택 사항으로 지정합니다.
+          </span>
+        </span>
         <Input
           id="settings-default-project"
           aria-label="Default project ID"
@@ -137,9 +156,14 @@ function SettingsDefaultsControls({ form, onChange }: SettingsDefaultsControlsPr
       </label>
       <label
         htmlFor="settings-default-scenario"
-        className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center"
+        className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center sm:gap-6"
       >
-        <span className="text-[14px] font-medium">Default scenario</span>
+        <span>
+          <span className="block text-[14px] font-medium text-foreground">Default scenario</span>
+          <span className="mt-1 block text-[12px] text-muted-strong">
+            새 컴파일 요청의 기본 시나리오입니다.
+          </span>
+        </span>
         <Select
           id="settings-default-scenario"
           aria-label="Default scenario"
@@ -157,9 +181,14 @@ function SettingsDefaultsControls({ form, onChange }: SettingsDefaultsControlsPr
       </label>
       <label
         htmlFor="settings-app-theme"
-        className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center"
+        className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center sm:gap-6"
       >
-        <span className="text-[14px] font-medium">App theme</span>
+        <span>
+          <span className="block text-[14px] font-medium text-foreground">App theme</span>
+          <span className="mt-1 block text-[12px] text-muted-strong">
+            시스템 설정을 따르거나 밝게 · 어둡게 선택합니다.
+          </span>
+        </span>
         <Select
           id="settings-app-theme"
           aria-label="App theme"
@@ -177,9 +206,16 @@ function SettingsDefaultsControls({ form, onChange }: SettingsDefaultsControlsPr
       </label>
       <label
         htmlFor="settings-compiler-language"
-        className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center"
+        className="grid gap-3 py-4 sm:grid-cols-[minmax(0,1fr)_260px] sm:items-center sm:gap-6"
       >
-        <span className="text-[14px] font-medium">Compiler default language</span>
+        <span>
+          <span className="block text-[14px] font-medium text-foreground">
+            Compiler default language
+          </span>
+          <span className="mt-1 block text-[12px] text-muted-strong">
+            컴파일 결과에 사용할 기본 언어입니다.
+          </span>
+        </span>
         <Input
           id="settings-compiler-language"
           aria-label="Compiler default language"
@@ -189,6 +225,6 @@ function SettingsDefaultsControls({ form, onChange }: SettingsDefaultsControlsPr
           }
         />
       </label>
-    </>
+    </div>
   )
 }

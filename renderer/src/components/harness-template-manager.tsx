@@ -180,7 +180,7 @@ export function HarnessTemplateManager({
     <div
       data-insights-target="harness-templates"
       tabIndex={-1}
-      className="min-w-0 space-y-3 overflow-hidden"
+      className="mx-auto w-full min-w-0 max-w-[740px] space-y-6 text-[14px] [overflow-wrap:anywhere]"
     >
       <HarnessTemplateSidebarSection
         error={harnesses.error}
@@ -202,17 +202,17 @@ export function HarnessTemplateManager({
       />
 
       {deleteConfirmation !== null && (
-        <div className="space-y-3 rounded-card border border-border bg-panel-muted p-3">
-          <p className="text-[13px] font-medium text-muted-strong">
+        <div className="space-y-3 rounded-card bg-panel p-4">
+          <p className="text-[14px] font-medium text-foreground">
             Delete {deleteConfirmation.name}?
           </p>
           <p className="text-[12px] leading-5 text-muted">
             This removes the template now. Seeded default templates can return after restart because
             Phase 12 has no tombstone field.
           </p>
-          <div className="grid gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
-              className="w-full"
+              className="h-auto min-w-0 max-w-full whitespace-normal"
               size="sm"
               variant="secondary"
               onClick={() => setDeleteConfirmation(null)}
@@ -221,7 +221,7 @@ export function HarnessTemplateManager({
             </Button>
             <Button
               aria-label="Confirm Delete Harness"
-              className="w-full"
+              className="h-auto min-w-0 max-w-full whitespace-normal"
               size="sm"
               onClick={() => void confirmDelete()}
             >

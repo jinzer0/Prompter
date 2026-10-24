@@ -1,7 +1,11 @@
 import { mkdir } from "node:fs/promises"
 import { expect, type Page, test } from "@playwright/test"
 
-import { createNamedProject } from "./electron-playwright-helpers"
+import {
+  createNamedProject,
+  openCompilerResult,
+  openPromptDetails,
+} from "./electron-playwright-helpers"
 import {
   generatedPreview,
   withPhase13Prompter,
@@ -60,6 +64,7 @@ async function createSavedPromptViaUi(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Save Prompt" }).click()
 
   await expect(page.getByRole("button", { name: new RegExp(savedPromptTitle) })).toBeVisible()
+  await openPromptDetails(page)
   await expect(page.getByText("Version 1")).toBeVisible()
 }
 
@@ -68,6 +73,7 @@ async function selectSavedPrompt(page: Page, projectName: string): Promise<void>
   await page.getByRole("button", { name: new RegExp(projectName) }).click()
   await page.getByRole("button", { name: new RegExp(savedPromptTitle) }).click()
   await expect(page.getByRole("heading", { name: savedPromptTitle })).toBeVisible()
+  await openPromptDetails(page)
 }
 
 async function readSavedReviewSnapshot(page: Page): Promise<SavedReviewSnapshot> {
@@ -169,6 +175,7 @@ test.describe("Phase 14 prompt quality integrated UI coverage", () => {
       await page.setViewportSize({ width: 1280, height: 800 })
       await page.getByRole("textbox", { name: "Original request" }).fill("Review a draft prompt.")
       await page.getByRole("button", { name: "프롬프트 컴파일" }).click()
+      await openCompilerResult(page)
       await expect(generatedPreview(page)).toHaveValue(/# Objective/)
 
       await page.getByRole("button", { name: "Review draft locally" }).click()

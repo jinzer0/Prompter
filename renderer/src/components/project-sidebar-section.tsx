@@ -80,16 +80,18 @@ export function ProjectSidebarSection({
   return (
     <section className="space-y-3" aria-labelledby="projects-heading">
       <div className="flex items-center justify-between">
-        <h2 id="projects-heading" className="text-[16px] font-semibold text-foreground">
+        <h2 id="projects-heading" className="text-[12px] font-medium text-muted">
           Projects
         </h2>
         <Button
           data-menu-action-target="new-project"
+          aria-label="New Project"
+          title="프로젝트 추가"
           variant="ghost"
           size="sm"
           onClick={() => setIsFormOpen((isOpen) => !isOpen)}
         >
-          New Project
+          +
         </Button>
       </div>
 

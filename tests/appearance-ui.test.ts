@@ -181,7 +181,7 @@ describe("renderer appearance", () => {
       }),
     )
 
-    expect(markup).toContain('<fieldset class="space-y-3" disabled="">')
+    expect(markup).toMatch(/<fieldset\b[^>]* disabled="">/)
     expect(markup).toContain("Saved appearance: Dark. Current theme: Dark.")
     expect(markup).toContain("Saving...")
     expect(markup).not.toContain("Unsaved appearance selection.")

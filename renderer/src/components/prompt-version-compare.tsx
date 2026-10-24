@@ -108,10 +108,15 @@ export function PromptVersionCompare({
   }, [compareResult])
 
   return (
-    <TabsContent value="compare" className="space-y-3" aria-label="Version compare">
-      <div className="grid gap-3 md:grid-cols-2">
+    <TabsContent
+      value="compare"
+      className="min-w-0 space-y-3 rounded-card bg-panel p-4 [overflow-wrap:anywhere]"
+      aria-label="Version compare"
+    >
+      <div className="grid min-w-0 gap-3 md:grid-cols-2">
         <Select
           aria-label="Base version"
+          className="min-w-0 max-w-full"
           value={baseVersionId}
           onChange={(event) => setBaseVersionId(event.currentTarget.value)}
         >
@@ -123,6 +128,7 @@ export function PromptVersionCompare({
         </Select>
         <Select
           aria-label="Compare version"
+          className="min-w-0 max-w-full"
           value={compareVersionId}
           onChange={(event) => setCompareVersionId(event.currentTarget.value)}
         >
@@ -133,12 +139,15 @@ export function PromptVersionCompare({
           ))}
         </Select>
       </div>
-      {compareError !== null && <p className="text-[12px] text-muted-strong">{compareError}</p>}
-      <div className="space-y-2">
+      {compareError !== null && <p className="text-[14px] text-muted-strong">{compareError}</p>}
+      <div className="min-w-0">
         {diff.map((line) => (
-          <div key={`${line.baseLineNumber ?? "new"}-${line.compareLineNumber ?? "old"}`}>
-            <div className={`rounded-card border p-3 text-[12px] ${diffClassName(line.kind)}`}>
-              <p className="font-mono text-[11px] text-muted">{line.kind}</p>
+          <div
+            key={`${line.baseLineNumber ?? "new"}-${line.compareLineNumber ?? "old"}`}
+            className="min-w-0"
+          >
+            <div className={`min-w-0 border-b p-3 text-[14px] ${diffClassName(line.kind)}`}>
+              <p className="font-mono text-[12px] text-muted">{line.kind}</p>
               {line.baseText !== null && (
                 <p className="mt-1 whitespace-pre-wrap">{line.baseText}</p>
               )}

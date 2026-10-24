@@ -9,21 +9,22 @@ Use this checklist after Phase 10 and later release-candidate changes before pac
 - [ ] `npm test` exits 0.
 - [ ] `npm run build` exits 0.
 - [ ] `npm run package` creates `release/Prompter-darwin-${process.arch}/Prompter.app`.
-- [ ] `npm run package`가 현재 버전의 `release/Prompter-0.1.2-mac-${process.arch}.zip`을 만든다.
+- [ ] `npm run package`가 현재 버전의 `release/Prompter-0.1.3-mac-${process.arch}.zip`을 만든다.
 - [ ] Packaged `Prompter.app` opens without a missing-executable error.
 - [ ] `npm run test:smoke` exits 0, or the exact blocker is recorded.
 
 ## Signed macOS Release Checks
 
-아래 항목은 Issue #35의 v0.1.2 후보 검증 절차이며 실제 서명·공증 완료 기록이 아니다.
-ARM64 macOS에서 해당 실행 단계 승인 후 메인테이너 signed 명령 전에 사전 점검을 수행한다.
-완료 후 점검은 `npm run package:release:macos`가 성공한 뒤에만 수행하며, 공개 게시에는 별도
-Stage 4 승인이 필요하다. 게시 전 공개 설치 링크와 최신 배포본은 v0.1.1을 유지한다.
+아래 항목은 새 UI를 포함한 현재 v0.1.3 후보 검증 절차이며 실제 서명·공증·게시 완료 기록이 아니다.
+이번 릴리스의 commit·push·배포는 명시적으로 승인되었다. ARM64 macOS에서 메인테이너 signed
+명령 전에 사전 점검을 수행하고, 완료 후 점검은 `npm run package:release:macos`가 성공한 뒤에만
+수행한다. 모든 검증을 통과해 실제 게시가 성공하기 전까지 공개 설치 링크와 최신 배포본은
+v0.1.2를 유지한다. 수행하지 않은 항목은 체크하지 않는다.
 
 Prepare local path variables without embedding secrets:
 
 ```bash
-RELEASE_DIR="release/v0.1.2"
+RELEASE_DIR="release/v0.1.3"
 ```
 
 - [ ] The version-specific candidate directory is absent before the release starts:
@@ -90,8 +91,8 @@ RELEASE_DIR="release/v0.1.2"
 Prepare artifact paths only after the signed command succeeds:
 
 ```bash
-ZIP_PATH="${RELEASE_DIR}/Prompter-0.1.2-mac-arm64.zip"
-DMG_PATH="${RELEASE_DIR}/Prompter-0.1.2-mac-arm64.dmg"
+ZIP_PATH="${RELEASE_DIR}/Prompter-0.1.3-mac-arm64.zip"
+DMG_PATH="${RELEASE_DIR}/Prompter-0.1.3-mac-arm64.dmg"
 CHECKSUM_PATH="${RELEASE_DIR}/SHA256SUMS"
 EXTRACT_DIR="$(mktemp -d)"
 MOUNT_DIR="$(mktemp -d)"
@@ -104,19 +105,19 @@ MOUNT_DIR="$(mktemp -d)"
   import { readdir } from "node:fs/promises"
 
   const expected = [
-    "Prompter-0.1.2-mac-arm64.dmg",
-    "Prompter-0.1.2-mac-arm64.zip",
+    "Prompter-0.1.3-mac-arm64.dmg",
+    "Prompter-0.1.3-mac-arm64.zip",
     "SHA256SUMS",
   ]
-  const actual = (await readdir("release/v0.1.2")).sort()
+  const actual = (await readdir("release/v0.1.3")).sort()
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error(`Unexpected release candidate allowlist: ${actual.join(",")}`)
   }
   NODE
   ```
 
-  허용 파일은 `Prompter-0.1.2-mac-arm64.zip`,
-  `Prompter-0.1.2-mac-arm64.dmg`, `SHA256SUMS`뿐이다.
+  허용 파일은 `Prompter-0.1.3-mac-arm64.zip`,
+  `Prompter-0.1.3-mac-arm64.dmg`, `SHA256SUMS`뿐이다.
 
 - [ ] The app and DMG evidence roots each retain a separate sanitized `notarization-final.json`
        receipt with `Accepted` plus warning-free and error-free issues. The validator reads these
@@ -130,8 +131,8 @@ MOUNT_DIR="$(mktemp -d)"
   import { validateFinalNotarizationEvidence } from "./scripts/macos/notarization-evidence.mjs"
 
   const roots = [
-    [".omo/evidence/release-macos/v0.1.2/app", "app"],
-    [".omo/evidence/release-macos/v0.1.2/dmg", "dmg"],
+    [".omo/evidence/release-macos/v0.1.3/app", "app"],
+    [".omo/evidence/release-macos/v0.1.3/dmg", "dmg"],
   ]
 
   for (const [root, artifactKind] of roots) {
@@ -188,7 +189,7 @@ MOUNT_DIR="$(mktemp -d)"
   ```
 
   `CFBundleIdentifier`가 `com.jinzer0.prompter`, `CFBundleShortVersionString`이
-  `0.1.2`, `CFBundleVersion`이 `0.1.2`인지 확인한다.
+  `0.1.3`, `CFBundleVersion`이 `0.1.3`인지 확인한다.
 
 - [ ] The checksum file verifies after all signature, notary, staple, Gatekeeper, extract, and
       mount checks pass:
@@ -245,7 +246,7 @@ MOUNT_DIR="$(mktemp -d)"
 
 ## 현재 소스의 작업 공간·편집 수동 점검
 
-아래는 현재 소스를 대상으로 수행할 절차이며 Stage 5 결과나 공개 v0.1.1 배포본의 동작 증거가
+아래는 현재 소스를 대상으로 수행할 절차이며 Stage 5 결과나 공개 v0.1.2 배포본의 동작 증거가
 아니다. 실행한 환경·관찰 결과·실패/차단 사유는 별도로 기록하고 수행하지 않은 항목은 체크하지 않는다.
 시각·행동 판정 기준은 [DESIGN](../DESIGN.md)과 [EXPERIENCE](ux/EXPERIENCE.md)를 따른다.
 실패 주입은 격리된 테스트 데이터와 환경에서 수행하고 실제 라이브러리는 변경하지 않는다.
@@ -259,6 +260,21 @@ MOUNT_DIR="$(mktemp -d)"
       두 크기·양 테마에서 Library 세 열과 본문 우선 배치가 유지되고 shell 가로 스크롤 없이
       복사·저장에 접근 가능한지 확인한다. 긴 제목·본문·컴파일 추가 옵션과 확대/축소를 사용해
       줄바꿈·내부 세로 스크롤·키보드 접근이 주요 조작을 가리지 않는지 확인한다.
+- [ ] 승인된 `redesign-*` 시안의 민트/중립·16px 주제 표면·8px 컨트롤·14px 본문을 확인한다.
+      작은 일반 텍스트의 실제 배경 대비를 4.5:1 이상으로 표본 검사하고 테마별 스크린샷과
+      실제 BrowserWindow 크기·자동화 transcript를 남긴다. 콘텐츠 캡처와 OS 프레임 캡처를 구별한다.
+- [ ] ‘더보기’를 키보드로 열어 화살표/Home/End·Escape·바깥 클릭·Tab 이동을 확인한다.
+      복제·버전 이력/비교·태그·내보내기·품질이 실제 도착점으로 이어지고 대화상자의 긴 내용은
+      내부에서 스크롤되는지 확인한다. Insights의 품질 이동도 추가 클릭 없이 해당 영역을 연다.
+- [ ] 보조 버전 대화상자를 연 상태에서 실제 native 메뉴 Search·New Prompt·New Project를
+      실행한다. Search는 검색에 초점을 두고 생성 폼은 모달에 막히지 않아야 하며, 편집·컴파일
+      초안은 정확히 유지한다. Close Active Panel은 현재 모달의 안전한 취소 또는 더보기 닫기로
+      연결한다. 미저장·개인정보 확인을 승인/저장으로 우회하거나 하위 모달까지 닫지 않아야 한다.
+- [ ] 테마 전환 애니메이션이 끝난 실제 표면에서 비어 있는 입력의 표시 중 placeholder,
+      선택된 프로젝트, 기본 버튼과 보조 버튼의 hover 대비를 검사한다. 양 테마에서 빈 프로젝트·
+      검색 결과 없음·Insights 로딩/오류/재시도·잠금 인증 오류 및 125% 확대·동작 줄이기를 확인한다.
+- [ ] 목록의 ‘필터’·‘태그 편집’, 컴파일러의 ‘추가 옵션’·‘LLM · 저장 · 클립보드’·결과/분석/
+      개인정보 검사 영역을 펼치고 접어도 값·초안·결과가 유지되고 기존 기능이 도달 가능한지 확인한다.
 - [ ] 제목 막대의 빈 드래그 영역으로 창을 이동하고 native traffic lights를 조작한다.
       검색·본문·컴파일 요청에서 텍스트를 드래그 선택하고 입력·버튼·select를 조작했을 때
       창이 이동하지 않는지 확인한다.
@@ -268,7 +284,7 @@ MOUNT_DIR="$(mktemp -d)"
 - [ ] ‘새 버전 저장’과 Cmd+S를 각각 사용해 같은 프롬프트에 버전이 한 번 추가되고 current가
       갱신되는지 확인한다. 변경 없는 반복 저장과 저장 중 반복 제출이 중복 버전을 만들지 않는지,
       저장 중 추가 입력은 덮어쓰지 않고 미저장으로 남는지 확인한다.
-- [ ] 본문을 수정한 뒤 ‘복제하여 저장’에서 제목을 입력한다. 독립 프롬프트에 편집 스냅샷이
+- [ ] 본문을 수정한 뒤 ‘더보기 → 복제하여 저장’에서 제목을 입력한다. 독립 프롬프트에 편집 스냅샷이
       저장되고 원본 본문·버전 이력이 그대로인지 확인한다. 생성 실패 시 원본 선택·초안 유지,
       저장 중 추가 입력 시 해당 초안을 잃지 않는지도 확인한다.
 - [ ] 컴파일 결과를 생성해도 편집 본문·저장 버전이 바뀌지 않는지 확인한다. ‘편집에 적용’의

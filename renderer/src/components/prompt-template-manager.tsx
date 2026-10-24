@@ -187,7 +187,7 @@ export function PromptTemplateManager({
     <div
       data-insights-target="prompt-templates"
       tabIndex={-1}
-      className="min-w-0 space-y-3 overflow-hidden"
+      className="mx-auto w-full min-w-0 max-w-[740px] space-y-6 text-[14px] [overflow-wrap:anywhere]"
     >
       <PromptTemplateSidebarSection
         error={promptTemplates.error}
@@ -220,16 +220,16 @@ export function PromptTemplateManager({
       />
 
       {deleteConfirmation !== null && (
-        <div className="space-y-3 rounded-card border border-border bg-panel-muted p-3">
-          <p className="text-[13px] font-medium text-muted-strong">
+        <div className="min-w-0 space-y-3 rounded-card bg-panel p-4">
+          <p className="text-[14px] font-medium text-foreground">
             Delete {deleteConfirmation.name}?
           </p>
           <p className="text-[12px] leading-5 text-muted">
             This removes the prompt template from the selector and manager.
           </p>
-          <div className="grid gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
             <Button
-              className="w-full"
+              className="h-auto min-w-0 whitespace-normal text-[14px]"
               size="sm"
               variant="secondary"
               onClick={() => setDeleteConfirmation(null)}
@@ -238,7 +238,7 @@ export function PromptTemplateManager({
             </Button>
             <Button
               aria-label="Confirm Delete Prompt Template"
-              className="w-full"
+              className="h-auto min-w-0 whitespace-normal text-[14px]"
               size="sm"
               onClick={() => void confirmDelete()}
             >

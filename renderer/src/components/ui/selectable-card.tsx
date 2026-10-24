@@ -17,8 +17,10 @@ export function SelectableCard({
       type={type}
       aria-pressed={selected}
       className={cn(
-        "rounded-card border bg-panel-elevated p-4 text-left transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45",
-        selected ? "border-accent/35" : "border-border hover:border-border-subtle",
+        "min-w-0 rounded-xl border p-3 text-left transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+        selected
+          ? "border-border-subtle bg-panel"
+          : "border-transparent bg-transparent hover:bg-panel-elevated",
         className,
       )}
       {...props}

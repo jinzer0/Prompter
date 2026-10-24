@@ -66,7 +66,7 @@ function AppliedScoreState({
       : null)
 
   return (
-    <div className="grid gap-1 text-[12px] text-muted-strong">
+    <div className="grid min-w-0 gap-1 text-[14px] text-muted-strong">
       <p>Review result score: {review === null ? "No review" : String(review.overallScore)}</p>
       <p>
         Applied quality review score:{" "}
@@ -81,19 +81,19 @@ function AppliedScoreState({
 
 function ReviewDetails({ review }: { readonly review: PromptQualityReviewResult }) {
   return (
-    <details className="rounded-card border border-border-subtle bg-panel-muted p-3 text-[12px] leading-5 text-muted-strong">
-      <summary className="cursor-pointer font-mono text-[11px] text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45">
+    <details className="min-w-0 border-y border-border-subtle py-3 text-[14px] leading-6 text-muted-strong">
+      <summary className="cursor-pointer rounded-control text-[14px] text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45">
         Review details
       </summary>
-      <div className="mt-3 grid gap-3">
+      <div className="mt-3 grid min-w-0 gap-3">
         <p>{review.scoreExplanation}</p>
         <section className="space-y-1">
-          <h4 className="font-mono text-[11px] text-muted">dimension_scores</h4>
-          <dl className="grid grid-cols-2 gap-2">
+          <h4 className="font-mono text-[12px] text-muted">dimension_scores</h4>
+          <dl className="grid min-w-0 gap-2 sm:grid-cols-2">
             {promptQualityDimensionRows(review).map((row) => (
               <div
                 key={row.key}
-                className="flex justify-between gap-2 border-b border-border-subtle pb-1"
+                className="flex min-w-0 flex-wrap justify-between gap-2 border-b border-border-subtle pb-1"
               >
                 <dt>{row.label}</dt>
                 <dd className="font-mono text-muted-strong">{row.score}</dd>
@@ -103,7 +103,7 @@ function ReviewDetails({ review }: { readonly review: PromptQualityReviewResult 
         </section>
         {review.strengths.length > 0 && (
           <section className="space-y-1">
-            <h4 className="font-mono text-[11px] text-muted">strengths</h4>
+            <h4 className="font-mono text-[12px] text-muted">strengths</h4>
             <ul className="list-disc space-y-1 pl-4">
               {review.strengths.map((strength) => (
                 <li key={strength}>{strength}</li>
@@ -113,7 +113,7 @@ function ReviewDetails({ review }: { readonly review: PromptQualityReviewResult 
         )}
         {review.recommendedClarifyingQuestions.length > 0 && (
           <section className="space-y-1">
-            <h4 className="font-mono text-[11px] text-muted">recommended_questions</h4>
+            <h4 className="font-mono text-[12px] text-muted">recommended_questions</h4>
             <ul className="list-disc space-y-1 pl-4">
               {review.recommendedClarifyingQuestions.map((question) => (
                 <li key={question}>{question}</li>
@@ -149,8 +149,9 @@ export function PromptQualityReviewPanel({
       tabIndex={-1}
       aria-busy={isBusy}
       aria-labelledby="prompt-quality-review-heading"
+      className="min-w-0 rounded-none border-0 border-t border-border-subtle bg-transparent pt-4 text-[14px] [overflow-wrap:anywhere]"
     >
-      <CardHeader>
+      <CardHeader className="min-w-0 px-0 pt-0">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle id="prompt-quality-review-heading">Prompt quality review</CardTitle>
           <Badge variant={review === null ? "neutral" : gradeBadgeVariant(review)}>
@@ -162,7 +163,7 @@ export function PromptQualityReviewPanel({
           applied.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="min-w-0 space-y-4 px-0 pb-0">
         <div className="flex flex-wrap gap-2">
           <Badge variant="neutral">{reviewStateLabel(review)}</Badge>
           {review !== null && (
@@ -183,6 +184,7 @@ export function PromptQualityReviewPanel({
             aria-label="Review saved version locally"
             type="button"
             variant="secondary"
+            className="min-w-0 whitespace-normal"
             disabled={!actionState.reviewVersionLocally.isEnabled}
             onClick={onReviewVersionLocally}
           >
@@ -192,6 +194,7 @@ export function PromptQualityReviewPanel({
             aria-label="Save prompt quality review"
             type="button"
             variant="secondary"
+            className="min-w-0 whitespace-normal"
             disabled={!actionState.saveReview.isEnabled}
             onClick={onSaveReview}
           >
@@ -201,6 +204,7 @@ export function PromptQualityReviewPanel({
             aria-label="Apply prompt quality review score"
             type="button"
             variant="ghost"
+            className="min-w-0 whitespace-normal"
             disabled={!actionState.applyScore.isEnabled}
             onClick={onApplyScore}
           >
@@ -216,26 +220,32 @@ export function PromptQualityReviewPanel({
           onRunLLMReview={onRunLLMReview}
         />
 
-        {isBusy && <p className="text-[12px] text-muted-strong">Working on prompt quality...</p>}
+        {isBusy && <p className="text-[14px] text-muted-strong">Working on prompt quality...</p>}
         {error !== null && (
-          <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted-strong">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-[14px] text-muted-strong">
             <p>{error}</p>
-            <Button type="button" size="sm" variant="ghost" onClick={onClearError}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="min-w-0 whitespace-normal text-[14px]"
+              onClick={onClearError}
+            >
               Dismiss
             </Button>
           </div>
         )}
 
-        <section className="space-y-2" aria-labelledby="prompt-quality-blockers-heading">
-          <h4 id="prompt-quality-blockers-heading" className="font-mono text-[11px] text-muted">
+        <section className="min-w-0 space-y-2" aria-labelledby="prompt-quality-blockers-heading">
+          <h4 id="prompt-quality-blockers-heading" className="font-mono text-[12px] text-muted">
             top_blockers
           </h4>
           {blockers.length === 0 ? (
-            <p className="rounded-card border border-border-subtle bg-panel-muted p-3 text-[12px] text-muted-strong">
+            <p className="border-t border-border-subtle py-3 text-[14px] text-muted-strong">
               {review === null ? "Run a local review to surface blockers." : "No blockers found."}
             </p>
           ) : (
-            <ul className="space-y-1 rounded-card border border-border-subtle bg-panel-muted p-3 text-[12px] leading-5 text-muted-strong">
+            <ul className="space-y-1 border-t border-border-subtle py-3 text-[14px] leading-6 text-muted-strong">
               {blockers.map((blocker) => (
                 <li key={blocker}>{blocker}</li>
               ))}

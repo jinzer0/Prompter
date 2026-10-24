@@ -8,10 +8,7 @@ export function Card({ className, ...props }: CardProps) {
   return (
     <div
       data-testid="ui-card"
-      className={cn(
-        "rounded-card border border-border bg-panel-elevated text-muted-strong",
-        className,
-      )}
+      className={cn("rounded-card border border-transparent bg-panel text-muted-strong", className)}
       {...props}
     />
   )

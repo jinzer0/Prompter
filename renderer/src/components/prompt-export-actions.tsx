@@ -1,4 +1,4 @@
-import { useId, useState } from "react"
+import { useId, useRef, useState } from "react"
 
 import type { ExportFormat } from "../../../electron/ipc-types"
 import { usePromptExportDestinations } from "../hooks/use-prompt-export-destinations"
@@ -46,6 +46,7 @@ export function PromptExportActions({
   const [message, setMessage] = useState<string | null>(null)
   const [previewContent, setPreviewContent] = useState<string | null>(null)
   const [isPreviewing, setIsPreviewing] = useState(false)
+  const destinationTrigger = useRef<HTMLButtonElement | null>(null)
   const formatSelectId = useId()
   const hasContent = rawContent.trim().length > 0
   const selectedLabel = promptExportChoiceLabels[selectedFormat]
@@ -103,6 +104,13 @@ export function PromptExportActions({
   const destinationIsBusy =
     isPreviewing || destinations.isWorking || destinations.isConfirmationPending
 
+  async function cancelPrivacyWarning(): Promise<void> {
+    const trigger = destinationTrigger.current
+    await destinations.cancelPrivacyWarning()
+    // The pending-action render must re-enable the original trigger before restoring focus.
+    window.requestAnimationFrame(() => trigger?.focus())
+  }
+
   return (
     <>
       <Card>
@@ -143,7 +151,10 @@ export function PromptExportActions({
               type="button"
               variant="secondary"
               disabled={!hasContent || destinationIsBusy}
-              onClick={destinations.copyExport}
+              onClick={(event) => {
+                destinationTrigger.current = event.currentTarget
+                void destinations.copyExport()
+              }}
             >
               {copyButtonLabel}
             </Button>
@@ -155,7 +166,10 @@ export function PromptExportActions({
               type="button"
               variant="ghost"
               disabled={!canSaveToFile || !hasContent || destinationIsBusy}
-              onClick={destinations.saveExport}
+              onClick={(event) => {
+                destinationTrigger.current = event.currentTarget
+                void destinations.saveExport()
+              }}
             >
               {saveButtonLabel}
             </Button>
@@ -175,7 +189,7 @@ export function PromptExportActions({
       <PrivacyWarningDialog
         confirmLabel={destinations.confirmationLabel}
         state={destinations.privacyWarningState}
-        onCancel={destinations.cancelPrivacyWarning}
+        onCancel={cancelPrivacyWarning}
         onConfirm={destinations.confirmPrivacyWarning}
       />
     </>

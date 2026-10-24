@@ -54,13 +54,18 @@ export const DialogShell = forwardRef<HTMLDialogElement, DialogShellProps>(funct
       aria-describedby={descriptionId}
       aria-labelledby={titleId}
       aria-modal="true"
-      className="m-auto max-h-full w-full max-w-lg bg-transparent p-4 text-inherit backdrop:bg-shell/90"
+      className="m-auto max-h-[calc(100dvh-32px)] w-full max-w-lg overflow-y-auto bg-transparent p-4 text-inherit backdrop:bg-shell/90"
       role={role}
-      onKeyDown={(event: ReactKeyboardEvent<HTMLDialogElement>) =>
-        handleDialogKeyDown({ event, onCancel })
-      }
+      onCancel={(event) => {
+        if (event.defaultPrevented) return
+        event.preventDefault()
+        void onCancel()
+      }}
+      onKeyDown={(event: ReactKeyboardEvent<HTMLDialogElement>) => {
+        if (!event.defaultPrevented) handleDialogKeyDown({ event, onCancel })
+      }}
     >
-      <Card className="max-h-full w-full max-w-lg overflow-y-auto shadow-panel">
+      <Card className="min-w-0 w-full max-w-lg shadow-panel">
         <CardHeader>
           <CardTitle id={titleId}>{title}</CardTitle>
           <CardDescription id={descriptionId}>{description}</CardDescription>

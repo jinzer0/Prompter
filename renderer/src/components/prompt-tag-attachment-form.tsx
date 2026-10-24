@@ -80,10 +80,7 @@ export function PromptTagAttachmentForm({
   }
 
   return (
-    <form
-      className="mt-4 space-y-3 rounded-card border border-border bg-panel-elevated p-4"
-      onSubmit={attachTag}
-    >
+    <form className="space-y-3 border-t border-border-subtle pt-3" onSubmit={attachTag}>
       <p className="font-mono text-[11px] text-muted">prompt tags</p>
       <div className="flex gap-2">
         <Input

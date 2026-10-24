@@ -186,7 +186,7 @@ export function ProjectContextProfileManager({
       <section
         data-insights-target="project-context"
         tabIndex={-1}
-        className="space-y-3"
+        className="mx-auto w-full min-w-0 max-w-[740px] space-y-4 rounded-card bg-panel p-4 [overflow-wrap:anywhere]"
         aria-labelledby="context-profiles-heading"
       >
         <h2
@@ -208,7 +208,7 @@ export function ProjectContextProfileManager({
     <div
       data-insights-target="project-context"
       tabIndex={-1}
-      className="min-w-0 space-y-3 overflow-hidden"
+      className="mx-auto w-full min-w-0 max-w-[740px] space-y-6 text-[14px] [overflow-wrap:anywhere]"
     >
       <ProjectContextProfileSidebarSection
         error={profiles.error}
@@ -224,16 +224,16 @@ export function ProjectContextProfileManager({
       />
 
       {deleteConfirmation !== null && (
-        <div className="space-y-3 rounded-card border border-border bg-panel-muted p-3">
-          <p className="text-[13px] font-medium text-muted-strong">
+        <div className="min-w-0 space-y-3 rounded-card bg-panel p-4">
+          <p className="text-[14px] font-medium text-foreground">
             Delete {deleteConfirmation.name}?
           </p>
           <p className="text-[12px] leading-5 text-muted">
             This removes the project context profile for the selected project.
           </p>
-          <div className="grid gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
             <Button
-              className="w-full"
+              className="h-auto min-w-0 whitespace-normal"
               size="sm"
               variant="secondary"
               onClick={() => setDeleteConfirmation(null)}
@@ -242,7 +242,7 @@ export function ProjectContextProfileManager({
             </Button>
             <Button
               aria-label="Confirm Delete Context Profile"
-              className="w-full"
+              className="h-auto min-w-0 whitespace-normal"
               size="sm"
               onClick={() => void confirmDelete()}
             >

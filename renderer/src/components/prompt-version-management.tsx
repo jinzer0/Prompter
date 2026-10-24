@@ -90,10 +90,14 @@ export function PromptVersionManagement({
   }
 
   return (
-    <Card data-insights-target="prompt-version" tabIndex={-1} className="flex flex-1 flex-col">
-      <CardHeader>
-        <div className="flex items-center justify-between gap-3">
-          <CardTitle>버전 관리</CardTitle>
+    <Card
+      data-insights-target="prompt-version"
+      tabIndex={-1}
+      className="mx-auto flex w-full min-w-0 max-w-[740px] flex-1 flex-col gap-6 border-0 bg-transparent text-[14px] [overflow-wrap:anywhere]"
+    >
+      <CardHeader className="p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-[17px]">버전 관리</CardTitle>
           {currentVersion !== null && (
             <Badge variant="accent">v{currentVersion.versionNumber}</Badge>
           )}
@@ -102,8 +106,11 @@ export function PromptVersionManagement({
           {scenarioLabel(selectedAsset.scenario)} · {targetAgentLabel(selectedAsset.targetAgent)}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-4">
-        <section className="space-y-3" aria-labelledby="version-history-heading">
+      <CardContent className="flex min-w-0 flex-1 flex-col gap-6 p-0">
+        <section
+          className="space-y-3 rounded-card bg-panel p-4"
+          aria-labelledby="version-history-heading"
+        >
           <h3 id="version-history-heading" className="text-[14px] font-semibold text-foreground">
             Version history
           </h3>
@@ -114,6 +121,7 @@ export function PromptVersionManagement({
                   type="button"
                   variant={selectedVersion?.id === version.id ? "secondary" : "ghost"}
                   size="sm"
+                  className="min-w-0 whitespace-normal text-[14px]"
                   onClick={() => selectVersion(version.id)}
                 >
                   {versionLabel(version)}
@@ -124,11 +132,12 @@ export function PromptVersionManagement({
           </ul>
         </section>
 
-        <Tabs defaultValue="version">
+        <Tabs defaultValue="version" className="min-w-0">
           <TabsList aria-label="Prompt version sections">
             <TabsTrigger
               active={activeTab === "version"}
               value="version"
+              className="min-w-0 whitespace-normal text-[14px]"
               onClick={() => setActiveTab("version")}
             >
               Selected version
@@ -136,6 +145,7 @@ export function PromptVersionManagement({
             <TabsTrigger
               active={activeTab === "compare"}
               value="compare"
+              className="min-w-0 whitespace-normal text-[14px]"
               onClick={() => setActiveTab("compare")}
             >
               Version compare
@@ -143,9 +153,9 @@ export function PromptVersionManagement({
           </TabsList>
 
           {activeTab === "version" && (
-            <TabsContent value="version" className="space-y-4">
+            <TabsContent value="version" className="min-w-0 space-y-5 rounded-card bg-panel p-4">
               {selectedVersion === null ? (
-                <p className="text-[12px] text-muted">No version is available for this prompt.</p>
+                <p className="text-[14px] text-muted">No version is available for this prompt.</p>
               ) : (
                 <PromptVersionDetail
                   currentMessage={currentMessage}

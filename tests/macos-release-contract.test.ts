@@ -20,7 +20,7 @@ describe("Electron shell contract", () => {
 
     expect(packageJson.scripts?.["package"]).toBe("npm run build && node scripts/package-macos.mjs")
     expect(packageJson.scripts?.["make"]).toBe("npm run package")
-    expect(packageJson.version).toBe("0.1.2")
+    expect(packageJson.version).toBe("0.1.3")
     expect(packageJson.scripts?.["package:release:macos"]).toBe(
       "node scripts/macos/release-version-preflight.mjs && npm run build && node scripts/release-macos.mjs",
     )

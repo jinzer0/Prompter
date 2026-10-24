@@ -1,8 +1,10 @@
 # macOS 서명 릴리스 안내
 
-이 안내는 Issue #35의 Prompter v0.1.2 ARM64 macOS 릴리스 경로를 설명하는 메인테이너 문서다.
-Issue #6에서 추가한 서명 경로를 0.1.2에 맞췄으며, 별도 실행·공개 승인 후 실제 서명·공증·게시와
-공개 다운로드 checksum 검증을 완료했다. 공개 최신 배포본과 README 설치 링크는 v0.1.2다.
+이 안내는 새 UI를 포함한 Prompter v0.1.3 ARM64 macOS 릴리스 준비를 위한 메인테이너 문서다.
+v0.1.3은 아직 게시되지 않았으며 공개 최신 배포본과 README 설치 링크는 v0.1.2를 유지한다.
+이번 릴리스의 commit·push·배포는 명시적으로 승인되었으며 아래 검증을 통과한 후보만 게시한다.
+과거 Issue #35에서는 Issue #6에서 추가한 서명 경로를 0.1.2에 맞추고, 별도 실행·공개 승인 후
+실제 서명·공증·게시와 공개 다운로드 checksum 검증을 완료했다. 이는 v0.1.3의 완료 증거가 아니다.
 이 경로는 GitHub Release 게시, 태그 생성·이동, asset 업로드, 공개 설치 안내 변경을 수행하지 않는다.
 
 ## 릴리스 경계
@@ -16,7 +18,7 @@ Prompter에는 두 가지 macOS 패키징 경로가 있다.
   실행하고 빌드한 뒤 `scripts/release-macos.mjs`를 통해 signed 릴리스 coordinator를 실행한다.
 
 signed 경로는 빌드, native rebuild, 번들링, Apple 사전 점검, 후보 생성, evidence 기록 전에
-정확한 버전 `0.1.2`를 요구하며 ARM64만 지원한다. coordinator는 버전별 후보 디렉터리가 없는지
+정확한 버전 `0.1.3`을 요구하며 ARM64만 지원한다. coordinator는 버전별 후보 디렉터리가 없는지
 확인하고, 현재 플랫폼·아키텍처, 깨끗한 Git worktree, 선택한 Xcode, 서명 identity, 잠금 해제된
 Keychain, notary profile, Apple notary 연결을 사전 점검한 뒤에만 후보를 예약하거나 변경한다.
 환경에서는 다음 두 비밀값이 아닌 변수 이름을 통해서만 설정을 읽는다.
@@ -75,8 +77,8 @@ API 키 파일 경로, 원시 개인 키 내용, 임의 인증 플래그는 받�
 
 ## 서명 릴리스 명령
 
-필수 변수가 이미 셸에 설정된 깨끗한 ARM64 macOS worktree에서만, 해당 단계 승인 후 실행한다.
-Issue #35 Stage 1은 준비 계약 정합화이며 실제 Apple 서명·공증 실행은 Stage 3 승인 범위다.
+필수 변수가 이미 셸에 설정된 깨끗한 ARM64 macOS worktree에서만 사전 점검 후 실행한다.
+현재 승인된 v0.1.3 릴리스 범위에서 실행하며 Issue #35의 과거 단계 승인을 새 조건으로 요구하지 않는다.
 
 ```bash
 npm run package:release:macos
@@ -105,8 +107,8 @@ coordinator는 서로 다른 두 artifact를 Apple에 제출한다.
 앱과 DMG는 각각 `Accepted` 상태와 경고·오류 없는 검토된 notary log가 있어야 다음 단계로 간다.
 각 제출 gate는 `Accepted`와 빈 issues 배열 또는 정확히 소문자 `info`인 issue 레코드만 허용한다.
 
-Evidence는 ignored 로컬 경로 `.omo/evidence/release-macos/v0.1.2/app`과
-`.omo/evidence/release-macos/v0.1.2/dmg` 아래에 보관한다. 복구 중 artifact bytes, 활성 notary log,
+Evidence는 ignored 로컬 경로 `.omo/evidence/release-macos/v0.1.3/app`과
+`.omo/evidence/release-macos/v0.1.3/dmg` 아래에 보관한다. 복구 중 artifact bytes, 활성 notary log,
 resume record, submit claim 파일은 일시 상태이며 성공 후 제거한다. 각 종류별 root에는 정확히
 `submissionId`, `status: "Accepted"`, `artifactKind`, `artifactSha256`, 경고·오류 없는 `issues`를
 담은 감사 receipt `notarization-final.json`만 남긴다. 최종 receipt는 재개 상태가 아니며,
@@ -122,10 +124,10 @@ issues에 경고·오류가 없어야 staple 또는 패키징을 계속한다.
 
 ## 최종 artifact 계약
 
-최종 후보 디렉터리는 `release/v0.1.2/`이며 성공하면 정확히 다음 파일만 포함할 수 있다.
+최종 후보 디렉터리는 `release/v0.1.3/`이며 성공하면 정확히 다음 파일만 포함할 수 있다.
 
-- `Prompter-0.1.2-mac-arm64.zip`
-- `Prompter-0.1.2-mac-arm64.dmg`
+- `Prompter-0.1.3-mac-arm64.zip`
+- `Prompter-0.1.3-mac-arm64.dmg`
 - `SHA256SUMS`
 
 최종 ZIP은 앱의 staple과 검증이 끝난 뒤에만 만든다. 깨끗한 임시 디렉터리에 추출하고 포함된
@@ -133,7 +135,7 @@ issues에 경고·오류가 없어야 staple 또는 패키징을 계속한다.
 읽기 전용으로 mount하여 `Prompter.app`이 있는지 확인한다. ZIP·DMG 검증이 모두 통과한 뒤
 `SHA256SUMS`를 마지막으로 기록한다.
 
-`release/v0.1.2/`에 다른 파일을 추가하지 않는다. signed 명령 시작 전에 후보 디렉터리가 없어야
+`release/v0.1.3/`에 다른 파일을 추가하지 않는다. signed 명령 시작 전에 후보 디렉터리가 없어야
 한다. 이미 존재하거나 실행 후 예상 밖 파일이 있으면 소유자를 파악하고 다른 작업에서 필요하지
 않다는 사실을 확인한 뒤에만 제거한다.
 
@@ -142,10 +144,11 @@ issues에 경고·오류가 없어야 staple 또는 패키징을 계속한다.
 Issue #6의 서명 경로 준비와 Issue #7의 실제 배포는 과거 v0.1.1 작업의 경계다. 현재 공개 배포본은
 v0.1.2이며, 과거 이슈가 아직 완료되지 않았다는 안내나 v0.1.0 unsigned 설치 안내를 적용하지 않는다.
 
-현재 Issue #35에서는 Stage 1 준비, Stage 2 전체 회귀·source 고정, Stage 3 실제 서명·공증·설치
-확인, Stage 4 공개 게시를 구분한다. signed 명령 성공만으로 게시 승인이 생기지 않는다.
-최종 asset 검토, GitHub Release 생성, 태그 생성, 업로드, 공개 README 설치 안내 변경은 Stage 4의
-별도 승인 후에만 수행한다. Issue #35에서는 Stage 4 공개 승인 후 v0.1.2를 게시했다.
+현재 v0.1.3의 공개 게시는 이미 승인된 릴리스 범위에서 수행하되 signed 명령 성공만으로
+모든 검증이 끝났다고 간주하지 않는다. 최종 asset 검토와 QA·checksum 검증을 통과한 뒤에만
+GitHub Release 생성, 새 태그 생성, 업로드, 공개 README 설치 안내 변경을 수행한다.
+Issue #35에서는 Stage 1 준비, Stage 2 전체 회귀·source 고정, Stage 3 실제 서명·공증·설치
+확인, Stage 4 공개 게시를 구분했으며 Stage 4 공개 승인 후 v0.1.2를 게시했다.
 tag source는 `55fc76292693c5c6af72df61f9878611d6dfb135`이며 이후 보고/안내 커밋과 구분한다.
 기존 공개 후보를 재빌드·교체하거나 태그를 재작성하지 않는다. 실제 결과는
 [Stage 4 보고](../mydocs/working/task_m012_35_stage4.md)에 기록했다.
@@ -157,9 +160,9 @@ tag source는 `55fc76292693c5c6af72df61f9878611d6dfb135`이며 이후 보고/안
 
 signed 명령 실행 전:
 
-- 해당 실행 단계 승인을 확인한다.
+- 현재 v0.1.3 릴리스의 승인된 실행 범위를 확인한다.
 - `git status --short`가 비어 있는지 확인한다.
-- `release/v0.1.2/`가 없는지 확인한다. 빈 버전별 후보 디렉터리도 사용할 수 없다.
+- `release/v0.1.3/`가 없는지 확인한다. 빈 버전별 후보 디렉터리도 사용할 수 없다.
 - 전체 Xcode가 선택되었고 `xcodebuild -version`이 Xcode를 보고하는지 확인한다.
 - 정확히 하나의 준비된 Developer ID Application identity와 대응하는 개인 키가 Keychain에서
   사용 가능한지 확인한다.
@@ -167,5 +170,5 @@ signed 명령 실행 전:
 - Apple notary 서비스로 연결할 수 있는지 확인한다.
 - signed 경로가 릴리스 게시, 태그, 업로드 명령을 실행하지 않는지 확인한다.
 
-명령 성공 후 `docs/qa-checklist.md`의 signed 릴리스 항목을 점검한다. 모든 점검 통과와
-Issue #35 Stage 4의 명시적 공개 승인 전에는 아무것도 게시하지 않는다.
+명령 성공 후 `docs/qa-checklist.md`의 signed 릴리스 항목을 점검한다. 모든 점검을 통과하기
+전에는 아무것도 게시하지 않는다. 게시 성공 전까지 공개 최신 배포본은 v0.1.2로 안내한다.

@@ -44,3 +44,6 @@ pnpm-debug.log*
 .codegraph/
 .codegraph
 .omo/
+_bmad-output/
+__pycache__/
+*.pyc

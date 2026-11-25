@@ -178,19 +178,19 @@ test("verification rejects a second native candidate before verify calls with di
 
 test.each([
   ["extra", (paths) => mkdir(runtimeRoot(paths, "pure-js-package"))],
-  ["missing", (paths) => rm(runtimeRoot(paths, "bindings"), { recursive: true })],
+  ["missing", (paths) => rm(runtimeRoot(paths, "better-sqlite3"), { recursive: true })],
   [
     "non-directory",
     async (paths) => {
-      await rm(runtimeRoot(paths, "bindings"), { recursive: true })
-      await writeFile(runtimeRoot(paths, "bindings"), "not a package root")
+      await rm(runtimeRoot(paths, "better-sqlite3"), { recursive: true })
+      await writeFile(runtimeRoot(paths, "better-sqlite3"), "not a package root")
     },
   ],
   [
     "symlink",
     async (paths) => {
-      await rm(runtimeRoot(paths, "bindings"), { recursive: true })
-      await symlink("better-sqlite3", runtimeRoot(paths, "bindings"))
+      await rm(runtimeRoot(paths, "better-sqlite3"), { recursive: true })
+      await symlink("absent-package", runtimeRoot(paths, "better-sqlite3"))
     },
   ],
 ])("rejects an %s runtime package-root closure before mutable signing", async (_kind, mutate) => {

@@ -108,13 +108,7 @@ export async function createElectronSigningFixture({
       await rm(targetPaths[target.path], { recursive: true, force: true })
   }
   await writeFile(entitlements, expectedEntitlements)
-  await Promise.all(
-    ["bindings", "file-uri-to-path"].map((name) =>
-      mkdir(join(appPath, "Contents", "Resources", "app", "node_modules", name), {
-        recursive: true,
-      }),
-    ),
-  )
+
   await Promise.all(extraExecutablePaths.map((path) => executable(fixturePath(appPath, path))))
   for (const relativePath of extraMachOPaths) {
     const path = fixturePath(appPath, relativePath)

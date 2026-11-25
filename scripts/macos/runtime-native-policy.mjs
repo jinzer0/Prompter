@@ -1,7 +1,8 @@
 import { lstat, open, readdir } from "node:fs/promises"
 import { extname, isAbsolute, join, relative, sep } from "node:path"
 
-export const runtimePackageRoots = ["better-sqlite3", "bindings", "file-uri-to-path"]
+// better-sqlite3 13 loads its N-API addon directly; legacy loader packages are not runtime inputs.
+export const runtimePackageRoots = ["better-sqlite3"]
 export const allowedRuntimeNativePath = join(
   "better-sqlite3",
   "build",
@@ -10,7 +11,8 @@ export const allowedRuntimeNativePath = join(
 )
 
 const runtimeNodeModulesPath = join("Contents", "Resources", "app", "node_modules")
-const machOMagic = new Set([
+const nativeMagic = new Set([
+  "7f454c46", // ELF payloads must not enter the macOS runtime either.
   "bebafeca",
   "bfbafeca",
   "cafebabe",
@@ -73,7 +75,10 @@ export async function shouldStageRuntimePackagePath({
   try {
     const bytes = Buffer.alloc(4)
     const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0)
-    return bytesRead !== bytes.length || !machOMagic.has(bytes.toString("hex"))
+    const portableExecutable = bytesRead >= 2 && bytes.subarray(0, 2).toString("ascii") === "MZ"
+    return (
+      !portableExecutable && (bytesRead !== bytes.length || !nativeMagic.has(bytes.toString("hex")))
+    )
   } finally {
     await handle.close()
   }

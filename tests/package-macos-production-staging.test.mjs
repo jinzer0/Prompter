@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { execFile } from "node:child_process"
 import { access, cp, mkdir, realpath, symlink, writeFile } from "node:fs/promises"
+import { createRequire } from "node:module"
 import { dirname, join, relative, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { promisify } from "node:util"
@@ -20,7 +21,7 @@ const executeFile = promisify(execFile)
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
 const temporaryDirectories = createTemporaryDirectoryTracker()
 const allowedCommands = new Set(["/usr/bin/file", "/usr/bin/lipo"])
-const runtimePackageRoots = ["better-sqlite3", "bindings", "file-uri-to-path"]
+const runtimePackageRoots = ["better-sqlite3"]
 const foreignNativePayloads = [
   "foreign.node",
   "foreign.dylib",
@@ -78,8 +79,6 @@ test("assembleMacOSApp stages only the runtime native dependency allowlist", asy
   for (const path of [
     "better-sqlite3",
     "better-sqlite3/lib/index.js",
-    "bindings",
-    "file-uri-to-path",
     "better-sqlite3/build/Release/better_sqlite3.node",
   ])
     await access(join(stagedModules, path))
@@ -88,6 +87,8 @@ test("assembleMacOSApp stages only the runtime native dependency allowlist", asy
   ])
   for (const path of [
     ".bin",
+    "bindings",
+    "file-uri-to-path",
     "better-sqlite3/build/Release/test_extension.node",
     "better-sqlite3/build/Release/foreign.NoDe",
     "better-sqlite3/build/Release/sqlite3.a",
@@ -95,6 +96,42 @@ test("assembleMacOSApp stages only the runtime native dependency allowlist", asy
     "vite",
   ])
     await assert.rejects(access(join(stagedModules, path)))
+})
+
+test("loads patched SQLite from the staged package without legacy loader dependencies", async () => {
+  const electron = temporaryDirectories.track(await createElectronAppFixture())
+  const output = temporaryDirectories.track(await createPackageFixture())
+  const sourceRoot = join(output.outputDirectory, "patched-sqlite-source")
+  await Promise.all([
+    ...["dist", "dist-electron", "drizzle", "node_modules"].map((name) =>
+      mkdir(join(sourceRoot, name), { recursive: true }),
+    ),
+    cp(join(repositoryRoot, "package.json"), join(sourceRoot, "package.json")),
+  ])
+  await cp(
+    join(repositoryRoot, "node_modules", "better-sqlite3"),
+    join(sourceRoot, "node_modules", "better-sqlite3"),
+    { recursive: true },
+  )
+  await assembleMacOSApp({
+    appPath: output.appPath,
+    electronAppPath: electron.appPath,
+    packageJsonPath: join(sourceRoot, "package.json"),
+    sourceRoot,
+  })
+  const resources = join(output.appPath, "Contents", "Resources", "app")
+  const require = createRequire(join(resources, "package.json"))
+  const Database = require("better-sqlite3")
+  const database = new Database(":memory:")
+  try {
+    const { version } = database.prepare("select sqlite_version() as version").get()
+    const [major, minor] = version.split(".").map(Number)
+    assert.equal(major > 3 || (major === 3 && minor >= 54), true)
+  } finally {
+    database.close()
+  }
+  await assert.rejects(access(join(resources, "node_modules", "bindings")))
+  await assert.rejects(access(join(resources, "node_modules", "file-uri-to-path")))
 })
 
 test("production staging contains only the SQLite native addon for read-only discovery", async () => {
@@ -117,7 +154,7 @@ test("production staging contains only the SQLite native addon for read-only dis
     mkdir(join(sourceRoot, "dist-electron")),
     mkdir(join(sourceRoot, "node_modules")),
     cp(join(repositoryRoot, "drizzle"), join(sourceRoot, "drizzle"), { recursive: true }),
-    ...["better-sqlite3", "bindings", "file-uri-to-path"].map((packageName) =>
+    ...["better-sqlite3"].map((packageName) =>
       cp(
         join(repositoryRoot, "node_modules", packageName),
         join(sourceRoot, "node_modules", packageName),

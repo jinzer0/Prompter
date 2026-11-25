@@ -1,6 +1,6 @@
 {
   "name": "prompter",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "type": "module",
   "main": "dist-electron/main.cjs",
@@ -10,8 +10,8 @@
     "build:electron": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --outdir=dist-electron --out-extension:.js=.cjs --external:electron --external:better-sqlite3 --sourcemap",
     "db:generate": "drizzle-kit generate",
     "electron:install": "node node_modules/electron/install.js",
-    "native:electron": "npm run electron:install && electron_version=$(node -p \"require('electron/package.json').version\") && cd node_modules/better-sqlite3 && ../../node_modules/.bin/node-gyp rebuild --release --runtime=electron --target=\"$electron_version\" --dist-url=https://electronjs.org/headers --build-from-source",
-    "native:node": "cd node_modules/better-sqlite3 && ../../node_modules/.bin/node-gyp rebuild --release",
+    "native:electron": "npm run electron:install && electron_version=$(node -p \"require('electron/package.json').version\") && cd node_modules/better-sqlite3 && ../../node_modules/.bin/node-gyp rebuild --release --runtime=electron --target=\"$electron_version\" --dist-url=https://electronjs.org/headers --build-from-source --force_build=1",
+    "native:node": "cd node_modules/better-sqlite3 && ../../node_modules/.bin/node-gyp rebuild --release --force_build=1",
     "lint": "biome check .",
     "typecheck": "tsc -p tsconfig.electron.json --noEmit && tsc -p tsconfig.renderer.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "npm run electron:install && npm run native:node && vitest run",
@@ -21,7 +21,7 @@
     "package:release:macos": "node scripts/macos/release-version-preflight.mjs && npm run build && node scripts/release-macos.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
@@ -43,7 +43,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "concurrently": "^10.0.6",
     "cross-env": "^10.1.0",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "^0.31.11",
     "electron": "^43.8.1",
     "esbuild": "^0.28.1",
     "tailwindcss": "^4.3.2",
@@ -53,11 +53,16 @@
     "wait-on": "^9.0.10"
   },
   "allowScripts": {
-    "better-sqlite3@12.11.1": true
+    "better-sqlite3@13.2.0": true
   },
   "overrides": {
     "concurrently": {
       "shell-quote": "^1.12.0"
-    }
+    },
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.28.2"
+    },
+    "joi": "^18.3.1",
+    "tar@7": "^7.5.21"
   }
 }
